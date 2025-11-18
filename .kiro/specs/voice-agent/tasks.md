@@ -1,6 +1,6 @@
 # Voice Agent Service - Implementation Plan (Simplified MVP)
 
-- [ ] 1. Set up project structure and core dependencies
+- [x] 1. Set up project structure and core dependencies
   - Create `apps/voice-agent/` directory with Python package structure
   - Set up `requirements.txt` with core dependencies (livekit-agents, openai, asyncpg, psycopg, pydantic)
   - Configure `pyproject.toml` for project metadata
