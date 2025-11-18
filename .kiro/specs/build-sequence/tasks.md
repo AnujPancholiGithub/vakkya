@@ -232,8 +232,12 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - All 7 config tests passing
   - _Requirements: 12.4_
 
-- [ ] 2.2 Implement data models (Voice Agent spec task 2)
+- [x] 2.2 Implement data models (Voice Agent spec task 2)
   - **Execute:** Voice Agent spec task 2 (all subtasks 2.1)
+  - Status: ✅ Complete
+  - Created models.py with dataclasses (Session, PageContext, Turn, Context, DocumentChunk)
+  - Created Pydantic validation models (PageContextInput, DataChannelMessage, TurnInput, SessionInput)
+  - All 30 tests passing (7 config + 23 model tests)
   - _Requirements: 2.1, 11.1_
 
 - [ ] 2.3 Implement STT handler (Voice Agent spec task 3)

@@ -9,12 +9,12 @@
   - Implement basic environment variable validation on startup
   - _Requirements: 12.4_
 
-- [ ] 2. Implement core data models
+- [x] 2. Implement core data models
   - Create `models.py` with simple dataclasses for Session, PageContext, Turn, Context
   - Add basic Pydantic models for input validation
   - _Requirements: 2.1, 11.1_
 
-- [ ] 2.1 Write basic tests for data models
+- [x] 2.1 Write basic tests for data models
   - Test validation rules
   - Test basic serialization
   - _Requirements: 2.1, 11.1_
