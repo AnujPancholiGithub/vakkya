@@ -137,13 +137,13 @@
   - Test error handling
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.5, 4.6_
 
-- [ ] 10. Implement document API routes
-- [ ] 10.1 Create Zod schemas for document endpoints
+- [x] 10. Implement document API routes
+- [x] 10.1 Create Zod schemas for document endpoints
   - DocumentIdParamSchema
   - ProjectIdParamSchema
   - _Requirements: 10.1_
 
-- [ ] 10.2 Create document routes
+- [x] 10.2 Create document routes
   - POST /projects/:projectId/documents - Upload document
   - GET /projects/:projectId/documents - List documents
   - GET /projects/:projectId/documents/:id - Get document details
@@ -151,7 +151,7 @@
   - All routes require authentication and ownership check
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 10.3 Write basic API tests for document routes
+- [x] 10.3 Write basic API tests for document routes
   - Test upload with multipart form data
   - Test file validation
   - Test processing flow

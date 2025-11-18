@@ -103,7 +103,16 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - All 86 tests passing
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 1.8 Implement document API routes (API spec task 10)
+- [x] 1.8 Implement document API routes (API spec task 10)
+  - **Execute:** API spec task 10 (all subtasks 10.1-10.3)
+  - Status: ✅ Complete
+  - Created document routes with multipart file upload
+  - POST /projects/:projectId/documents - Upload document
+  - GET /projects/:projectId/documents - List documents
+  - GET /projects/:projectId/documents/:id - Get document details
+  - DELETE /projects/:projectId/documents/:id - Delete document
+  - All 98 tests passing
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
   - **Execute:** API spec task 10 (all subtasks 10.1-10.3)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 

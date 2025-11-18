@@ -88,5 +88,9 @@ export async function createApp(env: Env, logger: Logger) {
   const { projectRoutes } = await import('./routes/projects.js');
   await projectRoutes(app, env);
 
+  // Register document routes
+  const { documentRoutes } = await import('./routes/documents.js');
+  await documentRoutes(app, env);
+
   return app;
 }
