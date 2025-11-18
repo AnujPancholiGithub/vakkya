@@ -10,6 +10,7 @@ import { chunkText } from './text-chunker.js';
 import { generateEmbeddings } from './embedding.js';
 import { storeVectors, deleteDocumentChunks } from './vector-storage.js';
 import { getFileType } from '../lib/document-validation.js';
+import { DocumentNotFoundError } from '../lib/errors.js';
 import type { AllowedFileType } from '../lib/document-validation.js';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || '/tmp/vakkya-uploads';
@@ -207,7 +208,7 @@ export async function deleteDocument(projectId: string, documentId: string): Pro
   });
 
   if (!document) {
-    throw new Error('Document not found');
+    throw new DocumentNotFoundError('Document not found');
   }
 
   try {

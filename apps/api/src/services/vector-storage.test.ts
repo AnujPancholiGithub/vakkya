@@ -76,7 +76,7 @@ describe('Vector Storage Service', () => {
     });
 
     it('should handle empty chunks array', async () => {
-      await expect(storeVectors(testProjectId, testDocumentId, [])).resolves.not.toThrow();
+      await expect(storeVectors(testProjectId, testDocumentId, [])).resolves.toBeUndefined();
     });
   });
 

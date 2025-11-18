@@ -8,6 +8,7 @@ import {
   deleteDocument,
 } from '../services/document.service.js';
 import { validateDocument, getFileType } from '../lib/document-validation.js';
+import { DocumentNotFoundError } from '../lib/errors.js';
 import type { Env } from '../config/env.js';
 import type { MultipartFile } from '@fastify/multipart';
 
@@ -258,11 +259,11 @@ export async function documentRoutes(app: FastifyInstance, env: Env) {
           });
         }
 
-        if (error instanceof Error && error.message.includes('not found')) {
+        if (error instanceof DocumentNotFoundError) {
           return reply.code(404).send({
             error: {
               code: 'DOCUMENT_NOT_FOUND',
-              message: 'Document not found',
+              message: error.message,
             },
           });
         }
