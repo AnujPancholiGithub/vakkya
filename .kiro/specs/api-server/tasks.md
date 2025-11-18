@@ -160,15 +160,15 @@
 - [x] 11. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 12. Implement conversation service
-- [ ] 12.1 Create simple conversation service
+- [x] 12. Implement conversation service
+- [x] 12.1 Create simple conversation service
   - Implement create conversation
   - Implement add turn (append to conversation)
   - Implement list (no pagination for MVP)
   - Implement get conversation with all turns
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 12.2 Write basic tests for conversation service
+- [x] 12.2 Write basic tests for conversation service
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
