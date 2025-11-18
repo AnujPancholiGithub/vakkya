@@ -35,5 +35,4 @@ Thumbs.db
 # Turbo
 .turbo/
 
-# Prisma
-prisma/migrations/
+
