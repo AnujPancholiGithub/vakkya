@@ -124,21 +124,30 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 - [x] 1.10 Implement conversation service (API spec task 12)
   - **Execute:** API spec task 12 (all subtasks 12.1-12.2)
-  - Status: ✅ Complete
+  - Status: ✅ Complete + Quality Improvements Applied
   - Created conversation service with CRUD operations
   - Implemented turn appending with atomic turnCount increment
-  - All 107 tests passing (9 new conversation tests)
+  - **Quality Fixes (2025-11-18):**
+    - Fixed transaction race condition in addTurn()
+    - Added getWithOwnership() for single-query ownership validation
+    - Added input sanitization and max length validation
+    - Fixed test cleanup order
+  - All 149 tests passing (14 conversation tests including 3 new ownership tests)
   - _Requirements: 5.1, 5.2, 5.3_
 
 - [x] 1.11 Implement conversation API routes (API spec task 13)
   - **Execute:** API spec task 13 (all subtasks 13.1-13.3)
-  - Status: ✅ Complete
+  - Status: ✅ Complete + Security Improvements Applied
   - Created conversation REST endpoints with widget token validation
   - POST /conversations - Create conversation (voice agent)
   - POST /conversations/:id/turns - Add turn (voice agent)
   - GET /projects/:projectId/conversations - List conversations (dashboard)
   - GET /conversations/:id - Get conversation detail (dashboard)
-  - All 117 tests passing (8 new conversation route tests)
+  - **Security Fixes (2025-11-18):**
+    - Fixed N+1 query vulnerability (eliminated DoS vector)
+    - Added input length validation to prevent memory exhaustion
+    - Single-query ownership validation with JOIN
+  - All 149 tests passing (8 conversation route tests)
   - _Requirements: 5.1, 5.2, 5.3_
 
 - [x] 1.12 Implement widget token validation endpoint (API spec task 14)

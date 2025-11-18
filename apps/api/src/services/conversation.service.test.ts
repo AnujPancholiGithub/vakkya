@@ -32,17 +32,34 @@ describe('ConversationService', () => {
 
   // Clean up test data after each test
   afterEach(async () => {
-    await prisma.conversation.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    // Delete in correct order to avoid foreign key violations
+    if (testProjectId) {
+      // Delete conversation turns first
+      await prisma.conversationTurn.deleteMany({
+        where: {
+          conversation: {
+            projectId: testProjectId,
+          },
+        },
+      });
 
-    await prisma.project.deleteMany({
-      where: { userId: testUserId },
-    });
+      // Then delete conversations
+      await prisma.conversation.deleteMany({
+        where: { projectId: testProjectId },
+      });
 
-    await prisma.user.deleteMany({
-      where: { email: testUserEmail },
-    });
+      // Then delete project
+      await prisma.project.deleteMany({
+        where: { id: testProjectId },
+      });
+    }
+
+    // Finally delete user
+    if (testUserId) {
+      await prisma.user.deleteMany({
+        where: { id: testUserId },
+      });
+    }
   });
 
   describe('Conversation Creation', () => {
@@ -265,6 +282,52 @@ describe('ConversationService', () => {
       await expect(
         conversationService.get(conversation.id, 'wrong-project-id')
       ).rejects.toThrow('Conversation not found or access denied');
+    });
+  });
+
+  describe('Ownership Validation', () => {
+    it('should get conversation with valid userId ownership', async () => {
+      const conversation = await conversationService.create({
+        projectId: testProjectId,
+        sessionId: 'session-ownership',
+      });
+
+      await conversationService.addTurn(conversation.id, {
+        userQuery: 'Test query',
+        agentResponse: 'Test response',
+      });
+
+      const result = await conversationService.getWithOwnership(
+        conversation.id,
+        testUserId
+      );
+
+      expect(result).toBeDefined();
+      expect(result!.id).toBe(conversation.id);
+      expect(result!.turns).toHaveLength(1);
+    });
+
+    it('should return null for conversation owned by different user', async () => {
+      const conversation = await conversationService.create({
+        projectId: testProjectId,
+        sessionId: 'session-wrong-owner',
+      });
+
+      const result = await conversationService.getWithOwnership(
+        conversation.id,
+        'wrong-user-id'
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for non-existent conversation', async () => {
+      const result = await conversationService.getWithOwnership(
+        'non-existent-id',
+        testUserId
+      );
+
+      expect(result).toBeNull();
     });
   });
 });

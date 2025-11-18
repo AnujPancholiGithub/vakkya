@@ -166,23 +166,39 @@
   - Implement add turn (append to conversation)
   - Implement list (no pagination for MVP)
   - Implement get conversation with all turns
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed transaction race condition in addTurn()
+    - Added getWithOwnership() method for single-query ownership validation
+    - Added input sanitization (trim, max length validation)
+    - See CODE_QUALITY_FIXES.md for details
   - _Requirements: 5.1, 5.2, 5.3_
 
 - [x] 12.2 Write basic tests for conversation service
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed test cleanup order to prevent foreign key violations
+    - Added 3 new ownership validation tests
+    - All 149 tests passing
   - _Requirements: 5.1, 5.2, 5.3_
 
 - [x] 13. Implement conversation API routes
 - [x] 13.1 Create Zod schemas for conversation endpoints
   - ConversationTurnSchema
+  - **Quality Improvements Applied (2025-11-18):**
+    - Added max length validation (5000 chars userQuery, 10000 agentResponse)
+    - Added .trim() to prevent whitespace-only inputs
   - _Requirements: 10.1_
 
 - [x] 13.2 Create conversation routes
   - GET /projects/:projectId/conversations - List conversations
   - GET /conversations/:id - Get conversation detail
   - POST /conversations - Create conversation (called by voice agent)
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed N+1 query vulnerability in GET /conversations/:id
+    - Now uses single query with JOIN for ownership validation
+    - Eliminated potential DoS vector
   - POST /conversations/:id/turns - Add turn (called by voice agent)
   - Dashboard routes require authentication, voice agent routes require token validation
   - _Requirements: 5.1, 5.2, 5.3_

@@ -55,11 +55,23 @@ describe('Conversation API Routes', () => {
   });
 
   afterEach(async () => {
-    // Clean up test data
+    // Clean up test data in correct order
     if (projectId) {
+      // Delete conversation turns first
+      await prisma.conversationTurn.deleteMany({
+        where: {
+          conversation: {
+            projectId,
+          },
+        },
+      });
+
+      // Then delete conversations
       await prisma.conversation.deleteMany({
         where: { projectId },
       });
+
+      // Then delete project
       await prisma.project.delete({
         where: { id: projectId },
       });

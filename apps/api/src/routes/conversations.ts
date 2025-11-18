@@ -13,8 +13,8 @@ const CreateConversationSchema = z.object({
 });
 
 const AddTurnSchema = z.object({
-  userQuery: z.string().min(1),
-  agentResponse: z.string().min(1),
+  userQuery: z.string().min(1).max(5000).trim(),
+  agentResponse: z.string().min(1).max(10000).trim(),
   widgetToken: z.string().length(64), // For voice agent authentication
 });
 
@@ -221,20 +221,11 @@ export async function conversationRoutes(app: FastifyInstance, env: Env) {
       const params = ConversationIdParamSchema.parse(request.params);
       const userId = request.user!.id;
 
-      // Get user's projects to find which one owns this conversation
-      const userProjects = await projectService.list(userId);
-      const projectIds = userProjects.map((p) => p.id);
-
-      // Try to get conversation from one of user's projects
-      let conversation = null;
-      for (const projectId of projectIds) {
-        try {
-          conversation = await conversationService.get(params.id, projectId);
-          break; // Found it
-        } catch {
-          // Not in this project, continue
-        }
-      }
+      // Get conversation with ownership validation in a single query
+      const conversation = await conversationService.getWithOwnership(
+        params.id,
+        userId
+      );
 
       if (!conversation) {
         reply.code(404).send({
