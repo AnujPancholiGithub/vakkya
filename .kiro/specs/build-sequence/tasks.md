@@ -78,17 +78,30 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - All tests passing (27 tests)
   - _Requirements: 4.1_
 
-- [ ] 1.5 Implement document validation (API spec task 7)
+- [x] 1.5 Implement document validation (API spec task 7)
   - **Execute:** API spec task 7 (all subtasks 7.1)
+  - Status: ✅ Complete
+  - Created document validation utilities with file type and size checks
+  - All 23 tests passing
   - _Requirements: 3.1, 3.5_
 
-- [ ] 1.6 Implement RAG processing service (API spec task 8)
+- [x] 1.6 Implement RAG processing service (API spec task 8)
   - **Execute:** API spec task 8 (all subtasks 8.1-8.5)
+  - Status: ✅ Complete
+  - Created document parser (PDF, TXT, MD)
+  - Created text chunking with LangChain (1000 chars, 200 overlap)
+  - Created embedding service with OpenAI (text-embedding-3-small)
+  - Created vector storage with pgvector
+  - All 76 tests passing
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 1.7 Implement document service (API spec task 9)
+- [x] 1.7 Implement document service (API spec task 9)
   - **Execute:** API spec task 9 (all subtasks 9.1-9.2)
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.5, 4.6, 4.7_
+  - Status: ✅ Complete
+  - Created document service orchestrating upload and processing
+  - Implemented synchronous processing pipeline
+  - All 86 tests passing
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
 - [ ] 1.8 Implement document API routes (API spec task 10)
   - **Execute:** API spec task 10 (all subtasks 10.1-10.3)

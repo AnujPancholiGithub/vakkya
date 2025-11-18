@@ -14,3 +14,6 @@ export function validateEnv(): Env {
     throw error;
   }
 }
+
+// Export validated environment variables
+export const env = validateEnv();

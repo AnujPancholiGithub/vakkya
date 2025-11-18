@@ -82,48 +82,48 @@
 - [x] 6. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Implement document validation utilities
-- [ ] 7.1 Create simple file type validation
+- [x] 7. Implement document validation utilities
+- [x] 7.1 Create simple file type validation
   - Check file extension for PDF, TXT, MD
   - Validate file size (10MB limit)
   - _Requirements: 3.1, 3.5_
 
-- [ ] 8. Implement RAG processing service with PostgreSQL
-- [ ] 8.1 Create document parser
+- [x] 8. Implement RAG processing service with PostgreSQL
+- [x] 8.1 Create document parser
   - Install pdf-parse for PDF parsing
   - Implement PDF parsing
   - Implement MD/TXT parsing (native)
   - Handle parsing errors
   - _Requirements: 4.1_
 
-- [ ] 8.2 Create text chunking service
+- [x] 8.2 Create text chunking service
   - Install LangChain text splitter
   - Configure RecursiveCharacterTextSplitter (1000 chars, 200 overlap)
   - Generate chunks with metadata
   - _Requirements: 4.2_
 
-- [ ] 8.3 Create embedding service
+- [x] 8.3 Create embedding service
   - Install OpenAI SDK
   - Implement batch embedding generation (100 chunks per call)
   - Use text-embedding-3-small model
   - Validate embedding dimensions (1536)
   - _Requirements: 4.3_
 
-- [ ] 8.4 Create vector storage service using PostgreSQL pgvector
+- [x] 8.4 Create vector storage service using PostgreSQL pgvector
   - Store embeddings in DocumentChunk table with vector column
   - Use projectId for filtering
   - Use documentId + chunkIndex as unique identifier
   - Implement similarity search using pgvector
   - _Requirements: 4.4_
 
-- [ ] 8.5 Write basic tests for RAG service
+- [x] 8.5 Write basic tests for RAG service
   - Test parser for PDF and TXT
   - Test chunking with overlap
   - Test embedding generation
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 9. Implement document service
-- [ ] 9.1 Create document service orchestrating upload and processing
+- [x] 9. Implement document service
+- [x] 9.1 Create document service orchestrating upload and processing
   - Implement upload flow: validate → store locally → create record
   - Implement synchronous processing: parse → chunk → embed → store in PostgreSQL
   - Update document status atomically (uploading → processing → completed)
@@ -131,7 +131,7 @@
   - Implement list, get, delete operations
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 9.2 Write basic tests for document service
+- [x] 9.2 Write basic tests for document service
   - Test upload flow
   - Test processing flow
   - Test error handling
