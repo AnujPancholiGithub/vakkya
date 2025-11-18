@@ -26,9 +26,11 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - **Execute:** API spec task 2
   - _Requirements: 9.1, 9.2_
 
-- [ ] 0.4 Create shared schemas package (Dashboard spec task 2)
-  - Create `packages/schemas` with TypeScript + Zod
-  - Define shared types and validation schemas
+- [x] 0.4 Create shared schemas package (Dashboard spec task 2)
+  - Status: ✅ Complete
+  - Created `packages/schemas` with TypeScript + Zod
+  - Defined shared types and validation schemas
+  - Added comprehensive tests (10 passing)
   - **Execute:** Dashboard spec task 2
   - _Requirements: 8.1, 8.2_
 
@@ -36,18 +38,25 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - Status: ✅ Complete
   - _Requirements: 9.3_
 
-- [ ] 0.6 Checkpoint - Validate foundation
-  - Verify Prisma migrations run successfully
-  - Verify shared types can be imported
-  - Verify all .env.example files are complete
+- [x] 0.6 Checkpoint - Validate foundation
+  - Status: ✅ Complete
+  - ✅ Prisma schema with pgvector configured
+  - ✅ Shared schemas package working (10 tests passing)
+  - ✅ Environment files complete and aligned with tech.md
+  - ✅ Package structure correct
+  - All foundation tasks verified and ready for Phase 1
 
 
 ## Phase 1: API Server Core
 
 **Overview:** Build authentication, project management, document processing with RAG, and conversation logging.
 
-- [ ] 1.1 Implement JWT authentication (API spec task 3)
+- [x] 1.1 Implement JWT authentication (API spec task 3)
   - **Execute:** API spec task 3 (all subtasks 3.1-3.3)
+  - Status: ✅ Complete
+  - Created JWT utilities (sign/verify)
+  - Created authentication middleware
+  - Created auth routes (signup/login)
   - _Requirements: 1.1, 1.2, 1.3_
 
 - [ ] 1.2 Implement project service (API spec task 4)

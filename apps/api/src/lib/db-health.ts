@@ -1,5 +1,4 @@
 import { prisma } from './prisma.js';
-import { logger } from '../config/logger.js';
 
 /**
  * Check database connection and pgvector extension
@@ -20,17 +19,12 @@ export async function checkDatabaseHealth(): Promise<{
 
     const pgvectorEnabled = result.length > 0;
 
-    if (!pgvectorEnabled) {
-      logger.warn('pgvector extension is not enabled');
-    }
-
     return {
       connected: true,
       pgvectorEnabled,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ error: errorMessage }, 'Database health check failed');
 
     return {
       connected: false,

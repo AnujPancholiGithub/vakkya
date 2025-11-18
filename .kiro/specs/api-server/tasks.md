@@ -15,8 +15,8 @@
   - Create initial migration
   - _Requirements: 1.1, 2.1, 3.2, 5.1_
 
-- [ ] 3. Implement simple JWT authentication
-- [ ] 3.1 Create JWT authentication middleware
+- [x] 3. Implement simple JWT authentication
+- [x] 3.1 Create JWT authentication middleware
   - Install jsonwebtoken library
   - Create sign/verify utility functions
   - Extract and verify JWT from Authorization header
@@ -25,7 +25,7 @@
   - Return 401 for invalid/expired tokens
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 3.2 Create auth routes
+- [x] 3.2 Create auth routes
   - POST /auth/signup - Create user and return JWT
   - POST /auth/login - Verify credentials and return JWT
   - _Requirements: 1.1_

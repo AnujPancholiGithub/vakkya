@@ -51,7 +51,7 @@ export async function createApp(env: Env, logger: Logger) {
     return { status: 'ok' };
   });
 
-  app.get('/health/ready', async (request, reply) => {
+  app.get('/health/ready', async (_request, reply) => {
     const { checkDatabaseHealth } = await import('./lib/db-health.js');
     const dbHealth = await checkDatabaseHealth();
 
@@ -79,6 +79,10 @@ export async function createApp(env: Env, logger: Logger) {
       pgvector: 'enabled',
     };
   });
+
+  // Register auth routes
+  const { authRoutes } = await import('./routes/auth.js');
+  await authRoutes(app, env);
 
   return app;
 }
