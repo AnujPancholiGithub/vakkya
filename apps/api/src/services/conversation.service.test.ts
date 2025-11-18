@@ -85,12 +85,18 @@ describe('ConversationService', () => {
         sessionId: 'session-test',
       });
 
-      await conversationService.addTurn(conversation.id, {
+      const turn = await conversationService.addTurn(conversation.id, {
         userQuery: 'What is your return policy?',
         agentResponse: 'Our return policy allows returns within 30 days.',
       });
 
-      const updated = await conversationService.get(conversation.id);
+      expect(turn).toBeDefined();
+      expect(turn.userQuery).toBe('What is your return policy?');
+
+      const updated = await conversationService.get(
+        conversation.id,
+        testProjectId
+      );
 
       expect(updated.turnCount).toBe(1);
       expect(updated.turns).toHaveLength(1);
@@ -121,10 +127,22 @@ describe('ConversationService', () => {
         agentResponse: 'Answer 3',
       });
 
-      const updated = await conversationService.get(conversation.id);
+      const updated = await conversationService.get(
+        conversation.id,
+        testProjectId
+      );
 
       expect(updated.turnCount).toBe(3);
       expect(updated.turns).toHaveLength(3);
+    });
+
+    it('should throw error when adding turn to non-existent conversation', async () => {
+      await expect(
+        conversationService.addTurn('non-existent-id', {
+          userQuery: 'Test query',
+          agentResponse: 'Test response',
+        })
+      ).rejects.toThrow('Conversation not found');
     });
 
     it('should maintain turn order by timestamp', async () => {
@@ -146,7 +164,10 @@ describe('ConversationService', () => {
         agentResponse: 'Second answer',
       });
 
-      const updated = await conversationService.get(conversation.id);
+      const updated = await conversationService.get(
+        conversation.id,
+        testProjectId
+      );
 
       expect(updated.turns[0].userQuery).toBe('First question');
       expect(updated.turns[1].userQuery).toBe('Second question');
@@ -217,7 +238,10 @@ describe('ConversationService', () => {
         agentResponse: 'Response 2',
       });
 
-      const detail = await conversationService.get(conversation.id);
+      const detail = await conversationService.get(
+        conversation.id,
+        testProjectId
+      );
 
       expect(detail.id).toBe(conversation.id);
       expect(detail.turns).toHaveLength(2);
@@ -227,8 +251,20 @@ describe('ConversationService', () => {
 
     it('should throw error for non-existent conversation', async () => {
       await expect(
-        conversationService.get('non-existent-id')
-      ).rejects.toThrow('Conversation not found');
+        conversationService.get('non-existent-id', testProjectId)
+      ).rejects.toThrow('Conversation not found or access denied');
+    });
+
+    it('should throw error when accessing conversation from different project', async () => {
+      const conversation = await conversationService.create({
+        projectId: testProjectId,
+        sessionId: 'session-security-test',
+      });
+
+      // Try to access with wrong projectId
+      await expect(
+        conversationService.get(conversation.id, 'wrong-project-id')
+      ).rejects.toThrow('Conversation not found or access denied');
     });
   });
 });

@@ -29,29 +29,41 @@ export class ConversationService {
 
   /**
    * Add a turn to an existing conversation
-   * Increments turnCount atomically
+   * Increments turnCount atomically using a transaction
    */
   async addTurn(conversationId: string, input: AddTurnInput) {
     const { userQuery, agentResponse } = input;
 
-    // Create turn and increment turnCount in a transaction
-    await prisma.$transaction([
-      prisma.conversationTurn.create({
-        data: {
-          conversationId,
-          userQuery,
-          agentResponse,
-        },
-      }),
-      prisma.conversation.update({
-        where: { id: conversationId },
-        data: {
-          turnCount: {
-            increment: 1,
+    try {
+      // Use transaction to ensure turnCount stays in sync with actual turn records
+      const [turn] = await prisma.$transaction([
+        prisma.conversationTurn.create({
+          data: {
+            conversationId,
+            userQuery,
+            agentResponse,
           },
-        },
-      }),
-    ]);
+        }),
+        prisma.conversation.update({
+          where: { id: conversationId },
+          data: {
+            turnCount: {
+              increment: 1,
+            },
+          },
+        }),
+      ]);
+
+      return turn;
+    } catch (error) {
+      // Handle case where conversation doesn't exist
+      if (error && typeof error === 'object' && 'code' in error) {
+        if (error.code === 'P2025' || error.code === 'P2003') {
+          throw new Error('Conversation not found');
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -69,10 +81,14 @@ export class ConversationService {
 
   /**
    * Get conversation detail with all turns
+   * Validates that conversation belongs to the specified project (ownership check)
    */
-  async get(conversationId: string) {
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
+  async get(conversationId: string, projectId: string) {
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        projectId, // Ownership validation
+      },
       include: {
         turns: {
           orderBy: { timestamp: 'asc' },
@@ -81,7 +97,7 @@ export class ConversationService {
     });
 
     if (!conversation) {
-      throw new Error('Conversation not found');
+      throw new Error('Conversation not found or access denied');
     }
 
     return conversation;
