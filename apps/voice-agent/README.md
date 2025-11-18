@@ -13,8 +13,14 @@ The Voice Agent Service orchestrates real-time voice conversations with sub-500m
 ## Architecture
 
 ```
-User speaks → LiveKit STT → Query pgvector → OpenAI GPT-4o → LiveKit TTS → User hears
+User speaks → AgentSession (STT/VAD/Turn Detection) → VakkyaAgent.on_user_turn_completed() 
+→ RAG Service (pgvector) → turn_ctx.add_message() → AgentSession (LLM/TTS) → User hears
 ```
+
+**Key Components:**
+- **AgentSession**: Manages STT/LLM/TTS pipeline, VAD, and turn detection
+- **VakkyaAgent**: Agent subclass with lifecycle hooks for RAG injection
+- **RAG Service**: PostgreSQL pgvector search for document retrieval
 
 ## Setup
 
@@ -94,17 +100,15 @@ curl http://localhost:8080/health
 apps/voice-agent/
 ├── src/
 │   ├── __init__.py
-│   ├── config.py          # Environment configuration
-│   ├── models.py          # Data models
-│   ├── agent.py           # Agent orchestrator
-│   ├── stt_handler.py     # STT processing
-│   ├── llm_service.py     # LLM integration
-│   ├── tts_handler.py     # TTS processing
-│   ├── rag_service.py     # RAG with pgvector
-│   ├── session_manager.py # Session state
-│   ├── logging_config.py  # Logging setup
-│   ├── health.py          # Health check
-│   └── main.py            # Application entry
+│   ├── config.py              # Environment configuration
+│   ├── models.py              # Data models (SessionUserData, PageContext, Turn)
+│   ├── agent.py               # VakkyaAgent (Agent subclass)
+│   ├── rag_service.py         # RAG with pgvector
+│   ├── entrypoint.py          # AgentSession configuration
+│   ├── conversation_logger.py # Log turns to API
+│   ├── logging_config.py      # Logging setup
+│   ├── health.py              # Health check endpoint
+│   └── main.py                # Application entry (CLI)
 ├── tests/
 │   └── ...
 ├── requirements.txt
@@ -121,6 +125,23 @@ Target latencies (P95):
 - LLM first token: <200ms
 - TTS first audio: <200ms
 - **Total pipeline: <500ms**
+
+## Development Guidelines
+
+**Important:** Always verify implementation patterns against official LiveKit documentation.
+
+See `.kiro/specs/voice-agent/WORKING_MODE.md` for:
+- Official documentation sources
+- Verification workflow
+- Common patterns and anti-patterns
+- Testing checklist
+
+**Key Documentation:**
+- Building Agents: https://docs.livekit.io/agents/build/
+- Sessions: https://docs.livekit.io/agents/build/sessions/
+- External Data (RAG): https://docs.livekit.io/agents/build/external-data/
+- Function Tools: https://docs.livekit.io/agents/build/tools/
+- Turn Detection: https://docs.livekit.io/agents/build/turns/
 
 ## License
 

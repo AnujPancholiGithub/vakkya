@@ -74,21 +74,42 @@ The fastest path to a working demo:
 
 ### Phase 2: Voice Agent Minimal (No RAG)
 
-**Purpose:** Build the real-time voice pipeline without RAG to validate LiveKit integration.
+**Purpose:** Build the real-time voice pipeline using LiveKit Agent SDK best practices without RAG to validate LiveKit integration.
 
 **Components:**
-- LiveKit room connection
-- STT (LiveKit built-in)
-- LLM (OpenAI GPT-4o)
-- TTS (LiveKit built-in)
+- `VakkyaAgent` (Agent subclass with lifecycle hooks)
+- `AgentSession` configuration (STT/LLM/TTS pipeline)
+- VAD and turn detection (automatic via LiveKit)
+- Page context injection via `SessionUserData`
 - Basic system prompt (no RAG context yet)
 
 **Interfaces:**
-- LiveKit Agents SDK
-- OpenAI API for LLM
+- LiveKit Agents SDK (Agent subclass pattern)
+- OpenAI API for LLM (configured on AgentSession)
+- LiveKit Inference for STT/TTS (configured on AgentSession)
 - Data channel for receiving page URL
 
-**Why Third:** Building voice agent without RAG lets us validate the hardest part (real-time audio pipeline) independently. RAG integration comes later.
+**Architecture Pattern:**
+```python
+# AgentSession configures the pipeline
+session = AgentSession[SessionUserData](
+    stt="deepgram/nova-3:en",
+    llm="openai/gpt-4o",
+    tts="cartesia/sonic-3:...",
+    vad=silero.VAD.load(),
+    turn_detection=MultilingualModel(),
+)
+
+# VakkyaAgent implements behavior
+class VakkyaAgent(Agent):
+    async def on_enter(self):
+        # Greet user
+    
+    async def on_user_turn_completed(self, turn_ctx, new_message):
+        # RAG injection happens here (Phase 4)
+```
+
+**Why Third:** Building voice agent without RAG lets us validate the hardest part (real-time audio pipeline) independently using LiveKit's recommended patterns. RAG integration comes later via the `on_user_turn_completed` hook.
 
 ### Phase 3: Widget Minimal
 
@@ -110,19 +131,37 @@ The fastest path to a working demo:
 
 ### Phase 4: Voice Agent RAG Integration
 
-**Purpose:** Connect Voice Agent to API Server's pgvector search to enable document-based answers.
+**Purpose:** Connect Voice Agent to API Server's pgvector search to enable document-based answers using LiveKit's official RAG pattern.
 
 **Components:**
-- PostgreSQL connection in Voice Agent
-- Vector similarity search
-- Context building (user query + page URL + RAG chunks)
+- RAG Service (PostgreSQL connection with pgvector)
+- Vector similarity search with project filtering
+- RAG injection via `on_user_turn_completed` hook
+- Context building using `turn_ctx.add_message()`
 - Enhanced system prompt with grounding rules
 
 **Interfaces:**
 - Direct PostgreSQL connection (not via API)
 - pgvector extension for similarity search
+- OpenAI API for query embeddings
 
-**Why Fifth:** Now that the voice pipeline works, we add intelligence. This makes the system useful.
+**Architecture Pattern:**
+```python
+class VakkyaAgent(Agent):
+    async def on_user_turn_completed(self, turn_ctx, new_message):
+        # Query pgvector for relevant context
+        rag_results = await self.rag_service.query(
+            new_message.text_content()
+        )
+        
+        # Inject into turn context (official LiveKit pattern)
+        turn_ctx.add_message(
+            role="assistant",
+            content=f"Context: {rag_results}"
+        )
+```
+
+**Why Fifth:** Now that the voice pipeline works, we add intelligence using LiveKit's recommended `on_user_turn_completed` hook for RAG injection. This makes the system useful.
 
 ### Phase 5: Dashboard
 

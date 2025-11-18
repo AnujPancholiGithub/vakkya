@@ -1,170 +1,146 @@
-# Voice Agent Service - Implementation Plan (Simplified MVP)
+# Voice Agent Service - Implementation Plan (LiveKit Best Practices)
 
 - [x] 1. Set up project structure and core dependencies
   - Create `apps/voice-agent/` directory with Python package structure
-  - Set up `requirements.txt` with core dependencies (livekit-agents, openai, asyncpg, psycopg, pydantic)
+  - Set up `requirements.txt` with LiveKit Agents SDK and plugins
   - Configure `pyproject.toml` for project metadata
   - Set up development dependencies (pytest, pytest-asyncio, black, ruff)
   - Create `.env.example` with required environment variables
   - Implement basic environment variable validation on startup
-  - _Requirements: 12.4_
+  - _Requirements: 11.3_
 
 - [x] 2. Implement core data models
-  - Create `models.py` with simple dataclasses for Session, PageContext, Turn, Context
-  - Add basic Pydantic models for input validation
-  - _Requirements: 2.1, 11.1_
+  - Create `models.py` with SessionUserData, PageContext, Turn, DocumentChunk
+  - Add Pydantic models for input validation (PageContextInput, DataChannelMessage)
+  - Remove Session and Context models (replaced by AgentSession.userdata)
+  - _Requirements: 2.1, 10.1_
 
 - [x] 2.1 Write basic tests for data models
   - Test validation rules
-  - Test basic serialization
-  - _Requirements: 2.1, 11.1_
+  - Test SessionUserData.add_turn() method
+  - _Requirements: 2.1, 10.1_
 
-- [ ] 3. Implement LiveKit STT handler
-  - Use LiveKit's built-in STT (no third-party adapter)
-  - Handle transcript events from LiveKit
-  - Implement basic VAD-based end-of-turn detection
-  - _Requirements: 1.1, 1.2, 1.3_
-
-- [ ] 3.1 Write basic tests for STT handler
-  - Test transcript event handling
-  - Test turn detection
-  - _Requirements: 1.1, 1.2, 1.3_
-
-- [ ] 4. Implement simple RAG service using PostgreSQL
+- [ ] 3. Implement RAG service using PostgreSQL pgvector
   - Create `rag_service.py` for vector search
   - Implement query embedding using OpenAI text-embedding-3-small
   - Implement pgvector similarity search with projectId filtering
   - Return top 3 relevant chunks
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4.1 Write basic tests for RAG service
+- [ ] 3.1 Write basic tests for RAG service
   - Test embedding generation
-  - Test vector search
+  - Test vector search with project filtering
   - _Requirements: 2.2, 2.3_
 
-- [ ] 5. Implement simple LLM service
-  - Create `llm_service.py` for OpenAI integration
-  - Implement streaming response generation with GPT-4o
-  - Build simple prompt with system instructions and context
-  - Include conversation history (last 3 turns)
-  - _Requirements: 3.1, 3.4_
+- [ ] 4. Implement VakkyaAgent (Agent subclass)
+  - Create `agent.py` with VakkyaAgent class extending Agent
+  - Implement `__init__` with instructions and RAG service initialization
+  - Implement `on_enter()` hook for greeting
+  - Implement `on_user_turn_completed()` hook for RAG injection
+  - Use `turn_ctx.add_message()` to inject RAG context
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.2, 2.3, 2.4, 3.1, 3.4_
 
-- [ ] 5.1 Write basic tests for LLM service
-  - Test prompt construction
-  - Test streaming response handling
-  - _Requirements: 3.1, 3.4_
+- [ ] 4.1 Add @function_tool methods to VakkyaAgent
+  - Implement `search_documents()` tool for explicit knowledge base search
+  - Add proper docstrings and type hints for tool schema generation
+  - _Requirements: 2.2, 2.3_
 
-- [ ] 6. Implement LiveKit TTS handler
-  - Use LiveKit's built-in TTS (no third-party adapter)
-  - Stream LLM tokens to LiveKit TTS
-  - Implement basic cancellation for interruptions
-  - _Requirements: 4.1, 5.2_
+- [ ] 4.2 Write basic tests for VakkyaAgent
+  - Test on_enter() greeting generation
+  - Test on_user_turn_completed() RAG injection
+  - Test function tools
+  - _Requirements: 1.1, 1.2, 1.3, 2.2, 2.3_
 
-- [ ] 6.1 Write basic tests for TTS handler
-  - Test text streaming
-  - Test cancellation
-  - _Requirements: 4.1, 5.2_
+- [ ] 5. Implement entrypoint function
+  - Create `entrypoint.py` with async entrypoint(ctx: JobContext)
+  - Configure AgentSession with STT/LLM/TTS using LiveKit Inference descriptors
+  - Configure VAD using silero.VAD.load()
+  - Configure turn detection using MultilingualModel()
+  - Initialize SessionUserData with project_id from room metadata
+  - Start session with VakkyaAgent instance
+  - _Requirements: 1.1, 1.2, 1.3, 3.2, 3.3, 4.1, 4.2, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 7. Implement agent orchestrator
-  - Create `agent.py` with VoiceAgent class
-  - Implement LiveKit room connection handling
-  - Handle audio input from LiveKit
-  - Implement data channel handling for page context
-  - Store session state in PostgreSQL
-  - _Requirements: 1.1, 1.2, 2.1_
+- [ ] 5.1 Write basic tests for entrypoint
+  - Test AgentSession configuration
+  - Test session startup
+  - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 7.1 Write basic tests for agent orchestrator
-  - Test room connection
-  - Test data channel handling
-  - _Requirements: 1.1, 1.2, 2.1_
+- [ ] 6. Implement page context injection
+  - Add data channel listener in entrypoint
+  - Update SessionUserData.page_context when widget sends page URL
+  - Optionally inject page context into chat_ctx as system message
+  - _Requirements: 2.1_
 
-- [ ] 8. Implement simple pipeline orchestration
-  - Add `on_turn_complete` method to VoiceAgent
-  - Query RAG for relevant context
-  - Build prompt with page context + RAG results + conversation history
-  - Stream LLM response to TTS
-  - Send audio to LiveKit
-  - _Requirements: 2.2, 3.1, 3.2, 4.1_
+- [ ] 6.1 Write basic tests for page context
+  - Test data channel message handling
+  - Test page context storage in userdata
+  - _Requirements: 2.1_
 
-- [ ] 8.1 Write basic tests for pipeline
-  - Test context assembly
-  - Test streaming flow
-  - _Requirements: 2.2, 3.1, 3.2, 4.1_
+- [ ] 7. Implement conversation logging
+  - Create `conversation_logger.py` for logging turns to API
+  - Log each turn (user query + agent response + RAG docs) to API server
+  - Include project_id and session metadata
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 9. Implement basic interruption handling
-  - Detect interruption via VAD during agent response
-  - Cancel TTS output
-  - Preserve conversation context
-  - Process new user input
-  - _Requirements: 5.1, 5.2, 5.3_
+- [ ] 7.1 Write basic tests for conversation logging
+  - Test turn logging to API
+  - Test error handling for API failures
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 9.1 Write basic tests for interruption
-  - Test TTS cancellation
-  - Test context preservation
-  - _Requirements: 5.1, 5.2, 5.3_
+- [ ] 8. Implement error handling
+  - Add try-catch blocks around RAG queries
+  - Add try-catch blocks around API logging
+  - Log errors with structured context (project_id, session_id)
+  - Never log API keys or tokens
+  - _Requirements: 1.5, 10.2_
 
-- [ ] 10. Implement simple error handling
-  - Add try-catch blocks around external calls
-  - Log errors with basic context
-  - Return graceful error responses to user
-  - _Requirements: 1.5_
+- [ ] 8.1 Write basic tests for error handling
+  - Test RAG service error handling
+  - Test API logging error handling
+  - Test secret exclusion from logs
+  - _Requirements: 1.5, 10.2_
 
-- [ ] 10.1 Write basic tests for error handling
-  - Test error logging
-  - Test error responses
-  - _Requirements: 1.5_
+- [ ] 9. Implement logging configuration
+  - Create `logging_config.py` with structlog configuration
+  - Configure JSON output for production
+  - Add context processors for project_id and session_id
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 11. Implement simple logging
-  - Create `logging_config.py` with basic Python logging
-  - Configure log levels (INFO for production, DEBUG for dev)
-  - Add session_id and project_id to log messages
-  - _Requirements: 9.1, 9.2_
-
-- [ ] 12. Implement basic input validation
-  - Add Pydantic validators for widget data
-  - Validate page context size (max 10KB)
-  - Validate LiveKit room tokens
-  - _Requirements: 11.1, 11.3_
-
-- [ ] 12.1 Write basic tests for validation
-  - Test input validation rules
-  - Test size limits
-  - _Requirements: 11.1, 11.3_
-
-- [ ] 13. Implement simple health check endpoint
-  - Create `health.py` with basic HTTP handler
+- [ ] 10. Implement health check endpoint
+  - Create `health.py` with simple HTTP server
   - GET /health returns {"status": "ok"} with 200
-  - _Requirements: 12.1_
+  - _Requirements: 11.1, 11.2_
 
-- [ ] 14. Implement main application entry point
-  - Create `main.py` with application startup
-  - Load and validate environment variables
+- [ ] 11. Implement main application entry point
+  - Create `main.py` with CLI setup
+  - Load and validate environment variables using config.py
   - Initialize logging
-  - Set up PostgreSQL connection
-  - Initialize LiveKit agent worker
-  - Register VoiceAgent with LiveKit
-  - Start health check server
-  - _Requirements: 12.4_
+  - Set up PostgreSQL connection pool
+  - Register entrypoint with LiveKit CLI
+  - Start health check server in background
+  - _Requirements: 11.3_
 
-- [ ] 14.1 Write basic startup tests
-  - Test successful startup
-  - Test missing env var failure
-  - _Requirements: 12.4_
+- [ ] 11.1 Write basic startup tests
+  - Test successful startup with valid env vars
+  - Test failure with missing env vars
+  - _Requirements: 11.3_
 
-- [ ] 15. Checkpoint - Ensure all tests pass
+- [ ] 12. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 16. Create Railway deployment configuration
+- [ ] 13. Create Railway deployment configuration
   - Create `railway.json` with service configuration
+  - Set buildCommand and startCommand
+  - Configure healthCheckPath
   - Document required environment variables in README
-  - Set up health check path
-  - _Requirements: 12.1_
+  - _Requirements: 11.1, 11.2_
 
-- [ ] 17. Add basic documentation
-  - Create README.md with setup instructions
-  - Document environment variables
-  - Add simple architecture diagram
+- [ ] 14. Update documentation
+  - Update README.md with LiveKit Agent architecture
+  - Document AgentSession configuration
+  - Document VakkyaAgent lifecycle hooks
+  - Add architecture diagram showing Agent subclass pattern
   - _Requirements: All_
 
-- [ ] 18. Final checkpoint - Ensure all tests pass
+- [ ] 15. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

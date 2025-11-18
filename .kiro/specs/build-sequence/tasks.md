@@ -218,7 +218,13 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ## Phase 2: Voice Agent Minimal (No RAG)
 
-**Overview:** Build real-time voice pipeline (STT → LLM → TTS) without RAG to validate LiveKit integration.
+**Overview:** Build real-time voice pipeline using LiveKit Agent SDK best practices (STT → LLM → TTS) without RAG to validate LiveKit integration.
+
+**Architecture Note:** Voice Agent now uses LiveKit Agent SDK patterns:
+- Single `VakkyaAgent(Agent)` subclass with lifecycle hooks
+- STT/LLM/TTS configured on `AgentSession` (not separate handlers)
+- Automatic VAD and interruption handling
+- No manual STT/TTS/VAD handler classes needed
 
 - [x] 2.1 Set up project structure (Voice Agent spec task 1)
   - **Execute:** Voice Agent spec task 1
@@ -230,66 +236,75 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - Implemented config.py with Pydantic settings validation
   - Created README.md with setup and usage instructions
   - All 7 config tests passing
-  - _Requirements: 12.4_
+  - _Requirements: 11.3_
 
 - [x] 2.2 Implement data models (Voice Agent spec task 2)
   - **Execute:** Voice Agent spec task 2 (all subtasks 2.1)
   - Status: ✅ Complete
-  - Created models.py with dataclasses (Session, PageContext, Turn, Context, DocumentChunk)
-  - Created Pydantic validation models (PageContextInput, DataChannelMessage, TurnInput, SessionInput)
+  - Created models.py with SessionUserData, PageContext, Turn, DocumentChunk
+  - Created Pydantic validation models (PageContextInput, DataChannelMessage)
+  - Removed Session and Context models (replaced by AgentSession.userdata)
   - All 30 tests passing (7 config + 23 model tests)
-  - _Requirements: 2.1, 11.1_
+  - _Requirements: 2.1, 10.1_
 
-- [ ] 2.3 Implement STT handler (Voice Agent spec task 3)
-  - **Execute:** Voice Agent spec task 3 (all subtasks 3.1)
-  - _Requirements: 1.1, 1.2, 1.3_
+- [ ] 2.3 Implement VakkyaAgent (Voice Agent spec task 4)
+  - **Execute:** Voice Agent spec task 4 (all subtasks 4.1-4.2)
+  - Create VakkyaAgent class extending Agent
+  - Implement `on_enter()` hook for greeting
+  - Implement `on_user_turn_completed()` hook (skip RAG for now)
+  - Add `@function_tool` methods if needed
+  - **Note:** No RAG injection yet, just basic conversation
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 3.1, 3.4_
 
-- [ ] 2.4 Implement LLM service (Voice Agent spec task 5)
+- [ ] 2.4 Implement entrypoint (Voice Agent spec task 5)
   - **Execute:** Voice Agent spec task 5 (all subtasks 5.1)
-  - **Note:** Skip RAG context for now, use simple prompt
-  - _Requirements: 3.1, 3.4_
+  - Configure AgentSession with STT/LLM/TTS using LiveKit Inference
+  - Configure VAD using silero.VAD.load()
+  - Configure turn detection using MultilingualModel()
+  - Initialize SessionUserData with project_id
+  - Start session with VakkyaAgent instance
+  - **Note:** This replaces separate STT/LLM/TTS handler tasks
+  - _Requirements: 1.1, 1.2, 1.3, 3.2, 3.3, 4.1, 4.2, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 2.5 Implement TTS handler (Voice Agent spec task 6)
+- [ ] 2.5 Implement page context injection (Voice Agent spec task 6)
   - **Execute:** Voice Agent spec task 6 (all subtasks 6.1)
-  - _Requirements: 4.1, 5.2_
+  - Add data channel listener in entrypoint
+  - Update SessionUserData.page_context when widget sends page URL
+  - _Requirements: 2.1_
 
-- [ ] 2.6 Implement agent orchestrator (Voice Agent spec task 7)
-  - **Execute:** Voice Agent spec task 7 (all subtasks 7.1)
-  - _Requirements: 1.1, 1.2, 2.1_
-
-- [ ] 2.7 Implement pipeline orchestration (Voice Agent spec task 8)
+- [ ] 2.6 Implement error handling (Voice Agent spec task 8)
   - **Execute:** Voice Agent spec task 8 (all subtasks 8.1)
-  - **Note:** Skip RAG query for now
-  - _Requirements: 3.1, 3.2, 4.1_
+  - Add try-catch blocks around external calls
+  - Log errors with structured context
+  - Never log API keys or tokens
+  - _Requirements: 1.5, 10.2_
 
-- [ ] 2.8 Implement interruption handling (Voice Agent spec task 9)
-  - **Execute:** Voice Agent spec task 9 (all subtasks 9.1)
-  - _Requirements: 5.1, 5.2, 5.3_
+- [ ] 2.7 Implement logging (Voice Agent spec task 9)
+  - **Execute:** Voice Agent spec task 9
+  - Configure structlog with JSON output
+  - Add context processors for project_id and session_id
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 2.9 Implement error handling (Voice Agent spec task 10)
-  - **Execute:** Voice Agent spec task 10 (all subtasks 10.1)
-  - _Requirements: 1.5_
+- [ ] 2.8 Implement health check (Voice Agent spec task 10)
+  - **Execute:** Voice Agent spec task 10
+  - Create simple HTTP server for /health endpoint
+  - _Requirements: 11.1, 11.2_
 
-- [ ] 2.10 Implement logging (Voice Agent spec task 11)
-  - **Execute:** Voice Agent spec task 11
-  - _Requirements: 9.1, 9.2_
+- [ ] 2.9 Implement main entry point (Voice Agent spec task 11)
+  - **Execute:** Voice Agent spec task 11 (all subtasks 11.1)
+  - Create main.py with CLI setup
+  - Load and validate environment variables
+  - Initialize logging
+  - Register entrypoint with LiveKit CLI
+  - Start health check server
+  - _Requirements: 11.3_
 
-- [ ] 2.11 Implement input validation (Voice Agent spec task 12)
-  - **Execute:** Voice Agent spec task 12 (all subtasks 12.1)
-  - _Requirements: 11.1, 11.3_
-
-- [ ] 2.12 Implement health check (Voice Agent spec task 13)
-  - **Execute:** Voice Agent spec task 13
-  - _Requirements: 12.1_
-
-- [ ] 2.13 Implement main entry point (Voice Agent spec task 14)
-  - **Execute:** Voice Agent spec task 14 (all subtasks 14.1)
-  - _Requirements: 12.4_
-
-- [ ] 2.14 Checkpoint (Voice Agent spec task 15)
-  - **Execute:** Voice Agent spec task 15
+- [ ] 2.10 Checkpoint (Voice Agent spec task 12)
+  - **Execute:** Voice Agent spec task 12
   - Test: Connect to LiveKit, speak, verify transcript, LLM response, TTS audio
+  - Verify automatic interruption handling works
   - Measure latency (target <500ms P95)
+  - Ensure all tests pass
   - _Requirements: 4.1_
 
 
@@ -346,36 +361,50 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ## Phase 4: Voice Agent RAG Integration
 
-**Overview:** Connect Voice Agent to API's pgvector search to enable document-based answers.
+**Overview:** Connect Voice Agent to API's pgvector search to enable document-based answers using `on_user_turn_completed` hook.
 
-- [ ] 4.1 Implement RAG service (Voice Agent spec task 4)
-  - **Execute:** Voice Agent spec task 4 (all subtasks 4.1)
+- [ ] 4.1 Implement RAG service (Voice Agent spec task 3)
+  - **Execute:** Voice Agent spec task 3 (all subtasks 3.1)
   - Implement PostgreSQL connection with pgvector
-  - Implement vector similarity search
+  - Implement vector similarity search with project filtering
+  - Implement query embedding using OpenAI
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4.2 Update pipeline orchestration with RAG
-  - **Execute:** Update Voice Agent spec task 8 to include RAG query
+- [ ] 4.2 Update VakkyaAgent with RAG injection
+  - **Execute:** Update Voice Agent spec task 4 to include RAG
+  - Modify `on_user_turn_completed()` to query RAG service
+  - Use `turn_ctx.add_message()` to inject RAG context
   - Build context with page URL + RAG chunks + conversation history
-  - _Requirements: 2.2, 3.1, 3.2_
+  - **Note:** This is the official LiveKit pattern for RAG
+  - _Requirements: 2.2, 2.3, 2.4, 3.1_
 
-- [ ] 4.3 Implement conversation logging to API
-  - **Execute:** Add API logging to Voice Agent
-  - Log all turns to API server
-  - _Requirements: 5.1, 5.2, 5.3_
+- [ ] 4.3 Implement conversation logging (Voice Agent spec task 7)
+  - **Execute:** Voice Agent spec task 7 (all subtasks 7.1)
+  - Create conversation_logger.py for logging turns to API
+  - Log each turn (user query + agent response + RAG docs) to API server
+  - Include project_id and session metadata
+  - _Requirements: 8.1, 8.2_
 
-- [ ] 4.4 Create Railway deployment config (Voice Agent spec task 16)
-  - **Execute:** Voice Agent spec task 16
-  - _Requirements: 12.1_
+- [ ] 4.4 Create Railway deployment config (Voice Agent spec task 13)
+  - **Execute:** Voice Agent spec task 13
+  - Create railway.json with service configuration
+  - Document required environment variables
+  - _Requirements: 11.1, 11.2_
 
-- [ ] 4.5 Add documentation (Voice Agent spec task 17)
-  - **Execute:** Voice Agent spec task 17
+- [ ] 4.5 Update documentation (Voice Agent spec task 14)
+  - **Execute:** Voice Agent spec task 14
+  - Update README with LiveKit Agent architecture
+  - Document AgentSession configuration
+  - Document VakkyaAgent lifecycle hooks
+  - Add architecture diagram
   - _Requirements: All_
 
-- [ ] 4.6 Final checkpoint (Voice Agent spec task 18)
-  - **Execute:** Voice Agent spec task 18
+- [ ] 4.6 Final checkpoint (Voice Agent spec task 15)
+  - **Execute:** Voice Agent spec task 15
   - Test: Upload document via API, ask question via widget, verify RAG response
   - Verify conversation logged in API
+  - Verify RAG context injection works via on_user_turn_completed
+  - Ensure all tests pass
   - _Requirements: 4.1_
 
 

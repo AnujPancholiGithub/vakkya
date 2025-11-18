@@ -69,9 +69,9 @@ The Voice Agent Service is a Python-based real-time voice interaction system tha
 
 #### Acceptance Criteria
 
-1. WHEN a user starts speaking during agent response THEN the Voice Agent Service SHALL detect the interruption via VAD
-2. WHEN an interruption is detected THEN the Voice Agent Service SHALL cancel ongoing TTS streaming immediately
-3. WHEN the interruption is processed THEN the Voice Agent Service SHALL begin processing the new user input
+1. WHEN a user starts speaking during agent response THEN the AgentSession SHALL automatically detect the interruption via VAD
+2. WHEN an interruption is detected THEN the AgentSession SHALL automatically pause ongoing TTS streaming
+3. WHEN the interruption is processed THEN the AgentSession SHALL automatically begin processing the new user input
 
 ### Requirement 6
 
@@ -91,10 +91,10 @@ The Voice Agent Service is a Python-based real-time voice interaction system tha
 
 #### Acceptance Criteria
 
-1. WHEN integrating LiveKit STT THEN the Voice Agent Service SHALL encapsulate STT logic behind an adapter interface
-2. WHEN integrating OpenAI THEN the Voice Agent Service SHALL encapsulate LLM logic behind an adapter interface
-3. WHEN integrating LiveKit TTS THEN the Voice Agent Service SHALL encapsulate TTS logic behind an adapter interface
-4. WHEN integrating pgvector THEN the Voice Agent Service SHALL encapsulate vector search logic behind an adapter interface
+1. WHEN implementing the agent THEN the Voice Agent Service SHALL use Agent subclass pattern with lifecycle hooks
+2. WHEN configuring the pipeline THEN the Voice Agent Service SHALL configure STT/LLM/TTS on AgentSession
+3. WHEN implementing RAG THEN the Voice Agent Service SHALL use on_user_turn_completed hook for context injection
+4. WHEN integrating pgvector THEN the Voice Agent Service SHALL encapsulate vector search logic in a RAG service class
 
 ### Requirement 8
 
@@ -112,7 +112,7 @@ The Voice Agent Service is a Python-based real-time voice interaction system tha
 #### Acceptance Criteria
 
 1. WHEN a session starts THEN the Voice Agent Service SHALL maintain stateless operation per session
-2. WHEN session state is needed THEN the Voice Agent Service SHALL store state in PostgreSQL
+2. WHEN session state is needed THEN the Voice Agent Service SHALL store state in AgentSession.userdata
 3. WHEN multiple sessions are active THEN the Voice Agent Service SHALL use asyncio for concurrent operations
 
 ### Requirement 10

@@ -21,15 +21,21 @@ The Voice Agent Service is a Python-based microservice that orchestrates real-ti
 ┌──────▼──────────────────────────────────┐
 │    Voice Agent Service (Python)         │
 │  ┌────────────────────────────────────┐ │
-│  │   Agent Orchestrator                │ │
+│  │   AgentSession                      │ │
+│  │   (STT/LLM/TTS Pipeline Config)     │ │
 │  └─┬──────────────────────────────────┘ │
-│    ├─► STT Handler (LiveKit)            │
-│    ├─► LLM Adapter (OpenAI GPT-4o)      │
-│    ├─► TTS Handler (LiveKit)            │
+│    │                                     │
+│  ┌─▼──────────────────────────────────┐ │
+│  │   VakkyaAgent (Agent subclass)      │ │
+│  │   - on_enter()                      │ │
+│  │   - on_user_turn_completed()        │ │
+│  │   - @function_tool methods          │ │
+│  └─┬──────────────────────────────────┘ │
+│    │                                     │
 │    └─► RAG Service (PostgreSQL pgvector)│
 └──────────────────────────────────────────┘
        │
-       └─► PostgreSQL (Session State + Vectors)
+       └─► PostgreSQL (Vectors + Conversation Logs)
 ```
 
 ### Pipeline Flow
@@ -37,109 +43,153 @@ The Voice Agent Service is a Python-based microservice that orchestrates real-ti
 ```
 User speaks
     ↓
-[1] Audio Stream → LiveKit STT
+[1] AgentSession: Audio → STT (LiveKit built-in)
     ↓
-[2] Transcript chunks → VAD detects end-of-turn
+[2] AgentSession: VAD detects end-of-turn (automatic)
     ↓
-[3] Finalized query → PostgreSQL pgvector search
+[3] VakkyaAgent.on_user_turn_completed() hook triggered
     ↓
-[4] Context assembly: query + page data + RAG results
+[4] RAG Service: Query pgvector for relevant chunks
     ↓
-[5] OpenAI GPT-4o (streaming) → Response tokens
+[5] turn_ctx.add_message() injects RAG context
     ↓
-[6] Tokens → LiveKit TTS → Audio chunks
+[6] AgentSession: LLM generates response (OpenAI GPT-4o streaming)
     ↓
-[7] Audio → User hears response
+[7] AgentSession: TTS synthesizes audio (LiveKit built-in)
+    ↓
+[8] User hears response (interruptions handled automatically)
 ```
 
 **Latency Budget (P95):**
-- STT finalization: <300ms
+- STT finalization: <300ms (LiveKit automatic)
 - pgvector query: <100ms
 - LLM first token: <200ms
-- TTS first audio byte: <200ms
+- TTS first audio byte: <200ms (LiveKit automatic)
 - **Total: <500ms**
 
 ## Components and Interfaces
 
-### 1. Agent Orchestrator
+### 1. AgentSession Configuration
 
-**Responsibility:** Coordinates the voice pipeline using LiveKit Agents SDK.
-
-```python
-class VoiceAgent:
-    async def on_room_connected(self, room: Room) -> None:
-        """Initialize session when user joins"""
-        
-    async def on_audio_received(self, audio_frame: AudioFrame) -> None:
-        """Stream audio to LiveKit STT"""
-        
-    async def on_transcript_received(self, transcript: str, is_final: bool) -> None:
-        """Process transcript chunks"""
-        
-    async def on_turn_complete(self, query: str) -> None:
-        """Orchestrate RAG → LLM → TTS"""
-        
-    async def on_data_received(self, data: dict) -> None:
-        """Receive page context from widget"""
-        
-    async def on_interruption_detected(self) -> None:
-        """Cancel ongoing TTS"""
-```
-
-### 2. STT Handler (LiveKit)
-
-**Responsibility:** Handle LiveKit's built-in STT.
+**Responsibility:** Configure the STT/LLM/TTS pipeline and manage the voice conversation.
 
 ```python
-class STTHandler:
-    async def handle_transcript(self, transcript: str, is_final: bool) -> None:
-        """Process transcript from LiveKit"""
-        
-    def detect_end_of_turn(self) -> bool:
-        """Use VAD to detect when user stops speaking"""
+from livekit.agents import AgentSession
+from livekit.plugins import silero
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+session = AgentSession[SessionUserData](
+    # STT: LiveKit built-in (configured via string descriptor)
+    stt="deepgram/nova-3:en",
+    
+    # LLM: OpenAI GPT-4o
+    llm="openai/gpt-4o",
+    
+    # TTS: LiveKit built-in (configured via string descriptor)
+    tts="cartesia/sonic-3:...",
+    
+    # VAD: Automatic voice activity detection
+    vad=silero.VAD.load(),
+    
+    # Turn detection: Automatic end-of-turn detection
+    turn_detection=MultilingualModel(),
+    
+    # Session-level state
+    userdata=SessionUserData(project_id=project_id),
+    
+    # Interruption handling (automatic)
+    allow_interruptions=True,
+)
 ```
 
-### 3. LLM Adapter (OpenAI)
+**Key Points:**
+- STT/LLM/TTS are configured on AgentSession, not as separate classes
+- VAD and turn detection are automatic when configured
+- Interruptions are handled automatically by the framework
+- Session state is managed via typed `userdata`
 
-**Responsibility:** Generate responses using GPT-4o.
+### 2. VakkyaAgent (Agent Subclass)
+
+**Responsibility:** Implement agent behavior using LiveKit lifecycle hooks.
 
 ```python
-class LLMAdapter:
-    async def generate_response(
-        self, 
-        query: str, 
-        context: Context
-    ) -> AsyncIterator[str]:
-        """Stream response tokens"""
+from livekit.agents import Agent, ChatContext, ChatMessage, function_tool, RunContext
+
+class VakkyaAgent(Agent):
+    def __init__(self, project_id: str):
+        super().__init__(
+            instructions="""You are a helpful voice assistant for Vakkya.
+            Only answer based on the provided context from the knowledge base.
+            If information is not in the context, say 'I don't have that information'.
+            Be concise and conversational."""
+        )
+        self.project_id = project_id
+        self.rag_service = RAGService()
+    
+    async def on_enter(self) -> None:
+        """Called when agent becomes active in the session."""
+        await self.session.generate_reply(
+            instructions="Greet the user warmly and ask how you can help"
+        )
+    
+    async def on_user_turn_completed(
+        self,
+        turn_ctx: ChatContext,
+        new_message: ChatMessage,
+    ) -> None:
+        """Called after user finishes speaking, before LLM generates response.
+        This is the official hook for RAG injection."""
         
-    def build_prompt(self, query: str, context: Context) -> list[dict]:
-        """Construct messages with system prompt"""
+        # Extract user's query
+        user_query = new_message.text_content()
+        
+        # Query pgvector for relevant context
+        rag_results = await self.rag_service.query(
+            query_text=user_query,
+            project_id=self.project_id,
+            top_k=3
+        )
+        
+        # Inject RAG context into the turn (not persisted to history)
+        if rag_results:
+            context_text = "\n\n".join([
+                f"Document: {chunk.content}" 
+                for chunk in rag_results
+            ])
+            turn_ctx.add_message(
+                role="assistant",
+                content=f"Relevant context from knowledge base:\n{context_text}"
+            )
+    
+    @function_tool()
+    async def search_documents(
+        self,
+        context: RunContext[SessionUserData],
+        query: str,
+    ) -> str:
+        """Search the knowledge base for specific information.
+        
+        Args:
+            query: The search query to find relevant documents
+        """
+        results = await self.rag_service.query(
+            query_text=query,
+            project_id=context.userdata.project_id,
+            top_k=5
+        )
+        return "\n".join([r.content for r in results])
 ```
 
-**System Prompt:**
-- "Only answer based on provided context"
-- "If information is not in context, say 'I don't have that information'"
-- "Be concise and conversational"
+**Key Points:**
+- Subclass `Agent` from `livekit.agents`
+- Use `on_enter()` for initialization/greeting
+- Use `on_user_turn_completed()` for RAG injection
+- Use `@function_tool()` decorator for LLM-callable tools
+- No manual STT/TTS/VAD handling needed
 
-### 4. TTS Handler (LiveKit)
+### 3. RAG Service (PostgreSQL pgvector)
 
-**Responsibility:** Use LiveKit's built-in TTS.
-
-```python
-class TTSHandler:
-    async def synthesize_stream(
-        self, 
-        text_stream: AsyncIterator[str]
-    ) -> AsyncIterator[bytes]:
-        """Stream audio from text tokens"""
-        
-    async def cancel_synthesis(self) -> None:
-        """Stop for interruption"""
-```
-
-### 5. RAG Service (PostgreSQL pgvector)
-
-**Responsibility:** Retrieve relevant document chunks.
+**Responsibility:** Retrieve relevant document chunks from vector database.
 
 ```python
 class RAGService:
@@ -149,59 +199,86 @@ class RAGService:
         project_id: str,
         top_k: int = 3
     ) -> list[DocumentChunk]:
-        """Search pgvector for relevant documents"""
+        """Search pgvector for relevant documents."""
+        # Embed query using OpenAI
+        embedding = await self.embed_query(query_text)
+        
+        # Query pgvector with project filter
+        results = await self.db.fetch(
+            """
+            SELECT chunk_id, content, document_id, 
+                   1 - (embedding <=> $1) as similarity_score
+            FROM document_chunks
+            WHERE project_id = $2
+            ORDER BY embedding <=> $1
+            LIMIT $3
+            """,
+            embedding, project_id, top_k
+        )
+        
+        return [DocumentChunk(**row) for row in results]
         
     async def embed_query(self, text: str) -> list[float]:
-        """Generate embedding using OpenAI"""
+        """Generate embedding using OpenAI text-embedding-3-small."""
+        response = await self.openai_client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
 ```
 
-**Query Flow:**
-1. Embed query text → OpenAI embedding API
-2. Query PostgreSQL pgvector with projectId filter
-3. Return top 3 results
+### 4. Session User Data
 
-### 6. Session State Manager
-
-**Responsibility:** Maintain conversation state.
+**Responsibility:** Store session-level state accessible to all agents and tools.
 
 ```python
-class SessionState:
-    session_id: str
+from dataclasses import dataclass, field
+
+@dataclass
+class SessionUserData:
+    """Session-level state managed by AgentSession.userdata"""
     project_id: str
-    page_context: dict
-    conversation_history: list[Turn]
-    created_at: datetime
+    page_context: PageContext | None = None
+    conversation_history: list[Turn] = field(default_factory=list)
     
-class SessionManager:
-    async def create_session(self, room_name: str, project_id: str) -> SessionState
-    async def get_session(self, session_id: str) -> Optional[SessionState]
-    async def add_turn(self, session_id: str, turn: Turn) -> None
-    async def end_session(self, session_id: str) -> None
+    def add_turn(self, turn: Turn) -> None:
+        """Add a turn to conversation history (last 3 turns only)."""
+        self.conversation_history.append(turn)
+        if len(self.conversation_history) > 3:
+            self.conversation_history.pop(0)
 ```
 
-**Storage:** PostgreSQL (no Redis for MVP)
+**Key Points:**
+- Stored in `AgentSession.userdata` (not PostgreSQL for MVP)
+- Accessible in agents via `self.session.userdata`
+- Accessible in tools via `context.userdata`
+- Type-safe through generic typing
 
 ## Data Models
 
-### Session
+### SessionUserData (Primary State Model)
 
 ```python
 @dataclass
-class Session:
-    session_id: str
+class SessionUserData:
+    """Session-level state stored in AgentSession.userdata"""
     project_id: str
-    room_name: str
-    page_context: PageContext
-    conversation_history: list[Turn]
-    created_at: datetime
-    status: Literal["active", "completed"]
+    page_context: PageContext | None = None
+    conversation_history: list[Turn] = field(default_factory=list)
+    
+    def add_turn(self, turn: Turn) -> None:
+        """Add turn to history (keep last 3 only)"""
+        self.conversation_history.append(turn)
+        if len(self.conversation_history) > 3:
+            self.conversation_history.pop(0)
 ```
 
-### Page Context
+### PageContext
 
 ```python
 @dataclass
 class PageContext:
+    """Context about the page the user is viewing"""
     url: str
 ```
 
@@ -210,23 +287,24 @@ class PageContext:
 ```python
 @dataclass
 class Turn:
+    """A single conversation turn"""
     turn_id: str
-    session_id: str
     user_query: str
     agent_response: str
     rag_documents: list[DocumentChunk]
     timestamp: datetime
 ```
 
-### Context
+### DocumentChunk
 
 ```python
 @dataclass
-class Context:
-    query: str
-    page_context: PageContext
-    rag_documents: list[DocumentChunk]
-    conversation_history: list[Turn]  # Last 3 turns
+class DocumentChunk:
+    """A chunk from RAG search"""
+    chunk_id: str
+    content: str
+    document_id: str
+    similarity_score: float
 ```
 
 ## Correctness Properties
@@ -491,15 +569,56 @@ LOG_LEVEL=INFO
 
 ```
 # requirements.txt
-livekit-agents==1.0.0
-livekit==0.10.0
-openai==1.0.0
-asyncpg==0.29.0
-psycopg2-binary==2.9.9
-pydantic==2.5.0
-python-dotenv==1.0.0
-structlog==24.1.0
-pytest==7.4.0
-pytest-asyncio==0.21.0
-hypothesis==6.92.0
+# Core LiveKit Agents SDK
+livekit-agents>=1.0.0
+livekit>=1.0.0
+
+# AI Providers
+openai>=1.0.0
+
+# LiveKit Plugins
+livekit-plugins-deepgram>=0.1.0  # STT
+livekit-plugins-openai>=0.1.0    # LLM
+livekit-plugins-cartesia>=0.1.0  # TTS
+livekit-plugins-silero>=0.1.0    # VAD
+
+# Database
+asyncpg>=0.29.0
+
+# Utilities
+pydantic>=2.5.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+structlog>=24.1.0
+
+# Development
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+black>=24.0.0
+ruff>=0.7.0
+hypothesis>=6.92.0
 ```
+
+
+## Development Guidelines
+
+**Important:** Always verify implementation patterns against official LiveKit documentation before implementing any feature.
+
+See `WORKING_MODE.md` in this directory for:
+- Official documentation sources (8 key URLs)
+- Verification workflow (before/during/after implementation)
+- Common patterns to verify
+- Anti-patterns to avoid
+- Testing checklist
+
+**Key Documentation Sources:**
+1. Building Agents: https://docs.livekit.io/agents/build/
+2. Sessions: https://docs.livekit.io/agents/build/sessions/
+3. Tasks & Nodes: https://docs.livekit.io/agents/build/tasks/
+4. Function Tools: https://docs.livekit.io/agents/build/tools/
+5. Turn Detection: https://docs.livekit.io/agents/build/turns/
+6. External Data (RAG): https://docs.livekit.io/agents/build/external-data/
+7. Workflows: https://docs.livekit.io/agents/build/workflows/
+8. Text I/O: https://docs.livekit.io/agents/build/text/
+
+**Golden Rule:** When in doubt, check official LiveKit docs first. Don't invent custom patterns.
