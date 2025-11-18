@@ -35,8 +35,8 @@
   - Test invalid token rejection
   - _Requirements: 1.2, 1.3_
 
-- [ ] 4. Implement project service
-- [ ] 4.1 Create project service with CRUD operations
+- [x] 4. Implement project service
+- [x] 4.1 Create project service with CRUD operations
   - Implement create with widget token generation (32 bytes hex)
   - Implement list (filter by userId)
   - Implement get (with ownership check)
@@ -45,13 +45,13 @@
   - Enforce 10 project limit per user
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 4.2 Implement simple token validation
+- [x] 4.2 Implement simple token validation
   - Query project by widget token from PostgreSQL
   - Return project configuration
   - Return null for invalid tokens
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ]* 4.3 Write basic tests for project service
+- [x] 4.3 Write basic tests for project service
   - Test token generation format (64 char hex)
   - Test ownership validation
   - Test project limit enforcement
