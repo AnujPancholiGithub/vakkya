@@ -8,7 +8,7 @@ import bcrypt from 'bcrypt';
 describe('Project API Routes', () => {
   let app: Awaited<ReturnType<typeof createApp>>;
   let authToken: string;
-  let userId: string;
+  let userId: string | undefined;
   const testEmail = `test-projects-${Date.now()}@example.com`;
 
   beforeEach(async () => {
@@ -42,13 +42,17 @@ describe('Project API Routes', () => {
 
   afterEach(async () => {
     // Clean up test data
-    await prisma.project.deleteMany({
-      where: { userId },
-    });
-    await prisma.user.delete({
-      where: { id: userId },
-    });
-    await app.close();
+    if (userId) {
+      await prisma.project.deleteMany({
+        where: { userId },
+      });
+      await prisma.user.delete({
+        where: { id: userId },
+      });
+    }
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('POST /projects', () => {
@@ -162,7 +166,7 @@ describe('Project API Routes', () => {
     it('should return 404 for non-existent project', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: '/projects/00000000-0000-0000-0000-000000000000',
+        url: '/projects/cjld2cjxh0000qzrmn831i7rn',
         headers: {
           authorization: `Bearer ${authToken}`,
         },

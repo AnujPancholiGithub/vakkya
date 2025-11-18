@@ -3,10 +3,12 @@ import type { Env } from './env.js';
 
 export function createLogger(env: Env) {
   const isDevelopment = env.NODE_ENV === 'development';
+  const isTest = env.NODE_ENV === 'test';
   
+  // In test mode, don't use transport to avoid compatibility issues
   return pino({
-    level: isDevelopment ? 'debug' : 'info',
-    transport: isDevelopment
+    level: isTest ? 'silent' : isDevelopment ? 'debug' : 'info',
+    transport: isDevelopment && !isTest
       ? {
           target: 'pino-pretty',
           options: {

@@ -8,7 +8,7 @@ import type { Logger } from 'pino';
 
 export async function createApp(env: Env, logger: Logger) {
   const app = Fastify({
-    logger,
+    logger: env.NODE_ENV === 'test' ? false : logger,
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     disableRequestLogging: false,

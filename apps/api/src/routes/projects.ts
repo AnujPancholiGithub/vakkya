@@ -14,7 +14,7 @@ const UpdateProjectSchema = z.object({
 });
 
 const ProjectIdParamSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().cuid(),
 });
 
 export async function projectRoutes(app: FastifyInstance, env: Env) {
