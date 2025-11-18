@@ -157,7 +157,7 @@
   - Test processing flow
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 11. Checkpoint - Ensure all tests pass
+- [x] 11. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 12. Implement conversation service
