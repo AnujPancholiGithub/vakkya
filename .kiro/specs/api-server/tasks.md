@@ -57,14 +57,14 @@
   - Test project limit enforcement
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 5. Implement project API routes
-- [ ] 5.1 Create Zod schemas for project endpoints
+- [x] 5. Implement project API routes
+- [x] 5.1 Create Zod schemas for project endpoints
   - CreateProjectSchema
   - UpdateProjectSchema
   - ProjectIdParamSchema
   - _Requirements: 10.1_
 
-- [ ] 5.2 Create project routes
+- [x] 5.2 Create project routes
   - POST /projects - Create project
   - GET /projects - List user's projects
   - GET /projects/:id - Get project details
@@ -73,7 +73,7 @@
   - All routes require authentication
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ]* 5.3 Write basic API tests for project routes
+- [x] 5.3 Write basic API tests for project routes
   - Test create project endpoint
   - Test authentication requirement
   - Test ownership validation
@@ -116,7 +116,7 @@
   - Implement similarity search using pgvector
   - _Requirements: 4.4_
 
-- [ ]* 8.5 Write basic tests for RAG service
+- [ ] 8.5 Write basic tests for RAG service
   - Test parser for PDF and TXT
   - Test chunking with overlap
   - Test embedding generation
@@ -131,7 +131,7 @@
   - Implement list, get, delete operations
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7_
 
-- [ ]* 9.2 Write basic tests for document service
+- [ ] 9.2 Write basic tests for document service
   - Test upload flow
   - Test processing flow
   - Test error handling
@@ -151,7 +151,7 @@
   - All routes require authentication and ownership check
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ]* 10.3 Write basic API tests for document routes
+- [ ] 10.3 Write basic API tests for document routes
   - Test upload with multipart form data
   - Test file validation
   - Test processing flow
@@ -168,7 +168,7 @@
   - Implement get conversation with all turns
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ]* 12.2 Write basic tests for conversation service
+- [ ] 12.2 Write basic tests for conversation service
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
@@ -187,7 +187,7 @@
   - Dashboard routes require authentication, voice agent routes require token validation
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ]* 13.3 Write basic API tests for conversation routes
+- [ ] 13.3 Write basic API tests for conversation routes
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
@@ -201,7 +201,7 @@
   - Include projectId and allowedDomains in response
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ]* 14.2 Write basic tests for token validation
+- [ ] 14.2 Write basic tests for token validation
   - Test valid token returns config
   - Test invalid token returns 401
   - _Requirements: 7.1, 7.2, 7.3_
@@ -225,7 +225,7 @@
   - Transform into 400 Bad Request with field details
   - _Requirements: 8.4, 10.1_
 
-- [ ]* 16.3 Write basic tests for error handlers
+- [ ] 16.3 Write basic tests for error handlers
   - Test error transformation
   - Test validation error handling
   - _Requirements: 8.4, 8.6_
@@ -241,7 +241,7 @@
   - Whitelist dashboard and widget origins from env vars
   - _Requirements: 10.3_
 
-- [ ]* 17.3 Write basic tests for security
+- [ ] 17.3 Write basic tests for security
   - Test CORS headers
   - Test security headers
   - _Requirements: 10.2, 10.3_

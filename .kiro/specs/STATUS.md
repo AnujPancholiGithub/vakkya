@@ -6,21 +6,20 @@
 **Phase 1: API Server Core** (In Progress)
 
 ## Last Completed Task
-**API Server Task 4:** Project Service ✅
-- Project CRUD operations (create, list, get, update, delete)
-- Widget token generation (64-char hex)
-- Token validation
-- Project limit enforcement (10 per user)
-- Ownership checks
-
-## Next Task
-**API Server Task 5:** Implement project API routes
-- Create Zod schemas for validation
-- POST /projects - Create project
-- GET /projects - List projects
+**API Server Task 5:** Project API Routes ✅
+- Zod validation schemas (CreateProject, UpdateProject, ProjectIdParam)
+- POST /projects - Create project with auth
+- GET /projects - List user's projects
 - GET /projects/:id - Get project details
 - PATCH /projects/:id - Update project
 - DELETE /projects/:id - Delete project
+- API integration tests written
+
+## Next Task
+**API Server Task 6:** Checkpoint - Ensure all tests pass
+- Verify all implemented features work correctly
+- Run test suite
+- Address any issues before proceeding
 
 ## Phase Completion Status
 
@@ -32,11 +31,11 @@
 - [x] 0.5 Environment templates
 - [x] 0.6 Foundation checkpoint
 
-### 🔄 Phase 1: API Server Core (In Progress - 20% complete)
+### 🔄 Phase 1: API Server Core (In Progress - 25% complete)
 - [x] 1.1 JWT authentication (Task 3) ✅
 - [x] 1.2 Project service (Task 4) ✅
-- [ ] 1.3 Project API routes (Task 5) ← **NEXT**
-- [ ] 1.3 Project API routes (Task 5)
+- [x] 1.3 Project API routes (Task 5) ✅
+- [ ] 1.4 Checkpoint (Task 6) ← **NEXT**
 - [ ] 1.4 Checkpoint (Task 6)
 - [ ] 1.5 Document validation (Task 7)
 - [ ] 1.6 RAG processing service (Task 8)
