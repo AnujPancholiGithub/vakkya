@@ -30,7 +30,7 @@
   - POST /auth/login - Verify credentials and return JWT
   - _Requirements: 1.1_
 
-- [ ]* 3.3 Write basic tests for authentication
+- [x] 3.3 Write basic tests for authentication
   - Test JWT sign and verify
   - Test invalid token rejection
   - _Requirements: 1.2, 1.3_
