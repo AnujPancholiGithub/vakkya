@@ -34,7 +34,7 @@
   - Test vector search with project filtering
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4. Implement VakkyaAgent (Agent subclass)
+- [x] 4. Implement VakkyaAgent (Agent subclass)
   - Create `agent.py` with VakkyaAgent class extending Agent
   - Implement `__init__` with instructions and RAG service initialization
   - Implement `on_enter()` hook for greeting
@@ -42,12 +42,12 @@
   - Use `turn_ctx.add_message()` to inject RAG context
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.2, 2.3, 2.4, 3.1, 3.4_
 
-- [ ] 4.1 Add @function_tool methods to VakkyaAgent
+- [x] 4.1 Add @function_tool methods to VakkyaAgent
   - Implement `search_documents()` tool for explicit knowledge base search
   - Add proper docstrings and type hints for tool schema generation
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4.2 Write basic tests for VakkyaAgent
+- [x] 4.2 Write basic tests for VakkyaAgent
   - Test on_enter() greeting generation
   - Test on_user_turn_completed() RAG injection
   - Test function tools
