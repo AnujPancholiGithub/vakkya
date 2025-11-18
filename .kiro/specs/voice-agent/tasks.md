@@ -13,11 +13,13 @@
   - Create `models.py` with SessionUserData, PageContext, Turn, DocumentChunk
   - Add Pydantic models for input validation (PageContextInput, DataChannelMessage)
   - Remove Session and Context models (replaced by AgentSession.userdata)
+  - Implemented SessionUserData.add_turn() method (keeps last 3 turns)
   - _Requirements: 2.1, 10.1_
 
 - [x] 2.1 Write basic tests for data models
   - Test validation rules
   - Test SessionUserData.add_turn() method
+  - All 31 tests passing (7 config + 24 model tests including 4 SessionUserData tests)
   - _Requirements: 2.1, 10.1_
 
 - [ ] 3. Implement RAG service using PostgreSQL pgvector

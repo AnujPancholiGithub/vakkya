@@ -240,11 +240,13 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 - [x] 2.2 Implement data models (Voice Agent spec task 2)
   - **Execute:** Voice Agent spec task 2 (all subtasks 2.1)
-  - Status: ✅ Complete
+  - Status: ✅ Complete (Fixed 2025-11-19)
   - Created models.py with SessionUserData, PageContext, Turn, DocumentChunk
   - Created Pydantic validation models (PageContextInput, DataChannelMessage)
   - Removed Session and Context models (replaced by AgentSession.userdata)
-  - All 30 tests passing (7 config + 23 model tests)
+  - Implemented SessionUserData.add_turn() method (keeps last 3 turns)
+  - All 31 tests passing (7 config + 24 model tests including 4 SessionUserData tests)
+  - **Fixed:** Aligned with LiveKit Agent SDK best practices
   - _Requirements: 2.1, 10.1_
 
 - [ ] 2.3 Implement VakkyaAgent (Voice Agent spec task 4)

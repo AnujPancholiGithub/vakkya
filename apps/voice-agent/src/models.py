@@ -42,26 +42,26 @@ class Turn:
 
 
 @dataclass
-class Session:
-    """A voice conversation session."""
+class SessionUserData:
+    """Session-level state managed by AgentSession.userdata.
+    
+    This model follows LiveKit Agent SDK best practices for storing
+    session state in AgentSession[SessionUserData].
+    """
 
-    session_id: str
     project_id: str
-    room_name: str
-    page_context: PageContext | None
+    page_context: PageContext | None = None
     conversation_history: list[Turn] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    status: Literal["active", "completed"] = "active"
 
-
-@dataclass
-class Context:
-    """Combined context for LLM prompt generation."""
-
-    query: str
-    page_context: PageContext | None
-    rag_documents: list[DocumentChunk]
-    conversation_history: list[Turn]
+    def add_turn(self, turn: Turn) -> None:
+        """Add a turn to conversation history (last 3 turns only).
+        
+        Args:
+            turn: The conversation turn to add
+        """
+        self.conversation_history.append(turn)
+        if len(self.conversation_history) > 3:
+            self.conversation_history.pop(0)
 
 
 # ============================================================================

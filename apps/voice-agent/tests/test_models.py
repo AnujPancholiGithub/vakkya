@@ -6,13 +6,12 @@ import pytest
 from pydantic import ValidationError
 
 from src.models import (
-    Context,
     DataChannelMessage,
     DocumentChunk,
     PageContext,
     PageContextInput,
-    Session,
     SessionInput,
+    SessionUserData,
     Turn,
     TurnInput,
 )
@@ -68,26 +67,20 @@ def test_turn_creation():
     assert turn.timestamp == now
 
 
-def test_session_creation():
-    """Test Session dataclass creation with defaults."""
+def test_session_user_data_creation():
+    """Test SessionUserData dataclass creation with defaults."""
     page = PageContext(url="https://example.com")
-    session = Session(
-        session_id="session-1",
+    userdata = SessionUserData(
         project_id="project-1",
-        room_name="room-1",
         page_context=page,
     )
-    assert session.session_id == "session-1"
-    assert session.project_id == "project-1"
-    assert session.room_name == "room-1"
-    assert session.page_context == page
-    assert session.conversation_history == []
-    assert session.status == "active"
-    assert isinstance(session.created_at, datetime)
+    assert userdata.project_id == "project-1"
+    assert userdata.page_context == page
+    assert userdata.conversation_history == []
 
 
-def test_session_with_conversation_history():
-    """Test Session with conversation history."""
+def test_session_user_data_with_conversation_history():
+    """Test SessionUserData with conversation history."""
     now = datetime.now(UTC)
     turn = Turn(
         turn_id="turn-1",
@@ -97,44 +90,56 @@ def test_session_with_conversation_history():
         rag_documents=[],
         timestamp=now,
     )
-    session = Session(
-        session_id="session-1",
+    userdata = SessionUserData(
         project_id="project-1",
-        room_name="room-1",
         page_context=None,
         conversation_history=[turn],
     )
-    assert len(session.conversation_history) == 1
-    assert session.conversation_history[0] == turn
+    assert len(userdata.conversation_history) == 1
+    assert userdata.conversation_history[0] == turn
 
 
-def test_context_creation():
-    """Test Context dataclass creation."""
-    page = PageContext(url="https://example.com")
-    chunk = DocumentChunk(
-        chunk_id="chunk-1",
-        content="Test",
-        document_id="doc-1",
-        similarity_score=0.9,
-    )
-    turn = Turn(
+def test_session_user_data_add_turn():
+    """Test SessionUserData.add_turn() method."""
+    now = datetime.now(UTC)
+    userdata = SessionUserData(project_id="project-1")
+    
+    # Add first turn
+    turn1 = Turn(
         turn_id="turn-1",
         session_id="session-1",
-        user_query="Previous question",
-        agent_response="Previous answer",
+        user_query="Question 1",
+        agent_response="Answer 1",
         rag_documents=[],
-        timestamp=datetime.now(UTC),
+        timestamp=now,
     )
-    context = Context(
-        query="What is this?",
-        page_context=page,
-        rag_documents=[chunk],
-        conversation_history=[turn],
-    )
-    assert context.query == "What is this?"
-    assert context.page_context == page
-    assert len(context.rag_documents) == 1
-    assert len(context.conversation_history) == 1
+    userdata.add_turn(turn1)
+    assert len(userdata.conversation_history) == 1
+    assert userdata.conversation_history[0] == turn1
+
+
+def test_session_user_data_add_turn_keeps_last_three():
+    """Test SessionUserData.add_turn() keeps only last 3 turns."""
+    now = datetime.now(UTC)
+    userdata = SessionUserData(project_id="project-1")
+    
+    # Add 4 turns
+    for i in range(4):
+        turn = Turn(
+            turn_id=f"turn-{i}",
+            session_id="session-1",
+            user_query=f"Question {i}",
+            agent_response=f"Answer {i}",
+            rag_documents=[],
+            timestamp=now,
+        )
+        userdata.add_turn(turn)
+    
+    # Should only keep last 3
+    assert len(userdata.conversation_history) == 3
+    assert userdata.conversation_history[0].turn_id == "turn-1"
+    assert userdata.conversation_history[1].turn_id == "turn-2"
+    assert userdata.conversation_history[2].turn_id == "turn-3"
 
 
 # ============================================================================
