@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Auto-commit on Task Completion",
+  "description": "Automatically stages all modified files and creates a git commit with a conventional commit message (feat:, fix:, etc.) that summarizes the completed task and changes made",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Automatically stages all modified files and creates a git commit with a conventional commit message (feat:, fix:, etc.) that summarizes the completed task and changes made"
+  },
+  "workspaceFolderName": "vakkya_v1",
+  "shortName": "auto-commit-task"
+}
