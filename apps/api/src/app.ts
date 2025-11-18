@@ -46,6 +46,10 @@ export async function createApp(env: Env, logger: Logger) {
     global: false, // Enable per-route
   });
 
+  // Global error handler
+  const { errorHandler } = await import('./middleware/error-handler.js');
+  app.setErrorHandler(errorHandler);
+
   // Health check routes (no auth required)
   app.get('/health', async () => {
     return { status: 'ok' };
@@ -91,6 +95,14 @@ export async function createApp(env: Env, logger: Logger) {
   // Register document routes
   const { documentRoutes } = await import('./routes/documents.js');
   await documentRoutes(app, env);
+
+  // Register conversation routes
+  const { conversationRoutes } = await import('./routes/conversations.js');
+  await conversationRoutes(app, env);
+
+  // Register widget routes
+  const { widgetRoutes } = await import('./routes/widget.js');
+  await widgetRoutes(app, env);
 
   return app;
 }

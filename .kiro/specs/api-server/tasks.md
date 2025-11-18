@@ -174,12 +174,12 @@
   - Test list and get operations
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 13. Implement conversation API routes
-- [ ] 13.1 Create Zod schemas for conversation endpoints
+- [x] 13. Implement conversation API routes
+- [x] 13.1 Create Zod schemas for conversation endpoints
   - ConversationTurnSchema
   - _Requirements: 10.1_
 
-- [ ] 13.2 Create conversation routes
+- [x] 13.2 Create conversation routes
   - GET /projects/:projectId/conversations - List conversations
   - GET /conversations/:id - Get conversation detail
   - POST /conversations - Create conversation (called by voice agent)
@@ -187,32 +187,32 @@
   - Dashboard routes require authentication, voice agent routes require token validation
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 13.3 Write basic API tests for conversation routes
+- [x] 13.3 Write basic API tests for conversation routes
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 14. Implement widget token validation endpoint
-- [ ] 14.1 Create token validation route
+- [x] 14. Implement widget token validation endpoint
+- [x] 14.1 Create token validation route
   - POST /validate-token - Validate widget token and return project config
   - Use project service token validation
   - Return 401 for invalid tokens
   - Include projectId and allowedDomains in response
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 14.2 Write basic tests for token validation
+- [x] 14.2 Write basic tests for token validation
   - Test valid token returns config
   - Test invalid token returns 401
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 15. Implement simple health check endpoint
-- [ ] 15.1 Create basic health check route
+- [x] 15. Implement simple health check endpoint
+- [x] 15.1 Create basic health check route
   - GET /health - Return "ok" with 200 status
   - _Requirements: 9.1_
 
-- [ ] 16. Implement global error handling
-- [ ] 16.1 Create error handler middleware
+- [x] 16. Implement global error handling
+- [x] 16.1 Create error handler middleware
   - Catch all unhandled errors
   - Transform errors into consistent JSON format
   - Log errors with Pino
@@ -220,33 +220,33 @@
   - Never expose secrets or internal details
   - _Requirements: 8.4, 8.6_
 
-- [ ] 16.2 Create validation error handler
+- [x] 16.2 Create validation error handler
   - Catch Zod validation errors
   - Transform into 400 Bad Request with field details
   - _Requirements: 8.4, 10.1_
 
-- [ ] 16.3 Write basic tests for error handlers
+- [x] 16.3 Write basic tests for error handlers
   - Test error transformation
   - Test validation error handling
   - _Requirements: 8.4, 8.6_
 
-- [ ] 17. Implement security middleware
-- [ ] 17.1 Configure Helmet for security headers
+- [x] 17. Implement security middleware
+- [x] 17.1 Configure Helmet for security headers
   - Install and configure @fastify/helmet
   - Set appropriate CSP, HSTS, etc.
   - _Requirements: 10.2_
 
-- [ ] 17.2 Configure CORS
+- [x] 17.2 Configure CORS
   - Install @fastify/cors
   - Whitelist dashboard and widget origins from env vars
   - _Requirements: 10.3_
 
-- [ ] 17.3 Write basic tests for security
+- [x] 17.3 Write basic tests for security
   - Test CORS headers
   - Test security headers
   - _Requirements: 10.2, 10.3_
 
-- [ ] 18. Configure Pino logging
+- [x] 18. Configure Pino logging
   - Set up structured JSON logging
   - Configure log levels per environment
   - Add request ID to all logs

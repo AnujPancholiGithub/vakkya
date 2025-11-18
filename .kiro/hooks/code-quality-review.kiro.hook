@@ -4,17 +4,12 @@
   "description": "Analyzes modified source code files for code smells, architectural issues, missing best practices, and readability/maintainability/performance concerns. Provides actionable improvement suggestions without changing functionality.",
   "version": "1",
   "when": {
-    "type": "fileEdited",
-    "patterns": [
-      "**/*.ts",
-      "**/*.tsx",
-      "**/*.js",
-      "**/*.jsx",
-      "**/*.py"
-    ]
+    "type": "userTriggered"
   },
   "then": {
     "type": "askAgent",
     "prompt": "Analyze the modified code in the changed file(s) and evaluate it for:\n\n1. **Code Smells**: Identify duplicated code, long functions/methods, large classes, excessive parameters, inappropriate naming, magic numbers, or dead code.\n\n2. **Architectural & Design Issues**: Check for violations of SOLID principles, poor separation of concerns, tight coupling, missing abstractions, or inconsistencies with the existing architecture defined in tech.md.\n\n3. **Missing Best Practices**: Look for missing error handling, lack of input validation, inadequate logging, security vulnerabilities, missing type safety, or deviations from the project's development philosophy.\n\n4. **Readability & Maintainability**: Assess code clarity, comment quality (too many/too few), naming conventions, function/file length, and overall code organization.\n\n5. **Performance Issues**: Identify unnecessary computations, inefficient algorithms, missing caching opportunities, excessive API calls, or memory leaks.\n\nProvide clear, concise, and actionable improvement suggestions. Focus ONLY on quality improvements - do not suggest feature additions or functionality changes. Prioritize issues by severity (critical, important, minor). Be specific about what to change and why it matters."
-  }
+  },
+  "workspaceFolderName": "vakkya_v1",
+  "shortName": "code-quality-review"
 }

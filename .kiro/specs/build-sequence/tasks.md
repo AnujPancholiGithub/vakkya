@@ -130,28 +130,61 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - All 107 tests passing (9 new conversation tests)
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 1.11 Implement conversation API routes (API spec task 13)
+- [x] 1.11 Implement conversation API routes (API spec task 13)
   - **Execute:** API spec task 13 (all subtasks 13.1-13.3)
+  - Status: ✅ Complete
+  - Created conversation REST endpoints with widget token validation
+  - POST /conversations - Create conversation (voice agent)
+  - POST /conversations/:id/turns - Add turn (voice agent)
+  - GET /projects/:projectId/conversations - List conversations (dashboard)
+  - GET /conversations/:id - Get conversation detail (dashboard)
+  - All 117 tests passing (8 new conversation route tests)
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 1.12 Implement widget token validation endpoint (API spec task 14)
+- [x] 1.12 Implement widget token validation endpoint (API spec task 14)
   - **Execute:** API spec task 14 (all subtasks 14.1-14.2)
+  - Status: ✅ Complete
+  - Created POST /validate-token endpoint
+  - Returns project config for valid tokens
+  - Returns 401 for invalid tokens
+  - All 122 tests passing (5 new widget validation tests)
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 1.13 Implement health check (API spec task 15)
+- [x] 1.13 Implement health check (API spec task 15)
   - **Execute:** API spec task 15 (all subtasks 15.1)
+  - Status: ✅ Complete
+  - GET /health - Basic health check
+  - GET /health/ready - Database and pgvector readiness check
+  - All 126 tests passing (4 new health check tests)
   - _Requirements: 9.1_
 
-- [ ] 1.14 Implement error handling (API spec task 16)
+- [x] 1.14 Implement error handling (API spec task 16)
   - **Execute:** API spec task 16 (all subtasks 16.1-16.3)
+  - Status: ✅ Complete
+  - Global error handler with consistent JSON format
+  - Zod validation error handling
+  - Request ID tracking for all errors
+  - Never exposes internal details in 500 errors
+  - All 133 tests passing (7 new error handler tests)
   - _Requirements: 8.4, 8.6_
 
-- [ ] 1.15 Implement security middleware (API spec task 17)
+- [x] 1.15 Implement security middleware (API spec task 17)
   - **Execute:** API spec task 17 (all subtasks 17.1-17.3)
+  - Status: ✅ Complete
+  - Helmet configured with CSP, XSS protection, frame options
+  - CORS configured with allowed origins and credentials
+  - Trust proxy enabled for Railway deployment
+  - All 141 tests passing (8 new security tests)
   - _Requirements: 10.2, 10.3_
 
-- [ ] 1.16 Configure logging (API spec task 18)
+- [x] 1.16 Configure logging (API spec task 18)
   - **Execute:** API spec task 18
+  - Status: ✅ Complete
+  - Pino structured JSON logging configured
+  - Sensitive data redaction (passwords, tokens, secrets)
+  - Environment-specific log levels (silent/debug/info)
+  - Pretty printing in development mode
+  - All 146 tests passing (5 new logger tests)
   - _Requirements: 10.6_
 
 - [ ] 1.17 Create Railway deployment config (API spec task 19)
