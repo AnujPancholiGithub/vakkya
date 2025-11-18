@@ -19,7 +19,7 @@
   - Ensure style isolation from host page
   - _Requirements: 1.3_
 
-- [ ]* 2.3 Write minimal smoke test for initialization
+- [ ] 2.3 Write minimal smoke test for initialization
   - Test widget initializes with valid token
   - _Requirements: 1.1_
 
@@ -145,8 +145,8 @@
   - Set CORS headers
   - _Requirements: 7.5_
 
-- [ ]* 11. Create basic Playwright test
-- [ ]* 11.1 Test simple widget flow
+- [ ] 11. Create basic Playwright test
+- [ ] 11.1 Test simple widget flow
   - Load page → click button → grant permission → close
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 5.1_
 

@@ -8,7 +8,7 @@ const ValidateTokenSchema = z.object({
   widgetToken: z.string().length(64),
 });
 
-export async function widgetRoutes(app: FastifyInstance, env: Env) {
+export async function widgetRoutes(app: FastifyInstance, _env: Env) {
   // POST /validate-token - Validate widget token and return project config
   app.post('/validate-token', async (request, reply) => {
     try {

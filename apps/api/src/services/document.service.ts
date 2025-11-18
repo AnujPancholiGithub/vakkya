@@ -9,7 +9,6 @@ import { parseDocument } from './document-parser.js';
 import { chunkText } from './text-chunker.js';
 import { generateEmbeddings } from './embedding.js';
 import { storeVectors, deleteDocumentChunks } from './vector-storage.js';
-import { getFileType } from '../lib/document-validation.js';
 import { DocumentNotFoundError } from '../lib/errors.js';
 import type { AllowedFileType } from '../lib/document-validation.js';
 

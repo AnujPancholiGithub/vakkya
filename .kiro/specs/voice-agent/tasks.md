@@ -14,7 +14,7 @@
   - Add basic Pydantic models for input validation
   - _Requirements: 2.1, 11.1_
 
-- [ ]* 2.1 Write basic tests for data models
+- [ ] 2.1 Write basic tests for data models
   - Test validation rules
   - Test basic serialization
   - _Requirements: 2.1, 11.1_
@@ -25,7 +25,7 @@
   - Implement basic VAD-based end-of-turn detection
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ]* 3.1 Write basic tests for STT handler
+- [ ] 3.1 Write basic tests for STT handler
   - Test transcript event handling
   - Test turn detection
   - _Requirements: 1.1, 1.2, 1.3_
@@ -37,7 +37,7 @@
   - Return top 3 relevant chunks
   - _Requirements: 2.2, 2.3_
 
-- [ ]* 4.1 Write basic tests for RAG service
+- [ ] 4.1 Write basic tests for RAG service
   - Test embedding generation
   - Test vector search
   - _Requirements: 2.2, 2.3_
@@ -49,7 +49,7 @@
   - Include conversation history (last 3 turns)
   - _Requirements: 3.1, 3.4_
 
-- [ ]* 5.1 Write basic tests for LLM service
+- [ ] 5.1 Write basic tests for LLM service
   - Test prompt construction
   - Test streaming response handling
   - _Requirements: 3.1, 3.4_
@@ -60,7 +60,7 @@
   - Implement basic cancellation for interruptions
   - _Requirements: 4.1, 5.2_
 
-- [ ]* 6.1 Write basic tests for TTS handler
+- [ ] 6.1 Write basic tests for TTS handler
   - Test text streaming
   - Test cancellation
   - _Requirements: 4.1, 5.2_
@@ -73,7 +73,7 @@
   - Store session state in PostgreSQL
   - _Requirements: 1.1, 1.2, 2.1_
 
-- [ ]* 7.1 Write basic tests for agent orchestrator
+- [ ] 7.1 Write basic tests for agent orchestrator
   - Test room connection
   - Test data channel handling
   - _Requirements: 1.1, 1.2, 2.1_
@@ -86,7 +86,7 @@
   - Send audio to LiveKit
   - _Requirements: 2.2, 3.1, 3.2, 4.1_
 
-- [ ]* 8.1 Write basic tests for pipeline
+- [ ] 8.1 Write basic tests for pipeline
   - Test context assembly
   - Test streaming flow
   - _Requirements: 2.2, 3.1, 3.2, 4.1_
@@ -98,7 +98,7 @@
   - Process new user input
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ]* 9.1 Write basic tests for interruption
+- [ ] 9.1 Write basic tests for interruption
   - Test TTS cancellation
   - Test context preservation
   - _Requirements: 5.1, 5.2, 5.3_
@@ -109,7 +109,7 @@
   - Return graceful error responses to user
   - _Requirements: 1.5_
 
-- [ ]* 10.1 Write basic tests for error handling
+- [ ] 10.1 Write basic tests for error handling
   - Test error logging
   - Test error responses
   - _Requirements: 1.5_
@@ -126,7 +126,7 @@
   - Validate LiveKit room tokens
   - _Requirements: 11.1, 11.3_
 
-- [ ]* 12.1 Write basic tests for validation
+- [ ] 12.1 Write basic tests for validation
   - Test input validation rules
   - Test size limits
   - _Requirements: 11.1, 11.3_
@@ -146,7 +146,7 @@
   - Start health check server
   - _Requirements: 12.4_
 
-- [ ]* 14.1 Write basic startup tests
+- [ ] 14.1 Write basic startup tests
   - Test successful startup
   - Test missing env var failure
   - _Requirements: 12.4_

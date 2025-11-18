@@ -12,6 +12,7 @@
     "lint": "eslint src",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
+    "db:migrate:full": "bash scripts/migrate.sh",
     "db:studio": "prisma studio",
     "db:verify": "tsx scripts/verify-prisma.ts"
   },

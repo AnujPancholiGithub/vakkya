@@ -10,6 +10,7 @@ describe('Logger Configuration', () => {
         PORT: 3000,
         DATABASE_URL: 'postgresql://test',
         JWT_SECRET: 'test-secret',
+        JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
@@ -28,6 +29,7 @@ describe('Logger Configuration', () => {
         PORT: 3000,
         DATABASE_URL: 'postgresql://test',
         JWT_SECRET: 'test-secret',
+        JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
@@ -42,6 +44,7 @@ describe('Logger Configuration', () => {
         PORT: 3000,
         DATABASE_URL: 'postgresql://test',
         JWT_SECRET: 'test-secret',
+        JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
@@ -56,6 +59,7 @@ describe('Logger Configuration', () => {
         PORT: 3000,
         DATABASE_URL: 'postgresql://test',
         JWT_SECRET: 'test-secret',
+        JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
@@ -70,6 +74,7 @@ describe('Logger Configuration', () => {
         PORT: 3000,
         DATABASE_URL: 'postgresql://test',
         JWT_SECRET: 'test-secret',
+        JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };

@@ -27,7 +27,7 @@
   - Add logout functionality
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ]* 3.1 Write minimal unit test for authentication
+- [ ] 3.1 Write minimal unit test for authentication
   - Test login form submission
   - Test unauthenticated redirect
   - _Requirements: 1.1, 1.2_
@@ -74,7 +74,7 @@
   - Implement tabs: Documents, Conversations
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-- [ ]* 8.1 Write minimal unit test for project detail
+- [ ] 8.1 Write minimal unit test for project detail
   - Test token display
   - Test copy to clipboard
   - _Requirements: 3.1, 3.2_
@@ -134,7 +134,7 @@
   - Show success toast notification
   - _Requirements: 2.5_
 
-- [ ]* 16. Write basic unit tests
+- [ ] 16. Write basic unit tests
   - Test project creation flow
   - Test document upload validation
   - Test navigation between pages

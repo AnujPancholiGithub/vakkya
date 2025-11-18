@@ -6,8 +6,9 @@ import type { Env } from '../config/env.js';
 const mockEnv: Env = {
   DATABASE_URL: 'postgresql://test',
   JWT_SECRET: 'test-secret-key-for-jwt-testing',
+  JWT_EXPIRES_IN: '7d',
   OPENAI_API_KEY: 'test-key',
-  ALLOWED_ORIGINS: 'http://localhost:3000',
+  ALLOWED_ORIGINS: ['http://localhost:3000'],
   PORT: 3000,
   NODE_ENV: 'test',
 };
