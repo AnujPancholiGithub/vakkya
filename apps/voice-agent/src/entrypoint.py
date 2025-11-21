@@ -1,5 +1,6 @@
 """Main entrypoint for LiveKit agent worker."""
 
+import json
 import logging
 from typing import Optional
 
@@ -13,8 +14,9 @@ from livekit.agents import (
     inference,
 )
 from livekit.plugins import silero
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from .models import PageContext, ProjectMetadata
+from .models import PageContext, PageContextInput, ProjectMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -71,11 +73,13 @@ async def entrypoint(ctx: JobContext) -> None:
     
     # Initialize AgentSession with LiveKit Inference models
     # These model descriptors use LiveKit's unified gateway
+    # Note: MultilingualModel() automatically retrieves job context internally
     session = AgentSession(
-        stt=inference.STT.from_model_string("deepgram/nova-2-general"),
+        stt=inference.STT.from_model_string("assemblyai/universal-streaming:en"),
         llm=inference.LLM.from_model_string("openai/gpt-4o-mini"),
-        tts=inference.TTS.from_model_string("openai/tts-1"),
+        tts=inference.TTS.from_model_string("cartesia/sonic-3"),
         vad=silero.VAD.load(),
+        turn_detection=MultilingualModel(),
     )
     
     logger.info(
@@ -83,12 +87,48 @@ async def entrypoint(ctx: JobContext) -> None:
         extra={
             "room": ctx.room.name,
             "project_id": project_id,
-            "stt": "deepgram/nova-2-general",
+            "stt": "assemblyai/universal-streaming:en",
             "llm": "openai/gpt-4o-mini",
-            "tts": "openai/tts-1",
+            "tts": "cartesia/sonic-3",
             "vad": "silero",
+            "turn_detection": "multilingual",
         },
     )
+    
+    # Set up data channel handler for page context
+    # Store page context in a dict that can be accessed by the agent
+    page_context_store = {"page_context": None}
+    
+    @ctx.room.on("data_received")
+    def on_data_received(data: rtc.DataPacket) -> None:
+        """Handle data channel messages from widget."""
+        try:
+            # Parse JSON payload
+            payload = json.loads(data.data.decode("utf-8"))
+            
+            # Validate using Pydantic
+            page_context_input = PageContextInput(**payload)
+            
+            # Store validated page context
+            page_context_store["page_context"] = PageContext(url=page_context_input.url)
+            
+            logger.info(
+                "Page context received",
+                extra={
+                    "room": ctx.room.name,
+                    "page_url": page_context_input.url,
+                },
+            )
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "Invalid JSON in data channel message",
+                extra={"room": ctx.room.name, "error": str(e)},
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to process data channel message",
+                extra={"room": ctx.room.name, "error": str(e)},
+            )
     
     # Start the session - framework handles everything from here!
     await session.start(room=ctx.room, agent=agent, participant=participant)
