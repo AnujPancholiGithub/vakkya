@@ -1,0 +1,29 @@
+# Core LiveKit Agents framework with VAD and turn detection
+# Note: Requires Python 3.12 (not 3.14) due to livekit-blingfire compatibility
+livekit-agents[silero,turn-detector]~=1.2
+
+# Database (asyncpg for async PostgreSQL operations)
+asyncpg>=0.30.0
+
+# OpenAI for embeddings (already included via livekit-agents)
+# openai>=1.54.0
+
+# Validation and config
+pydantic>=2.10.0  # Already included via livekit-agents
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.0
+
+# Logging
+structlog>=24.1.0
+
+# HTTP client for API logging
+httpx>=0.27.0  # Already included via livekit-agents
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+hypothesis>=6.92.0
+
+# Development tools
+black>=24.0.0
+ruff>=0.8.0

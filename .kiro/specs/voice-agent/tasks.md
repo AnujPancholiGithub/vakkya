@@ -1,6 +1,6 @@
 # Voice Agent Service - Implementation Plan (Modern LiveKit Agents 1.0+)
 
-- [ ] 1. Set up project structure and core dependencies
+- [x] 1. Set up project structure and core dependencies
   - Create `apps/voice-agent/` directory with Python package structure
   - Set up `requirements.txt` with `livekit-agents[silero,turn-detector]~=1.2`
   - Add database dependencies (asyncpg, psycopg2-binary)
@@ -14,9 +14,7 @@
   - Create `models.py` with simple dataclasses for Session, PageContext, Turn
   - Add basic Pydantic models for input validation
   - Keep models minimal - no need for pipeline/adapter models
-  - _Requirements: 2.1, 10.1_
-
-- [ ] 2.1 Write basic tests for data models
+  - Write basic tests for data models
   - Test validation rules
   - Test basic serialization
   - _Requirements: 2.1, 10.1_
@@ -27,9 +25,7 @@
   - Implement pgvector similarity search with projectId filtering
   - Return top 3 relevant chunks formatted as string
   - This is the ONLY custom service we need - framework handles STT/LLM/TTS
-  - _Requirements: 2.2, 2.3_
-
-- [ ] 3.1 Write basic tests for RAG service
+  - Write basic tests for RAG service
   - Test embedding generation
   - Test vector search
   - Test result formatting
@@ -45,34 +41,28 @@
     - turn_detection=MultilingualModel()
   - Extract project_id from room metadata
   - Initialize RAG service
-  - _Requirements: 1.1, 1.2, 1.3, 1.4_
-
-- [ ] 4.1 Write basic tests for entrypoint
+  - Write basic tests for entrypoint
   - Test session initialization
   - Test project_id extraction
-  - _Requirements: 1.1, 1.2_
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
 - [ ] 5. Implement Agent with instructions and RAG tool
   - Define Agent with clear instructions for knowledge grounding
   - Implement @agent.function() decorator for search_knowledge tool
   - Tool should call RAG service and return formatted results
   - Let LLM decide when to use the tool
-  - _Requirements: 2.4, 3.1, 3.4_
-
-- [ ] 5.1 Write basic tests for Agent tool
+  - Write basic tests for Agent tool
   - Test tool invocation
   - Test RAG integration
   - Test result formatting
-  - _Requirements: 2.4, 3.1_
+  - _Requirements: 2.4, 3.1, 3.4_
 
 - [ ] 6. Implement session state management
   - Create `session_manager.py` for conversation state
   - Store session data in PostgreSQL
   - Track conversation history (last 3 turns)
   - Implement conversation logging to API server
-  - _Requirements: 2.1, 9.2_
-
-- [ ] 6.1 Write basic tests for session management
+  - Write basic tests for session management
   - Test session creation
   - Test turn tracking
   - Test API logging
@@ -82,9 +72,7 @@
   - Handle data channel messages from widget
   - Store page URL in session state
   - Make page context available to Agent
-  - _Requirements: 2.1_
-
-- [ ] 7.1 Write basic tests for data channel
+  - Write basic tests for data channel
   - Test message reception
   - Test context storage
   - _Requirements: 2.1_
@@ -93,9 +81,7 @@
   - Add try-catch blocks around RAG service calls
   - Log errors with session context
   - Framework handles pipeline errors automatically
-  - _Requirements: 1.5_
-
-- [ ] 8.1 Write basic tests for error handling
+  - Write basic tests for error handling
   - Test RAG error handling
   - Test error logging
   - _Requirements: 1.5_
@@ -111,9 +97,7 @@
   - Add Pydantic validators for page context data
   - Validate page context size (max 10KB)
   - Validate project_id format
-  - _Requirements: 10.1_
-
-- [ ] 10.1 Write basic tests for validation
+  - Write basic tests for validation
   - Test input validation rules
   - Test size limits
   - _Requirements: 10.1_
@@ -131,9 +115,7 @@
   - Load and validate environment variables
   - Initialize logging
   - Set up PostgreSQL connection pool
-  - _Requirements: 11.3_
-
-- [ ] 12.1 Write basic startup tests
+  - Write basic startup tests
   - Test successful startup
   - Test missing env var failure
   - _Requirements: 11.3_
