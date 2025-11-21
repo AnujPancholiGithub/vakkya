@@ -29,71 +29,110 @@ async def entrypoint(ctx: JobContext) -> None:
     It initializes the AgentSession with LiveKit Inference models and
     starts the voice pipeline (STT → LLM → TTS).
     
+    Error Handling:
+    - Connection errors: Logged and raised (framework will retry)
+    - Invalid project_id: Logged and returns early (permanent error)
+    - Session initialization errors: Logged and raised (permanent error)
+    - Data channel errors: Logged but don't interrupt session (transient)
+    
     Args:
         ctx: JobContext provided by LiveKit Agents framework
     """
-    logger.info("Agent worker starting", extra={"room": ctx.room.name})
+    room_name = ctx.room.name
+    logger.info("Agent worker starting", extra={"room": room_name})
     
-    # Connect to the room
-    await ctx.connect()
-    logger.info("Connected to room", extra={"room": ctx.room.name})
+    try:
+        # Connect to the room
+        await ctx.connect()
+        logger.info("Connected to room", extra={"room": room_name})
+    except Exception as e:
+        logger.error(
+            "Failed to connect to room",
+            extra={"room": room_name, "error": str(e), "error_type": type(e).__name__},
+            exc_info=True,
+        )
+        raise  # Let framework handle retry
     
-    # Wait for a participant to join
-    participant = await ctx.wait_for_participant()
-    logger.info(
-        "Participant joined",
-        extra={
-            "room": ctx.room.name,
-            "participant": participant.identity,
-        },
-    )
+    try:
+        # Wait for a participant to join
+        participant = await ctx.wait_for_participant()
+        logger.info(
+            "Participant joined",
+            extra={
+                "room": room_name,
+                "participant": participant.identity,
+            },
+        )
+    except Exception as e:
+        logger.error(
+            "Failed waiting for participant",
+            extra={"room": room_name, "error": str(e), "error_type": type(e).__name__},
+            exc_info=True,
+        )
+        raise  # Let framework handle retry
     
     # Extract project_id from room metadata
     project_id = await _extract_project_id(ctx)
     if not project_id:
-        logger.error("No project_id in room metadata", extra={"room": ctx.room.name})
-        return
+        logger.error(
+            "No valid project_id in room metadata - cannot proceed",
+            extra={"room": room_name},
+        )
+        return  # Permanent error - don't retry
     
     logger.info(
         "Extracted project metadata",
-        extra={"room": ctx.room.name, "project_id": project_id},
+        extra={"room": room_name, "project_id": project_id},
     )
     
-    # Create agent with simple instructions (no RAG tool yet)
-    agent = Agent(
-        instructions="""You are a helpful voice assistant for website visitors.
+    try:
+        # Create agent with simple instructions (no RAG tool yet)
+        agent = Agent(
+            instructions="""You are a helpful voice assistant for website visitors.
+            
+            Be conversational, friendly, and concise in your responses.
+            Speak naturally as if having a real conversation.
+            Keep responses brief - aim for 1-2 sentences unless more detail is requested.
+            
+            If you don't know something, be honest and say so.
+            """
+        )
         
-        Be conversational, friendly, and concise in your responses.
-        Speak naturally as if having a real conversation.
-        Keep responses brief - aim for 1-2 sentences unless more detail is requested.
+        # Initialize AgentSession with LiveKit Inference models
+        # These model descriptors use LiveKit's unified gateway
+        # Note: MultilingualModel() automatically retrieves job context internally
+        session = AgentSession(
+            stt=inference.STT.from_model_string("assemblyai/universal-streaming:en"),
+            llm=inference.LLM.from_model_string("openai/gpt-4o-mini"),
+            tts=inference.TTS.from_model_string("cartesia/sonic-3"),
+            vad=silero.VAD.load(),
+            turn_detection=MultilingualModel(),
+        )
         
-        If you don't know something, be honest and say so.
-        """
-    )
-    
-    # Initialize AgentSession with LiveKit Inference models
-    # These model descriptors use LiveKit's unified gateway
-    # Note: MultilingualModel() automatically retrieves job context internally
-    session = AgentSession(
-        stt=inference.STT.from_model_string("assemblyai/universal-streaming:en"),
-        llm=inference.LLM.from_model_string("openai/gpt-4o-mini"),
-        tts=inference.TTS.from_model_string("cartesia/sonic-3"),
-        vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
-    )
-    
-    logger.info(
-        "AgentSession initialized",
-        extra={
-            "room": ctx.room.name,
-            "project_id": project_id,
-            "stt": "assemblyai/universal-streaming:en",
-            "llm": "openai/gpt-4o-mini",
-            "tts": "cartesia/sonic-3",
-            "vad": "silero",
-            "turn_detection": "multilingual",
-        },
-    )
+        logger.info(
+            "AgentSession initialized",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "stt": "assemblyai/universal-streaming:en",
+                "llm": "openai/gpt-4o-mini",
+                "tts": "cartesia/sonic-3",
+                "vad": "silero",
+                "turn_detection": "multilingual",
+            },
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to initialize agent session",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
+        raise  # Permanent error - invalid configuration
     
     # Set up data channel handler for page context
     # Store page context in a dict that can be accessed by the agent
@@ -101,7 +140,12 @@ async def entrypoint(ctx: JobContext) -> None:
     
     @ctx.room.on("data_received")
     def on_data_received(data: rtc.DataPacket) -> None:
-        """Handle data channel messages from widget."""
+        """
+        Handle data channel messages from widget.
+        
+        Errors in data channel processing are logged but don't interrupt
+        the voice session (transient errors).
+        """
         try:
             # Parse JSON payload
             payload = json.loads(data.data.decode("utf-8"))
@@ -115,25 +159,63 @@ async def entrypoint(ctx: JobContext) -> None:
             logger.info(
                 "Page context received",
                 extra={
-                    "room": ctx.room.name,
+                    "room": room_name,
+                    "project_id": project_id,
                     "page_url": page_context_input.url,
                 },
             )
         except json.JSONDecodeError as e:
             logger.warning(
                 "Invalid JSON in data channel message",
-                extra={"room": ctx.room.name, "error": str(e)},
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                    "error": str(e),
+                    "error_type": "JSONDecodeError",
+                },
+            )
+        except ValueError as e:
+            # Pydantic validation error
+            logger.warning(
+                "Invalid page context data",
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                    "error": str(e),
+                    "error_type": "ValidationError",
+                },
             )
         except Exception as e:
             logger.warning(
                 "Failed to process data channel message",
-                extra={"room": ctx.room.name, "error": str(e)},
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
             )
     
-    # Start the session - framework handles everything from here!
-    await session.start(room=ctx.room, agent=agent, participant=participant)
-    
-    logger.info("AgentSession started", extra={"room": ctx.room.name})
+    try:
+        # Start the session - framework handles everything from here!
+        await session.start(room=ctx.room, agent=agent, participant=participant)
+        
+        logger.info(
+            "AgentSession started",
+            extra={"room": room_name, "project_id": project_id},
+        )
+    except Exception as e:
+        logger.error(
+            "Failed to start agent session",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+            exc_info=True,
+        )
+        raise  # Let framework handle cleanup
 
 
 async def _extract_project_id(ctx: JobContext) -> Optional[str]:

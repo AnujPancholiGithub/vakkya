@@ -31,6 +31,11 @@ def mock_db_pool():
 class TestSessionManager:
     """Tests for SessionManager."""
 
+    def test_init_with_none_pool(self):
+        """Test that SessionManager raises ValueError when db_pool is None."""
+        with pytest.raises(ValueError, match="db_pool cannot be None"):
+            SessionManager(db_pool=None)
+
     @pytest.mark.asyncio
     async def test_create_session(self, mock_db_pool):
         """Test creating a new session."""
@@ -180,9 +185,10 @@ class TestSessionManager:
         # Assert
         assert len(session.conversation_history) == 3
         
-        # Verify SQL query limits to 3
+        # Verify SQL query uses MAX_CONVERSATION_HISTORY constant
         call_args = conn.fetch.call_args[0]
-        assert "LIMIT 3" in call_args[0]
+        assert "LIMIT $2" in call_args[0]
+        assert call_args[2] == 3  # MAX_CONVERSATION_HISTORY value
 
     @pytest.mark.asyncio
     async def test_update_page_context(self, mock_db_pool):
@@ -362,3 +368,164 @@ class TestSessionManager:
             await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
             
             # Assert - no exception raised, error logged internally
+
+
+
+class TestSessionManagerErrorHandling:
+    """Tests for error handling in SessionManager."""
+
+    @pytest.mark.asyncio
+    async def test_create_session_database_error(self):
+        """Test that database errors during session creation are logged and raised."""
+        # Arrange
+        pool = MagicMock()
+        conn = MagicMock()
+        
+        # Create a proper async mock that raises on execute
+        async def mock_execute(*args, **kwargs):
+            raise Exception("Database connection failed")
+        
+        conn.execute = mock_execute
+        
+        # Mock the async context manager for acquire()
+        # __aexit__ must return False to propagate exceptions
+        async def mock_aexit(*args):
+            return False
+        
+        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        pool.acquire.return_value.__aexit__ = mock_aexit
+        
+        manager = SessionManager(db_pool=pool)
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Database connection failed"):
+            await manager.create_session(
+                project_id=TEST_PROJECT_ID,
+                room_name=TEST_ROOM_NAME,
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_session_database_error(self):
+        """Test that database errors during session retrieval are logged and raised."""
+        # Arrange
+        pool = MagicMock()
+        conn = MagicMock()
+        
+        # Create a proper async mock that raises on fetchrow
+        async def mock_fetchrow(*args, **kwargs):
+            raise Exception("Database query failed")
+        
+        conn.fetchrow = mock_fetchrow
+        
+        # Mock the async context manager for acquire()
+        # __aexit__ must return False to propagate exceptions
+        async def mock_aexit(*args):
+            return False
+        
+        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        pool.acquire.return_value.__aexit__ = mock_aexit
+        
+        manager = SessionManager(db_pool=pool)
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Database query failed"):
+            await manager.get_session(session_id=TEST_SESSION_ID)
+
+    @pytest.mark.asyncio
+    async def test_add_turn_database_error(self):
+        """Test that database errors during turn addition are logged and raised."""
+        # Arrange
+        pool = MagicMock()
+        conn = MagicMock()
+        
+        # Create a proper async mock that raises on execute
+        async def mock_execute(*args, **kwargs):
+            raise Exception("Database insert failed")
+        
+        conn.execute = mock_execute
+        
+        # Mock the async context manager for acquire()
+        # __aexit__ must return False to propagate exceptions
+        async def mock_aexit(*args):
+            return False
+        
+        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
+        pool.acquire.return_value.__aexit__ = mock_aexit
+        
+        manager = SessionManager(db_pool=pool)
+
+        turn = Turn(
+            turn_id="turn-123",
+            session_id=TEST_SESSION_ID,
+            user_query="Test query",
+            agent_response="Test response",
+            rag_documents=[],
+            timestamp=FIXED_TIMESTAMP,
+        )
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Database insert failed"):
+            await manager.add_turn(session_id=TEST_SESSION_ID, turn=turn)
+
+    @pytest.mark.asyncio
+    async def test_log_to_api_network_error_does_not_raise(self):
+        """Test that API logging errors are logged but don't raise exceptions."""
+        # Arrange
+        pool = MagicMock()
+        manager = SessionManager(db_pool=pool)
+
+        turn = Turn(
+            turn_id="turn-123",
+            session_id=TEST_SESSION_ID,
+            user_query="Test query",
+            agent_response="Test response",
+            rag_documents=[],
+            timestamp=FIXED_TIMESTAMP,
+        )
+
+        # Mock httpx to raise an exception
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                side_effect=Exception("Network error")
+            )
+
+            # Act - should not raise exception
+            await manager.log_to_api(
+                session_id=TEST_SESSION_ID,
+                turn=turn,
+                api_url="https://api.example.com",
+            )
+
+            # Assert - method completed without raising
+
+    @pytest.mark.asyncio
+    async def test_log_to_api_timeout_does_not_raise(self):
+        """Test that API logging timeouts are logged but don't raise exceptions."""
+        # Arrange
+        pool = MagicMock()
+        manager = SessionManager(db_pool=pool)
+
+        turn = Turn(
+            turn_id="turn-123",
+            session_id=TEST_SESSION_ID,
+            user_query="Test query",
+            agent_response="Test response",
+            rag_documents=[],
+            timestamp=FIXED_TIMESTAMP,
+        )
+
+        # Mock httpx to timeout
+        import httpx
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
+                side_effect=httpx.TimeoutException("Request timeout")
+            )
+
+            # Act - should not raise exception
+            await manager.log_to_api(
+                session_id=TEST_SESSION_ID,
+                turn=turn,
+                api_url="https://api.example.com",
+            )
+
+            # Assert - method completed without raising

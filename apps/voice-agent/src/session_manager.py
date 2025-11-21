@@ -39,6 +39,17 @@ class SessionManager:
     """
     Manages conversation session state in PostgreSQL.
     
+    Error Handling Strategy:
+    - Database operations (create_session, get_session, add_turn): Raise exceptions
+    - API logging (log_to_api): Swallow exceptions (fire-and-forget, non-critical)
+    """
+    
+    # Configuration constants
+    MAX_CONVERSATION_HISTORY = 3
+    API_TIMEOUT_SECONDS = 5.0
+    """
+    Manages conversation session state in PostgreSQL.
+    
     Responsibilities:
     - Create and retrieve sessions
     - Track conversation history (last 3 turns)
@@ -51,7 +62,12 @@ class SessionManager:
         
         Args:
             db_pool: PostgreSQL connection pool
+            
+        Raises:
+            ValueError: If db_pool is None
         """
+        if db_pool is None:
+            raise ValueError("db_pool cannot be None")
         self.db_pool = db_pool
 
     async def create_session(self, project_id: str, room_name: str) -> Session:
@@ -64,35 +80,52 @@ class SessionManager:
             
         Returns:
             Created session with generated ID and timestamp
+            
+        Raises:
+            Exception: If database operation fails
         """
         session = Session.create(project_id=project_id, room_name=room_name)
         
-        async with self.db_pool.acquire() as conn:
-            # Use existing conversations table from API schema
-            # Note: Prisma uses camelCase column names in PostgreSQL
-            await conn.execute(
-                """
-                INSERT INTO conversations 
-                ("id", "projectId", "sessionId", "startedAt", "turnCount")
-                VALUES ($1, $2, $3, $4, $5)
-                """,
-                session.session_id,
-                session.project_id,
-                room_name,  # Store LiveKit room name as sessionId
-                session.created_at,
-                0,  # Initial turn count
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Use existing conversations table from API schema
+                # Note: Prisma uses camelCase column names in PostgreSQL
+                await conn.execute(
+                    """
+                    INSERT INTO conversations 
+                    ("id", "projectId", "sessionId", "startedAt", "turnCount")
+                    VALUES ($1, $2, $3, $4, $5)
+                    """,
+                    session.session_id,
+                    session.project_id,
+                    room_name,  # Store LiveKit room name as sessionId
+                    session.created_at,
+                    0,  # Initial turn count
+                )
+            
+            logger.info(
+                "Session created",
+                extra={
+                    "session_id": session.session_id,
+                    "project_id": project_id,
+                    "room_name": room_name,
+                },
             )
-        
-        logger.info(
-            "Session created",
-            extra={
-                "session_id": session.session_id,
-                "project_id": project_id,
-                "room_name": room_name,
-            },
-        )
-        
-        return session
+            
+            return session
+        except Exception as e:
+            logger.error(
+                "Failed to create session in database",
+                extra={
+                    "session_id": session.session_id,
+                    "project_id": project_id,
+                    "room_name": room_name,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True,
+            )
+            raise
 
     async def get_session(self, session_id: str) -> Optional[Session]:
         """
@@ -103,69 +136,98 @@ class SessionManager:
             
         Returns:
             Session if found, None otherwise
+            
+        Raises:
+            Exception: If database operation fails
         """
-        async with self.db_pool.acquire() as conn:
-            # Use existing conversations table with camelCase column names
-            row = await conn.fetchrow(
-                """
-                SELECT "id", "projectId", "sessionId", "startedAt", "turnCount"
-                FROM conversations
-                WHERE "id" = $1
-                """,
-                session_id,
-            )
-            
-            if not row:
-                return None
-            
-            # Fetch conversation history (last 3 turns)
-            turns_rows = await conn.fetch(
-                """
-                SELECT "id", "conversationId", "userQuery", "agentResponse", "timestamp"
-                FROM conversation_turns
-                WHERE "conversationId" = $1
-                ORDER BY "timestamp" DESC
-                LIMIT 3
-                """,
-                session_id,
-            )
-            
-            # Build session object (no page_context stored in DB yet - will add in task 7)
-            turns = [
-                Turn(
-                    turn_id=turn_row["id"],
-                    session_id=turn_row["conversationId"],
-                    user_query=turn_row["userQuery"],
-                    agent_response=turn_row["agentResponse"],
-                    rag_documents=[],  # No RAG documents stored yet
-                    timestamp=turn_row["timestamp"],
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Use existing conversations table with camelCase column names
+                row = await conn.fetchrow(
+                    """
+                    SELECT "id", "projectId", "sessionId", "startedAt", "turnCount"
+                    FROM conversations
+                    WHERE "id" = $1
+                    """,
+                    session_id,
                 )
-                for turn_row in reversed(turns_rows)  # Reverse to get chronological order
-            ]
-            
-            return Session(
-                session_id=row["id"],
-                project_id=row["projectId"],
-                room_name=row["sessionId"],  # sessionId stores the LiveKit room name
-                page_context=None,  # Will be added in task 7
-                conversation_history=turns,
-                created_at=row["startedAt"],
-                status="active",  # Default status (not stored in DB)
+                
+                if not row:
+                    logger.debug(
+                        "Session not found",
+                        extra={"session_id": session_id},
+                    )
+                    return None
+                
+                # Fetch conversation history (last 3 turns)
+                turns_rows = await conn.fetch(
+                    """
+                    SELECT "id", "conversationId", "userQuery", "agentResponse", "timestamp"
+                    FROM conversation_turns
+                    WHERE "conversationId" = $1
+                    ORDER BY "timestamp" DESC
+                    LIMIT $2
+                    """,
+                    session_id,
+                    self.MAX_CONVERSATION_HISTORY,
+                )
+                
+                # Build session object (no page_context stored in DB yet - will add in task 7)
+                turns = [
+                    Turn(
+                        turn_id=turn_row["id"],
+                        session_id=turn_row["conversationId"],
+                        user_query=turn_row["userQuery"],
+                        agent_response=turn_row["agentResponse"],
+                        rag_documents=[],  # No RAG documents stored yet
+                        timestamp=turn_row["timestamp"],
+                    )
+                    for turn_row in reversed(turns_rows)  # Reverse to get chronological order
+                ]
+                
+                logger.debug(
+                    "Session retrieved",
+                    extra={
+                        "session_id": session_id,
+                        "project_id": row["projectId"],
+                        "turn_count": len(turns),
+                    },
+                )
+                
+                return Session(
+                    session_id=row["id"],
+                    project_id=row["projectId"],
+                    room_name=row["sessionId"],  # sessionId stores the LiveKit room name
+                    page_context=None,  # Will be added in task 7
+                    conversation_history=turns,
+                    created_at=row["startedAt"],
+                    status="active",  # Default status (not stored in DB)
+                )
+        except Exception as e:
+            logger.error(
+                "Failed to retrieve session from database",
+                extra={
+                    "session_id": session_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True,
             )
+            raise
 
     async def update_page_context(self, session_id: str, page_context: PageContext) -> None:
         """
         Update the page context for a session.
         
         Note: Page context is not stored in DB for MVP - kept in memory only.
-        This method is a placeholder for task 7 (data channel handling).
+        Data channel handling is implemented in entrypoint.py (task 7 complete).
+        This method exists for future enhancement when page context persistence is needed.
         
         Args:
             session_id: Session identifier
             page_context: Page context to store
         """
-        # TODO: Task 7 - Store page context when implementing data channel handling
-        logger.info(
+        logger.debug(
             "Page context received (not persisted in MVP)",
             extra={
                 "session_id": session_id,
@@ -180,55 +242,71 @@ class SessionManager:
         Args:
             session_id: Session identifier (conversation.id)
             turn: Conversation turn to add
-        """
-        async with self.db_pool.acquire() as conn:
-            # Use existing conversation_turns table with camelCase column names
-            # Note: RAG documents are not stored in MVP schema
-            await conn.execute(
-                """
-                INSERT INTO conversation_turns
-                ("id", "conversationId", "userQuery", "agentResponse", "timestamp")
-                VALUES ($1, $2, $3, $4, $5)
-                """,
-                turn.turn_id,
-                session_id,
-                turn.user_query,
-                turn.agent_response,
-                turn.timestamp,
-            )
             
-            # Update turn count in conversations table
-            await conn.execute(
-                """
-                UPDATE conversations
-                SET "turnCount" = "turnCount" + 1
-                WHERE "id" = $1
-                """,
-                session_id,
+        Raises:
+            Exception: If database operation fails
+        """
+        try:
+            async with self.db_pool.acquire() as conn:
+                # Use existing conversation_turns table with camelCase column names
+                # Note: RAG documents are not stored in MVP schema
+                await conn.execute(
+                    """
+                    INSERT INTO conversation_turns
+                    ("id", "conversationId", "userQuery", "agentResponse", "timestamp")
+                    VALUES ($1, $2, $3, $4, $5)
+                    """,
+                    turn.turn_id,
+                    session_id,
+                    turn.user_query,
+                    turn.agent_response,
+                    turn.timestamp,
+                )
+                
+                # Update turn count in conversations table
+                await conn.execute(
+                    """
+                    UPDATE conversations
+                    SET "turnCount" = "turnCount" + 1
+                    WHERE "id" = $1
+                    """,
+                    session_id,
+                )
+            
+            logger.info(
+                "Turn added to session",
+                extra={
+                    "session_id": session_id,
+                    "turn_id": turn.turn_id,
+                    "user_query_length": len(turn.user_query),
+                    "agent_response_length": len(turn.agent_response),
+                },
             )
-        
-        logger.info(
-            "Turn added to session",
-            extra={
-                "session_id": session_id,
-                "turn_id": turn.turn_id,
-                "user_query_length": len(turn.user_query),
-                "agent_response_length": len(turn.agent_response),
-            },
-        )
+        except Exception as e:
+            logger.error(
+                "Failed to add turn to session",
+                extra={
+                    "session_id": session_id,
+                    "turn_id": turn.turn_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True,
+            )
+            raise
 
     async def complete_session(self, session_id: str) -> None:
         """
         Mark a session as completed.
         
         Note: The conversations table doesn't have a status field in MVP.
-        This is a no-op for now, kept for future enhancement.
+        This is a no-op for now, kept for future enhancement when session
+        lifecycle tracking is needed.
         
         Args:
             session_id: Session identifier
         """
-        # TODO: Add status field to conversations table if needed
-        logger.info(
+        logger.debug(
             "Session completed (status not persisted in MVP)",
             extra={"session_id": session_id},
         )
@@ -255,7 +333,7 @@ class SessionManager:
                 "timestamp": turn.timestamp.isoformat(),
             }
             
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=self.API_TIMEOUT_SECONDS) as client:
                 response = await client.post(
                     f"{api_url}/api/conversations/log",
                     json=payload,

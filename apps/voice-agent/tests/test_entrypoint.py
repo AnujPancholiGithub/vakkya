@@ -503,3 +503,153 @@ class TestDataChannelHandling:
         
         # Should not raise exception - should log warning instead
         data_handler(mock_data_packet)
+
+
+
+class TestErrorHandling:
+    """Tests for error handling in entrypoint function."""
+
+    @pytest.mark.asyncio
+    @patch("src.entrypoint.MultilingualModel")
+    @patch("src.entrypoint.AgentSession")
+    @patch("src.entrypoint.Agent")
+    async def test_entrypoint_handles_connection_error(
+        self, mock_agent_class, mock_session_class, mock_multilingual
+    ):
+        """Test that connection errors are logged and raised."""
+        # Arrange
+        ctx = MagicMock()
+        ctx.room.name = "test-room"
+        ctx.connect = AsyncMock(side_effect=Exception("Connection failed"))
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Connection failed"):
+            await entrypoint(ctx)
+
+    @pytest.mark.asyncio
+    @patch("src.entrypoint.MultilingualModel")
+    @patch("src.entrypoint.AgentSession")
+    @patch("src.entrypoint.Agent")
+    async def test_entrypoint_handles_participant_wait_error(
+        self, mock_agent_class, mock_session_class, mock_multilingual
+    ):
+        """Test that participant wait errors are logged and raised."""
+        # Arrange
+        ctx = MagicMock()
+        ctx.room.name = "test-room"
+        ctx.connect = AsyncMock()
+        ctx.wait_for_participant = AsyncMock(side_effect=Exception("Participant wait failed"))
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Participant wait failed"):
+            await entrypoint(ctx)
+
+    @pytest.mark.asyncio
+    @patch("src.entrypoint.MultilingualModel")
+    @patch("src.entrypoint.AgentSession")
+    @patch("src.entrypoint.Agent")
+    async def test_entrypoint_handles_session_initialization_error(
+        self, mock_agent_class, mock_session_class, mock_multilingual
+    ):
+        """Test that session initialization errors are logged and raised."""
+        # Arrange
+        ctx = MagicMock()
+        ctx.room.name = "test-room"
+        ctx.room.metadata = json.dumps({"project_id": "550e8400-e29b-41d4-a716-446655440000"})
+        ctx.connect = AsyncMock()
+        ctx.wait_for_participant = AsyncMock()
+        
+        mock_participant = MagicMock()
+        ctx.wait_for_participant.return_value = mock_participant
+
+        # Make AgentSession initialization fail
+        mock_session_class.side_effect = Exception("Session init failed")
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Session init failed"):
+            await entrypoint(ctx)
+
+    @pytest.mark.asyncio
+    @patch("src.entrypoint.MultilingualModel")
+    @patch("src.entrypoint.AgentSession")
+    @patch("src.entrypoint.Agent")
+    async def test_entrypoint_handles_session_start_error(
+        self, mock_agent_class, mock_session_class, mock_multilingual
+    ):
+        """Test that session start errors are logged and raised."""
+        # Arrange
+        ctx = MagicMock()
+        ctx.room.name = "test-room"
+        ctx.room.metadata = json.dumps({"project_id": "550e8400-e29b-41d4-a716-446655440000"})
+        ctx.connect = AsyncMock()
+        ctx.wait_for_participant = AsyncMock()
+        
+        mock_participant = MagicMock()
+        ctx.wait_for_participant.return_value = mock_participant
+
+        mock_agent = MagicMock()
+        mock_agent_class.return_value = mock_agent
+
+        mock_session = MagicMock()
+        mock_session.start = AsyncMock(side_effect=Exception("Session start failed"))
+        mock_session_class.return_value = mock_session
+        
+        mock_turn_detector = MagicMock()
+        mock_multilingual.return_value = mock_turn_detector
+
+        # Act & Assert
+        with pytest.raises(Exception, match="Session start failed"):
+            await entrypoint(ctx)
+
+    @pytest.mark.asyncio
+    @patch("src.entrypoint.MultilingualModel")
+    @patch("src.entrypoint.AgentSession")
+    @patch("src.entrypoint.Agent")
+    async def test_data_channel_error_does_not_interrupt_session(
+        self, mock_agent_class, mock_session_class, mock_multilingual
+    ):
+        """Test that data channel errors are logged but don't interrupt session."""
+        # Arrange
+        ctx = MagicMock()
+        ctx.room.name = "test-room"
+        ctx.room.metadata = json.dumps({"project_id": "550e8400-e29b-41d4-a716-446655440000"})
+        ctx.connect = AsyncMock()
+        ctx.wait_for_participant = AsyncMock()
+        
+        mock_participant = MagicMock()
+        ctx.wait_for_participant.return_value = mock_participant
+
+        mock_agent = MagicMock()
+        mock_agent_class.return_value = mock_agent
+
+        mock_session = MagicMock()
+        mock_session.start = AsyncMock()
+        mock_session_class.return_value = mock_session
+        
+        mock_turn_detector = MagicMock()
+        mock_multilingual.return_value = mock_turn_detector
+
+        # Capture the data channel handler
+        data_handler = None
+        def capture_handler(event_name):
+            def decorator(func):
+                nonlocal data_handler
+                if event_name == "data_received":
+                    data_handler = func
+                return func
+            return decorator
+        
+        ctx.room.on = capture_handler
+
+        # Act
+        await entrypoint(ctx)
+
+        # Simulate data channel error (malformed data)
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = b"not json at all"
+        
+        # Should not raise exception - should log warning instead
+        data_handler(mock_data_packet)
+        
+        # Assert session was still started
+        mock_session.start.assert_called_once()
