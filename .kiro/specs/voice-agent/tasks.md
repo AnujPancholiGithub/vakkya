@@ -10,7 +10,7 @@
   - Create `.env.example` with required environment variables (LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DATABASE_URL)
   - _Requirements: 11.3_
 
-- [ ] 2. Implement core data models
+- [x] 2. Implement core data models
   - Create `models.py` with simple dataclasses for Session, PageContext, Turn
   - Add basic Pydantic models for input validation
   - Keep models minimal - no need for pipeline/adapter models
