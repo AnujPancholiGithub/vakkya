@@ -31,7 +31,7 @@
   - Test result formatting
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4. Implement entrypoint function
+- [x] 4. Implement entrypoint function
   - Create `entrypoint.py` with async entrypoint(ctx: JobContext)
   - Initialize AgentSession with LiveKit Inference models:
     - stt="assemblyai/universal-streaming:en"
@@ -57,7 +57,7 @@
   - Test result formatting
   - _Requirements: 2.4, 3.1, 3.4_
 
-- [ ] 6. Implement session state management
+- [x] 6. Implement session state management
   - Create `session_manager.py` for conversation state
   - Store session data in PostgreSQL
   - Track conversation history (last 3 turns)
