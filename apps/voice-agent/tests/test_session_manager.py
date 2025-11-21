@@ -8,6 +8,12 @@ import pytest
 from src.models import DocumentChunk, PageContext, Session, Turn
 from src.session_manager import SessionManager
 
+# Test constants
+TEST_PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000"
+TEST_SESSION_ID = "session-123"
+TEST_ROOM_NAME = "room-456"
+FIXED_TIMESTAMP = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+
 
 @pytest.fixture
 def mock_db_pool():
@@ -35,13 +41,13 @@ class TestSessionManager:
 
         # Act
         session = await manager.create_session(
-            project_id="550e8400-e29b-41d4-a716-446655440000",
-            room_name="room-123",
+            project_id=TEST_PROJECT_ID,
+            room_name=TEST_ROOM_NAME,
         )
 
         # Assert
-        assert session.project_id == "550e8400-e29b-41d4-a716-446655440000"
-        assert session.room_name == "room-123"
+        assert session.project_id == TEST_PROJECT_ID
+        assert session.room_name == TEST_ROOM_NAME
         assert session.status == "active"
         assert session.page_context is None
         assert session.conversation_history == []
@@ -50,7 +56,7 @@ class TestSessionManager:
         # Verify database insert was called
         conn.execute.assert_called_once()
         call_args = conn.execute.call_args[0]
-        assert "INSERT INTO voice_sessions" in call_args[0]
+        assert "INSERT INTO conversations" in call_args[0]
 
     @pytest.mark.asyncio
     async def test_get_session_found(self, mock_db_pool):
@@ -58,23 +64,22 @@ class TestSessionManager:
         # Arrange
         pool, conn = mock_db_pool
         
+        # Mock data with camelCase column names (matches Prisma PostgreSQL schema)
         session_row = {
-            "session_id": "session-123",
-            "project_id": "550e8400-e29b-41d4-a716-446655440000",
-            "room_name": "room-456",
-            "page_url": "https://example.com/page",
-            "created_at": datetime.now(UTC),
-            "status": "active",
+            "id": TEST_SESSION_ID,
+            "projectId": TEST_PROJECT_ID,
+            "sessionId": TEST_ROOM_NAME,  # LiveKit room name stored here
+            "startedAt": FIXED_TIMESTAMP,
+            "turnCount": 1,
         }
         
         turn_rows = [
             {
-                "turn_id": "turn-1",
-                "session_id": "session-123",
-                "user_query": "What is X?",
-                "agent_response": "X is...",
-                "rag_documents": [],
-                "timestamp": datetime.now(UTC),
+                "id": "turn-1",
+                "conversationId": TEST_SESSION_ID,
+                "userQuery": "What is X?",
+                "agentResponse": "X is...",
+                "timestamp": FIXED_TIMESTAMP,
             }
         ]
         
@@ -84,14 +89,14 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
 
         # Act
-        session = await manager.get_session("session-123")
+        session = await manager.get_session(TEST_SESSION_ID)
 
         # Assert
         assert session is not None
-        assert session.session_id == "session-123"
-        assert session.project_id == "550e8400-e29b-41d4-a716-446655440000"
-        assert session.room_name == "room-456"
-        assert session.page_context.url == "https://example.com/page"
+        assert session.session_id == TEST_SESSION_ID
+        assert session.project_id == TEST_PROJECT_ID
+        assert session.room_name == TEST_ROOM_NAME
+        assert session.page_context is None  # No page context in MVP
         assert len(session.conversation_history) == 1
         assert session.conversation_history[0].user_query == "What is X?"
 
@@ -116,13 +121,13 @@ class TestSessionManager:
         # Arrange
         pool, conn = mock_db_pool
         
+        # Mock data with camelCase column names (matches Prisma PostgreSQL schema)
         session_row = {
-            "session_id": "session-123",
-            "project_id": "550e8400-e29b-41d4-a716-446655440000",
-            "room_name": "room-456",
-            "page_url": None,  # No page context
-            "created_at": datetime.now(UTC),
-            "status": "active",
+            "id": TEST_SESSION_ID,
+            "projectId": TEST_PROJECT_ID,
+            "sessionId": TEST_ROOM_NAME,  # LiveKit room name stored here
+            "startedAt": FIXED_TIMESTAMP,
+            "turnCount": 0,
         }
         
         conn.fetchrow = AsyncMock(return_value=session_row)
@@ -131,7 +136,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
 
         # Act
-        session = await manager.get_session("session-123")
+        session = await manager.get_session(TEST_SESSION_ID)
 
         # Assert
         assert session is not None
@@ -143,24 +148,23 @@ class TestSessionManager:
         # Arrange
         pool, conn = mock_db_pool
         
+        # Mock data with camelCase column names (matches Prisma PostgreSQL schema)
         session_row = {
-            "session_id": "session-123",
-            "project_id": "550e8400-e29b-41d4-a716-446655440000",
-            "room_name": "room-456",
-            "page_url": None,
-            "created_at": datetime.now(UTC),
-            "status": "active",
+            "id": TEST_SESSION_ID,
+            "projectId": TEST_PROJECT_ID,
+            "sessionId": TEST_ROOM_NAME,  # LiveKit room name stored here
+            "startedAt": FIXED_TIMESTAMP,
+            "turnCount": 3,
         }
         
         # Create 3 turns (should all be returned)
         turn_rows = [
             {
-                "turn_id": f"turn-{i}",
-                "session_id": "session-123",
-                "user_query": f"Query {i}",
-                "agent_response": f"Response {i}",
-                "rag_documents": [],
-                "timestamp": datetime.now(UTC),
+                "id": f"turn-{i}",
+                "conversationId": TEST_SESSION_ID,
+                "userQuery": f"Query {i}",
+                "agentResponse": f"Response {i}",
+                "timestamp": FIXED_TIMESTAMP,
             }
             for i in range(3)
         ]
@@ -171,7 +175,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
 
         # Act
-        session = await manager.get_session("session-123")
+        session = await manager.get_session(TEST_SESSION_ID)
 
         # Assert
         assert len(session.conversation_history) == 3
@@ -191,15 +195,12 @@ class TestSessionManager:
         page_context = PageContext(url="https://example.com/new-page")
 
         # Act
-        await manager.update_page_context("session-123", page_context)
+        await manager.update_page_context(TEST_SESSION_ID, page_context)
 
         # Assert
-        conn.execute.assert_called_once()
-        call_args = conn.execute.call_args[0]
-        assert "UPDATE voice_sessions" in call_args[0]
-        assert "SET page_url" in call_args[0]
-        assert call_args[1] == "https://example.com/new-page"
-        assert call_args[2] == "session-123"
+        # In MVP, page context is not persisted to DB (no-op)
+        # This will be implemented in task 7
+        conn.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_add_turn(self, mock_db_pool):
@@ -211,7 +212,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
         
         turn = Turn.create(
-            session_id="session-123",
+            session_id=TEST_SESSION_ID,
             user_query="What is the weather?",
             agent_response="It's sunny today.",
             rag_documents=[
@@ -220,16 +221,24 @@ class TestSessionManager:
         )
 
         # Act
-        await manager.add_turn("session-123", turn)
+        await manager.add_turn(TEST_SESSION_ID, turn)
 
-        # Assert
-        conn.execute.assert_called_once()
-        call_args = conn.execute.call_args[0]
-        assert "INSERT INTO conversation_turns" in call_args[0]
-        assert call_args[1] == turn.turn_id
-        assert call_args[2] == "session-123"
-        assert call_args[3] == "What is the weather?"
-        assert call_args[4] == "It's sunny today."
+        # Assert - now makes 2 calls: INSERT turn + UPDATE turn_count
+        assert conn.execute.call_count == 2
+        
+        # Check first call (INSERT turn)
+        first_call = conn.execute.call_args_list[0][0]
+        assert "INSERT INTO conversation_turns" in first_call[0]
+        assert first_call[1] == turn.turn_id
+        assert first_call[2] == TEST_SESSION_ID
+        assert first_call[3] == "What is the weather?"
+        assert first_call[4] == "It's sunny today."
+        
+        # Check second call (UPDATE turnCount)
+        second_call = conn.execute.call_args_list[1][0]
+        assert "UPDATE conversations" in second_call[0]
+        assert "turnCount" in second_call[0]
+        assert second_call[1] == TEST_SESSION_ID  # Verify correct session_id
 
     @pytest.mark.asyncio
     async def test_add_turn_with_empty_rag_documents(self, mock_db_pool):
@@ -241,19 +250,20 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
         
         turn = Turn.create(
-            session_id="session-123",
+            session_id=TEST_SESSION_ID,
             user_query="Hello",
             agent_response="Hi there!",
         )
 
         # Act
-        await manager.add_turn("session-123", turn)
+        await manager.add_turn(TEST_SESSION_ID, turn)
 
-        # Assert
-        conn.execute.assert_called_once()
-        call_args = conn.execute.call_args[0]
-        # RAG documents should be empty list
-        assert call_args[5] == []
+        # Assert - now makes 2 calls: INSERT turn + UPDATE turn_count
+        assert conn.execute.call_count == 2
+        
+        # Check first call (INSERT turn)
+        first_call = conn.execute.call_args_list[0][0]
+        assert "INSERT INTO conversation_turns" in first_call[0]
 
     @pytest.mark.asyncio
     async def test_complete_session(self, mock_db_pool):
@@ -265,14 +275,11 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
 
         # Act
-        await manager.complete_session("session-123")
+        await manager.complete_session(TEST_SESSION_ID)
 
         # Assert
-        conn.execute.assert_called_once()
-        call_args = conn.execute.call_args[0]
-        assert "UPDATE voice_sessions" in call_args[0]
-        assert "SET status = 'completed'" in call_args[0]
-        assert call_args[1] == "session-123"
+        # In MVP, status is not persisted to DB (no-op)
+        conn.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_log_to_api_success(self, mock_db_pool):
@@ -282,7 +289,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
         
         turn = Turn.create(
-            session_id="session-123",
+            session_id=TEST_SESSION_ID,
             user_query="Test query",
             agent_response="Test response",
         )
@@ -298,13 +305,13 @@ class TestSessionManager:
         
         with patch("httpx.AsyncClient", return_value=mock_client):
             # Act
-            await manager.log_to_api("session-123", turn, "https://api.example.com")
+            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
             
             # Assert
             mock_client.post.assert_called_once()
             call_args = mock_client.post.call_args
             assert call_args[0][0] == "https://api.example.com/api/conversations/log"
-            assert call_args[1]["json"]["session_id"] == "session-123"
+            assert call_args[1]["json"]["session_id"] == TEST_SESSION_ID
             assert call_args[1]["json"]["user_query"] == "Test query"
 
     @pytest.mark.asyncio
@@ -315,7 +322,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
         
         turn = Turn.create(
-            session_id="session-123",
+            session_id=TEST_SESSION_ID,
             user_query="Test query",
             agent_response="Test response",
         )
@@ -331,7 +338,7 @@ class TestSessionManager:
         
         with patch("httpx.AsyncClient", return_value=mock_client):
             # Act - should not raise exception
-            await manager.log_to_api("session-123", turn, "https://api.example.com")
+            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
             
             # Assert - just verify it was called
             mock_client.post.assert_called_once()
@@ -344,7 +351,7 @@ class TestSessionManager:
         manager = SessionManager(db_pool=pool)
         
         turn = Turn.create(
-            session_id="session-123",
+            session_id=TEST_SESSION_ID,
             user_query="Test query",
             agent_response="Test response",
         )
@@ -352,6 +359,6 @@ class TestSessionManager:
         # Mock httpx to raise exception
         with patch("httpx.AsyncClient", side_effect=Exception("Network error")):
             # Act - should not raise exception
-            await manager.log_to_api("session-123", turn, "https://api.example.com")
+            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
             
             # Assert - no exception raised, error logged internally

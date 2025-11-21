@@ -8,11 +8,24 @@
 ## Last Completed Task
 **Task 2.4:** Implement session state management (Voice Agent spec task 6) ✅
 - Created SessionManager class for PostgreSQL-backed conversation state
+- Aligned with existing API schema (conversations/conversation_turns tables)
 - Implemented session CRUD, conversation history tracking (last 3 turns), API logging
 - 57 tests passing (12 session manager tests)
 
 ## Next Task
 **Task 2.5:** Implement data channel handling (Voice Agent spec task 7)
+
+## Recent Fixes (2025-11-21)
+**Critical Schema Alignment:**
+- Fixed SessionManager to use existing API database schema (conversations/conversation_turns)
+- Corrected all SQL queries to use Prisma's camelCase column names ("projectId", "sessionId", "conversationId", etc.)
+- Added comprehensive schema documentation in session_manager.py header
+- All 57 tests passing with correct schema alignment
+- Page context and session status marked as TODO for task 7 (not in MVP schema yet)
+
+**Schema Reference:**
+- conversations: id, projectId, sessionId (stores room name), startedAt, turnCount
+- conversation_turns: id, conversationId, userQuery, agentResponse, timestamp
 
 ## Phase Completion Status
 
