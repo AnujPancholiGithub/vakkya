@@ -141,6 +141,8 @@ class TestEntrypoint:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        # Handle AgentSession[SessionContext] generic type parameter
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -208,6 +210,7 @@ class TestEntrypoint:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -246,6 +249,7 @@ class TestEntrypoint:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -290,6 +294,7 @@ class TestDataChannelHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -325,6 +330,7 @@ class TestDataChannelHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -377,6 +383,7 @@ class TestDataChannelHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -427,6 +434,7 @@ class TestDataChannelHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -477,6 +485,7 @@ class TestDataChannelHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -563,6 +572,8 @@ class TestErrorHandling:
         ctx.wait_for_participant.return_value = mock_participant
 
         # Make AgentSession initialization fail
+        # Need to handle AgentSession[SessionContext] call pattern
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.side_effect = Exception("Session init failed")
 
         # Act & Assert
@@ -592,6 +603,7 @@ class TestErrorHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock(side_effect=Exception("Session start failed"))
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()
@@ -624,6 +636,7 @@ class TestErrorHandling:
 
         mock_session = MagicMock()
         mock_session.start = AsyncMock()
+        mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
         mock_turn_detector = MagicMock()

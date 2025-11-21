@@ -286,19 +286,32 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - Framework handles pipeline errors automatically
   - _Requirements: 1.5_
 
-- [ ] 2.7 Implement logging (Voice Agent spec task 9)
+- [x] 2.7 Implement logging (Voice Agent spec task 9)
   - **Execute:** Voice Agent spec task 9
-  - Structured logging with session context
+  - Status: ✅ Complete
+  - Created logging_config.py with structlog integration
+  - Configured JSON logging for production, pretty-printing for development
+  - Added context binding (session_id, project_id) via contextvars
+  - Environment-based log level configuration (LOG_LEVEL env var)
+  - All 88 tests passing (15 new logging tests)
   - _Requirements: 8.1, 8.2_
 
-- [ ] 2.8 Implement input validation (Voice Agent spec task 10)
+- [x] 2.8 Implement input validation (Voice Agent spec task 10)
   - **Execute:** Voice Agent spec task 10 (all subtasks 10.1)
-  - Validate page context data
+  - Status: ✅ Complete
+  - Created validation.py with comprehensive input validation utilities
+  - Implemented 10KB size limit for page context and data channel messages
+  - Integrated validation into entrypoint for page context and project metadata
+  - All 115 tests passing (27 new validation tests)
   - _Requirements: 10.1_
 
-- [ ] 2.9 Implement environment validation (Voice Agent spec task 11)
+- [x] 2.9 Implement environment validation (Voice Agent spec task 11)
   - **Execute:** Voice Agent spec task 11
-  - Validate required environment variables
+  - Status: ✅ Complete
+  - Created config.py with pydantic-settings for environment validation
+  - Validates all required vars: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, DATABASE_URL, OPENAI_API_KEY
+  - Fail-fast with clear error messages on startup
+  - All 142 tests passing (27 new config tests)
   - _Requirements: 11.3_
 
 - [ ] 2.10 Implement main entry point (Voice Agent spec task 12)

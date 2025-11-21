@@ -1,6 +1,5 @@
 """Main entrypoint for LiveKit agent worker."""
 
-import json
 import logging
 from typing import Optional
 
@@ -16,9 +15,15 @@ from livekit.agents import (
 from livekit.plugins import silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-from .models import PageContext, PageContextInput, ProjectMetadata
+from .models import PageContext, SessionContext
+from .validation import ValidationException, validate_and_parse_page_context, validate_project_metadata
 
 logger = logging.getLogger(__name__)
+
+# Model descriptors for LiveKit Inference
+STT_MODEL = "assemblyai/universal-streaming:en"
+LLM_MODEL = "openai/gpt-4o-mini"
+TTS_MODEL = "cartesia/sonic-3"
 
 
 async def entrypoint(ctx: JobContext) -> None:
@@ -44,7 +49,6 @@ async def entrypoint(ctx: JobContext) -> None:
     try:
         # Connect to the room
         await ctx.connect()
-        logger.info("Connected to room", extra={"room": room_name})
     except Exception as e:
         logger.error(
             "Failed to connect to room",
@@ -85,8 +89,15 @@ async def entrypoint(ctx: JobContext) -> None:
         extra={"room": room_name, "project_id": project_id},
     )
     
+    # Initialize session context for storing page context and other session data
+    # This will be accessible in agent tools via RunContext (Task 5)
+    session_context = SessionContext(
+        project_id=project_id,
+        page_context=None,  # Will be populated by data channel handler
+    )
+    
     try:
-        # Create agent with simple instructions (no RAG tool yet)
+        # Create agent with simple instructions (no RAG tool yet - Task 5)
         agent = Agent(
             instructions="""You are a helpful voice assistant for website visitors.
             
@@ -101,12 +112,13 @@ async def entrypoint(ctx: JobContext) -> None:
         # Initialize AgentSession with LiveKit Inference models
         # These model descriptors use LiveKit's unified gateway
         # Note: MultilingualModel() automatically retrieves job context internally
-        session = AgentSession(
-            stt=inference.STT.from_model_string("assemblyai/universal-streaming:en"),
-            llm=inference.LLM.from_model_string("openai/gpt-4o-mini"),
-            tts=inference.TTS.from_model_string("cartesia/sonic-3"),
+        session = AgentSession[SessionContext](
+            stt=inference.STT.from_model_string(STT_MODEL),
+            llm=inference.LLM.from_model_string(LLM_MODEL),
+            tts=inference.TTS.from_model_string(TTS_MODEL),
             vad=silero.VAD.load(),
             turn_detection=MultilingualModel(),
+            userdata=session_context,
         )
         
         logger.info(
@@ -114,9 +126,9 @@ async def entrypoint(ctx: JobContext) -> None:
             extra={
                 "room": room_name,
                 "project_id": project_id,
-                "stt": "assemblyai/universal-streaming:en",
-                "llm": "openai/gpt-4o-mini",
-                "tts": "cartesia/sonic-3",
+                "stt": STT_MODEL,
+                "llm": LLM_MODEL,
+                "tts": TTS_MODEL,
                 "vad": "silero",
                 "turn_detection": "multilingual",
             },
@@ -135,9 +147,8 @@ async def entrypoint(ctx: JobContext) -> None:
         raise  # Permanent error - invalid configuration
     
     # Set up data channel handler for page context
-    # Store page context in a dict that can be accessed by the agent
-    page_context_store = {"page_context": None}
-    
+    # Page context is stored in session_context.userdata and will be accessible
+    # in agent tools via RunContext parameter (Task 5)
     @ctx.room.on("data_received")
     def on_data_received(data: rtc.DataPacket) -> None:
         """
@@ -147,14 +158,12 @@ async def entrypoint(ctx: JobContext) -> None:
         the voice session (transient errors).
         """
         try:
-            # Parse JSON payload
-            payload = json.loads(data.data.decode("utf-8"))
+            # Validate and parse page context (includes size check, JSON parsing, and Pydantic validation)
+            page_context_input = validate_and_parse_page_context(data.data)
             
-            # Validate using Pydantic
-            page_context_input = PageContextInput(**payload)
-            
-            # Store validated page context
-            page_context_store["page_context"] = PageContext(url=page_context_input.url)
+            # Store validated page context in session userdata
+            # This will be accessible in agent tools via context.userdata.page_context
+            session_context.page_context = PageContext(url=page_context_input.url)
             
             logger.info(
                 "Page context received",
@@ -164,25 +173,13 @@ async def entrypoint(ctx: JobContext) -> None:
                     "page_url": page_context_input.url,
                 },
             )
-        except json.JSONDecodeError as e:
-            logger.warning(
-                "Invalid JSON in data channel message",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "error": str(e),
-                    "error_type": "JSONDecodeError",
-                },
-            )
-        except ValueError as e:
-            # Pydantic validation error
+        except ValidationException as e:
             logger.warning(
                 "Invalid page context data",
                 extra={
                     "room": room_name,
                     "project_id": project_id,
                     "error": str(e),
-                    "error_type": "ValidationError",
                 },
             )
         except Exception as e:
@@ -235,13 +232,17 @@ async def _extract_project_id(ctx: JobContext) -> Optional[str]:
             logger.warning("Room has no metadata", extra={"room": ctx.room.name})
             return None
         
-        # Parse and validate using Pydantic
-        import json
-        metadata_dict = json.loads(metadata) if isinstance(metadata, str) else metadata
-        project_metadata = ProjectMetadata(**metadata_dict)
+        # Validate and parse using validation utility
+        project_metadata = validate_project_metadata(metadata)
         
         return project_metadata.project_id
         
+    except ValidationException as e:
+        logger.error(
+            "Invalid project metadata",
+            extra={"room": ctx.room.name, "error": str(e)},
+        )
+        return None
     except Exception as e:
         logger.error(
             "Failed to extract project_id from metadata",

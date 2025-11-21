@@ -21,6 +21,19 @@ class PageContext:
 
 
 @dataclass
+class SessionContext:
+    """
+    Session-level context stored in AgentSession.userdata.
+    
+    This context is accessible in agent tools via RunContext parameter
+    and persists throughout the session lifecycle.
+    """
+
+    project_id: str
+    page_context: Optional[PageContext] = None
+
+
+@dataclass
 class DocumentChunk:
     """A chunk of document content from RAG search."""
 
