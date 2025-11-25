@@ -3,32 +3,42 @@
 **Last Updated:** 2025-11-25
 
 ## Current Phase
-**Phase 4: Voice Agent RAG Integration** - IN PROGRESS
+**Phase 5: Dashboard** - IN PROGRESS
 
 ## Last Completed Task
-**Task 4.5:** Add documentation ✅
-- Added ASCII architecture diagram showing AgentSession pipeline
-- Enhanced LiveKit Inference model descriptors with alternatives
-- All 186 voice agent tests passing
+**Task 5.1:** Set up Next.js project ✅
+- Next.js 15 with App Router, React 19, TypeScript 5.7
+- Tailwind CSS 4, React Query v5, shadcn/ui components
+- 11 dashboard tests passing
 
 ## Next Task
-**Task 4.6:** Final checkpoint
+**Task 5.2:** Implement authentication (Dashboard spec task 3)
 
 ## Phase Completion Status
 
 ### ✅ Phase 0: Foundation (Complete)
 ### ✅ Phase 1: API Server Core (Complete - 149 tests)
 ### ✅ Phase 2: Voice Agent Minimal (Complete - 150 tests)
-### ✅ Phase 3: Widget Minimal (Complete - 144 tests)
-### ⏳ Phase 4: Voice Agent RAG Integration (In Progress)
-- [x] 4.1 RAG service ✅
-- [x] 4.2 Agent with RAG tool ✅
-- [x] 4.3 Session management for conversation logging ✅
-- [x] 4.4 Railway deployment config ✅
-- [x] 4.5 Documentation ✅
-- [ ] 4.6 Final checkpoint
+### ✅ Phase 3: Widget Minimal (Complete - 143 tests)
+### ✅ Phase 4: Voice Agent RAG Integration (Complete - 186 tests)
+### ⏳ Phase 5: Dashboard (In Progress)
+- [x] 5.1 Set up Next.js project ✅
+- [ ] 5.2 Implement authentication
+- [ ] 5.3 Create API client
+- [ ] 5.4 Implement layout
+- [ ] 5.5 Build projects list page
+- [ ] 5.6 Implement create project dialog
+- [ ] 5.7 Build project detail page
+- [ ] 5.8 Implement documents tab
+- [ ] 5.9 Implement document status display
+- [ ] 5.10 Build conversations tab
+- [ ] 5.11 Implement conversation detail page
+- [ ] 5.12 Implement toast notifications
+- [ ] 5.13 Implement error handling
+- [ ] 5.14 Implement delete project
+- [ ] 5.15 Configure deployment
+- [ ] 5.16 Final checkpoint
 
-### ⏳ Phase 5: Dashboard (Not Started)
 ### ⏳ Phase 6: Deployment & Validation (Not Started)
 
 ## Quick Links
