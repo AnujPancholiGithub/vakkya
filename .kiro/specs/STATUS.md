@@ -6,12 +6,12 @@
 **Phase 5: Dashboard** - IN PROGRESS
 
 ## Last Completed Task
-**Task 5.6:** Implement create project dialog ✅
-- Dashboard layout, projects list, create dialog
+**Task 5.11:** Implement conversation detail page ✅
+- Project detail, documents tab, conversations tab
 - 20 dashboard tests passing
 
 ## Next Task
-**Task 5.7:** Build project detail page (Dashboard spec task 8)
+**Task 5.12:** Implement toast notifications (Dashboard spec task 13)
 
 ## Phase Completion Status
 
@@ -27,7 +27,11 @@
 - [x] 5.4 Implement layout ✅
 - [x] 5.5 Build projects list page ✅
 - [x] 5.6 Implement create project dialog ✅
-- [ ] 5.7 Build project detail page
+- [x] 5.7 Build project detail page ✅
+- [x] 5.8 Implement documents tab ✅
+- [x] 5.9 Implement document status display ✅
+- [x] 5.10 Build conversations tab ✅
+- [x] 5.11 Implement conversation detail page ✅
 - [ ] 5.8 Implement documents tab
 - [ ] 5.9 Implement document status display
 - [ ] 5.10 Build conversations tab

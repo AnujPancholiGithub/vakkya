@@ -544,24 +544,34 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - Form with validation, token display on success
   - _Requirements: 2.2, 2.3_
 
-- [ ] 5.7 Build project detail page (Dashboard spec task 8)
+- [x] 5.7 Build project detail page (Dashboard spec task 8)
   - **Execute:** Dashboard spec task 8 (all subtasks 8.1)
+  - Status: ✅ Complete
+  - Token/embed code with copy buttons, tabs
   - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-- [ ] 5.8 Implement documents tab (Dashboard spec task 9)
+- [x] 5.8 Implement documents tab (Dashboard spec task 9)
   - **Execute:** Dashboard spec task 9
+  - Status: ✅ Complete
+  - Upload, validation, table, delete
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 5.9 Implement document status display (Dashboard spec task 10)
+- [x] 5.9 Implement document status display (Dashboard spec task 10)
   - **Execute:** Dashboard spec task 10
+  - Status: ✅ Complete
+  - Status badges with error display
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 5.10 Build conversations tab (Dashboard spec task 11)
+- [x] 5.10 Build conversations tab (Dashboard spec task 11)
   - **Execute:** Dashboard spec task 11
+  - Status: ✅ Complete
+  - Conversations table with navigation
   - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 5.11 Implement conversation detail page (Dashboard spec task 12)
+- [x] 5.11 Implement conversation detail page (Dashboard spec task 12)
   - **Execute:** Dashboard spec task 12
+  - Status: ✅ Complete
+  - Transcript with user/agent bubbles
   - _Requirements: 6.4_
 
 - [ ] 5.12 Implement toast notifications (Dashboard spec task 13)

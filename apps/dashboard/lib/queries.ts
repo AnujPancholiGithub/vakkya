@@ -1,13 +1,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from './api-client'
 
-// Types
+// Types - match API response format
 export interface Project {
   id: string
-  userId: string
   name: string
-  token: string
+  widgetToken: string
   createdAt: string
+  updatedAt: string
+}
+
+// Mapped type for UI (token alias)
+export interface ProjectWithToken extends Omit<Project, 'widgetToken'> {
+  token: string
+}
+
+// API response wrappers
+interface ProjectsResponse {
+  projects: Project[]
+}
+
+interface ProjectResponse {
+  project: Project
+}
+
+interface DocumentsResponse {
+  documents: Document[]
+}
+
+interface DocumentResponse {
+  document: Document
+}
+
+interface ConversationsResponse {
+  conversations: Conversation[]
+}
+
+interface ConversationResponse {
+  conversation: ConversationDetail
 }
 
 export interface Document {
@@ -39,18 +69,29 @@ export interface ConversationDetail extends Conversation {
   turns: ConversationTurn[]
 }
 
+// Helper to map project response to UI format
+function mapProject(p: Project): ProjectWithToken {
+  return { ...p, token: p.widgetToken }
+}
+
 // Project hooks
 export function useProjects() {
   return useQuery({
     queryKey: ['projects'],
-    queryFn: () => api.get<Project[]>('/projects'),
+    queryFn: async () => {
+      const res = await api.get<ProjectsResponse>('/projects')
+      return res.projects.map(mapProject)
+    },
   })
 }
 
 export function useProject(id: string) {
   return useQuery({
     queryKey: ['projects', id],
-    queryFn: () => api.get<Project>(`/projects/${id}`),
+    queryFn: async () => {
+      const res = await api.get<ProjectResponse>(`/projects/${id}`)
+      return mapProject(res.project)
+    },
     enabled: !!id,
   })
 }
@@ -58,7 +99,10 @@ export function useProject(id: string) {
 export function useCreateProject() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string }) => api.post<Project>('/projects', data),
+    mutationFn: async (data: { name: string }) => {
+      const res = await api.post<ProjectResponse>('/projects', data)
+      return mapProject(res.project)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
@@ -79,7 +123,10 @@ export function useDeleteProject() {
 export function useDocuments(projectId: string) {
   return useQuery({
     queryKey: ['documents', projectId],
-    queryFn: () => api.get<Document[]>(`/projects/${projectId}/documents`),
+    queryFn: async () => {
+      const res = await api.get<DocumentsResponse>(`/projects/${projectId}/documents`)
+      return res.documents
+    },
     enabled: !!projectId,
   })
 }
@@ -87,10 +134,11 @@ export function useDocuments(projectId: string) {
 export function useUploadDocument(projectId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const formData = new FormData()
       formData.append('file', file)
-      return api.upload<Document>(`/projects/${projectId}/documents`, formData)
+      const res = await api.upload<DocumentResponse>(`/projects/${projectId}/documents`, formData)
+      return res.document
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents', projectId] })
@@ -113,7 +161,10 @@ export function useDeleteDocument(projectId: string) {
 export function useConversations(projectId: string) {
   return useQuery({
     queryKey: ['conversations', projectId],
-    queryFn: () => api.get<Conversation[]>(`/projects/${projectId}/conversations`),
+    queryFn: async () => {
+      const res = await api.get<ConversationsResponse>(`/projects/${projectId}/conversations`)
+      return res.conversations
+    },
     enabled: !!projectId,
   })
 }
@@ -121,8 +172,10 @@ export function useConversations(projectId: string) {
 export function useConversation(projectId: string, conversationId: string) {
   return useQuery({
     queryKey: ['conversations', projectId, conversationId],
-    queryFn: () =>
-      api.get<ConversationDetail>(`/conversations/${conversationId}`),
+    queryFn: async () => {
+      const res = await api.get<ConversationResponse>(`/conversations/${conversationId}`)
+      return res.conversation
+    },
     enabled: !!projectId && !!conversationId,
   })
 }

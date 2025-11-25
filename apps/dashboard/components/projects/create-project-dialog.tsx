@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -54,13 +54,19 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     }
   }
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    if (!copied) return
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
+
   const handleCopy = async () => {
     if (!createdToken) return
     try {
       await navigator.clipboard.writeText(createdToken)
       setCopied(true)
       toast.success('Token copied to clipboard')
-      setTimeout(() => setCopied(false), 2000)
     } catch {
       toast.error('Failed to copy token')
     }
