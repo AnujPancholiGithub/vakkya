@@ -58,10 +58,14 @@ class TestSessionManager:
         assert session.conversation_history == []
         assert isinstance(session.created_at, datetime)
         
-        # Verify database insert was called
-        conn.execute.assert_called_once()
-        call_args = conn.execute.call_args[0]
-        assert "INSERT INTO conversations" in call_args[0]
+        # Verify database calls: SET statement_timeout + INSERT
+        assert conn.execute.call_count == 2
+        # First call sets timeout
+        first_call = conn.execute.call_args_list[0][0]
+        assert "statement_timeout" in first_call[0]
+        # Second call is the INSERT
+        second_call = conn.execute.call_args_list[1][0]
+        assert "INSERT INTO conversations" in second_call[0]
 
     @pytest.mark.asyncio
     async def test_get_session_found(self, mock_db_pool):
@@ -88,6 +92,7 @@ class TestSessionManager:
             }
         ]
         
+        conn.execute = AsyncMock()  # For SET statement_timeout
         conn.fetchrow = AsyncMock(return_value=session_row)
         conn.fetch = AsyncMock(return_value=turn_rows)
         
@@ -110,6 +115,7 @@ class TestSessionManager:
         """Test retrieving a non-existent session."""
         # Arrange
         pool, conn = mock_db_pool
+        conn.execute = AsyncMock()  # For SET statement_timeout
         conn.fetchrow = AsyncMock(return_value=None)
         
         manager = SessionManager(db_pool=pool)
@@ -135,6 +141,7 @@ class TestSessionManager:
             "turnCount": 0,
         }
         
+        conn.execute = AsyncMock()  # For SET statement_timeout
         conn.fetchrow = AsyncMock(return_value=session_row)
         conn.fetch = AsyncMock(return_value=[])
         
@@ -174,6 +181,7 @@ class TestSessionManager:
             for i in range(3)
         ]
         
+        conn.execute = AsyncMock()  # For SET statement_timeout
         conn.fetchrow = AsyncMock(return_value=session_row)
         conn.fetch = AsyncMock(return_value=turn_rows)
         
@@ -229,22 +237,26 @@ class TestSessionManager:
         # Act
         await manager.add_turn(TEST_SESSION_ID, turn)
 
-        # Assert - now makes 2 calls: INSERT turn + UPDATE turn_count
-        assert conn.execute.call_count == 2
+        # Assert - now makes 3 calls: SET timeout + INSERT turn + UPDATE turn_count
+        assert conn.execute.call_count == 3
         
-        # Check first call (INSERT turn)
+        # Check first call (SET statement_timeout)
         first_call = conn.execute.call_args_list[0][0]
-        assert "INSERT INTO conversation_turns" in first_call[0]
-        assert first_call[1] == turn.turn_id
-        assert first_call[2] == TEST_SESSION_ID
-        assert first_call[3] == "What is the weather?"
-        assert first_call[4] == "It's sunny today."
+        assert "statement_timeout" in first_call[0]
         
-        # Check second call (UPDATE turnCount)
+        # Check second call (INSERT turn)
         second_call = conn.execute.call_args_list[1][0]
-        assert "UPDATE conversations" in second_call[0]
-        assert "turnCount" in second_call[0]
-        assert second_call[1] == TEST_SESSION_ID  # Verify correct session_id
+        assert "INSERT INTO conversation_turns" in second_call[0]
+        assert second_call[1] == turn.turn_id
+        assert second_call[2] == TEST_SESSION_ID
+        assert second_call[3] == "What is the weather?"
+        assert second_call[4] == "It's sunny today."
+        
+        # Check third call (UPDATE turnCount)
+        third_call = conn.execute.call_args_list[2][0]
+        assert "UPDATE conversations" in third_call[0]
+        assert "turnCount" in third_call[0]
+        assert third_call[1] == TEST_SESSION_ID  # Verify correct session_id
 
     @pytest.mark.asyncio
     async def test_add_turn_with_empty_rag_documents(self, mock_db_pool):
@@ -264,12 +276,12 @@ class TestSessionManager:
         # Act
         await manager.add_turn(TEST_SESSION_ID, turn)
 
-        # Assert - now makes 2 calls: INSERT turn + UPDATE turn_count
-        assert conn.execute.call_count == 2
+        # Assert - now makes 3 calls: SET timeout + INSERT turn + UPDATE turn_count
+        assert conn.execute.call_count == 3
         
-        # Check first call (INSERT turn)
-        first_call = conn.execute.call_args_list[0][0]
-        assert "INSERT INTO conversation_turns" in first_call[0]
+        # Check second call (INSERT turn - after SET timeout)
+        second_call = conn.execute.call_args_list[1][0]
+        assert "INSERT INTO conversation_turns" in second_call[0]
 
     @pytest.mark.asyncio
     async def test_complete_session(self, mock_db_pool):
@@ -510,6 +522,9 @@ class TestSessionManagerErrorHandling:
         # Arrange
         pool = MagicMock()
         conn = MagicMock()
+        
+        # Mock execute for SET statement_timeout
+        conn.execute = AsyncMock()
         
         # Create a proper async mock that raises on fetchrow
         async def mock_fetchrow(*args, **kwargs):

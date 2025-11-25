@@ -40,7 +40,7 @@ describe('validateToken', () => {
       expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: 'my-token' }),
+        body: JSON.stringify({ widgetToken: 'my-token' }),
       })
     );
   });

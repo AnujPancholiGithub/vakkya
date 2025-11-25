@@ -139,11 +139,13 @@
   - All 186 tests passing
   - _Requirements: 11.1, 11.2_
 
-- [ ] 15. Add documentation
-  - Create README.md with setup instructions
-  - Document environment variables
-  - Add architecture diagram showing AgentSession
-  - Document LiveKit Inference model descriptors
+- [x] 15. Add documentation
+  - Status: ✅ Complete
+  - README.md already exists with setup instructions
+  - Environment variables documented in table format
+  - Added ASCII architecture diagram showing AgentSession pipeline
+  - Enhanced LiveKit Inference model descriptors with alternatives table
+  - SCHEMA_REFERENCE.md documents database schema alignment
   - _Requirements: All_
 
 - [ ] 16. Final checkpoint - Ensure all tests pass

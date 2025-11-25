@@ -29,6 +29,7 @@ class Config(BaseSettings):
     
     # OpenAI Configuration (optional - only needed for RAG embeddings in Phase 4)
     openai_api_key: str | None = Field(default=None, description="OpenAI API key for embeddings (optional until RAG is implemented)")
+    openai_base_url: str | None = Field(default=None, description="OpenAI base URL for OpenRouter support")
     
     # API Server Configuration (required for conversation logging)
     api_server_url: str = Field(

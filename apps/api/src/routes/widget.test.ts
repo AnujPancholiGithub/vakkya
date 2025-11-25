@@ -71,8 +71,10 @@ describe('Widget Token Validation API', () => {
       const data = JSON.parse(response.body);
       expect(data.projectId).toBe(projectId);
       expect(data.projectName).toBe('Test Widget Project');
-      expect(data.allowedDomains).toBeDefined();
-      expect(Array.isArray(data.allowedDomains)).toBe(true);
+      expect(data.livekitUrl).toBeDefined();
+      expect(data.livekitToken).toBeDefined();
+      expect(data.roomName).toBeDefined();
+      expect(data.roomName).toMatch(/^vakkya-/);
     });
 
     it('should return 401 for invalid token', async () => {

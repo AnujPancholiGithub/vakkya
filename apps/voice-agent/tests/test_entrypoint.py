@@ -29,8 +29,13 @@ def mock_ctx() -> MagicMock:
     ctx = MagicMock()
     ctx.room.name = TEST_ROOM_NAME
     ctx.room.metadata = json.dumps({"project_id": TEST_PROJECT_ID})
+    ctx.room.remote_participants = {}  # Empty dict for remote participants
     ctx.connect = AsyncMock()
     ctx.wait_for_participant = AsyncMock()
+    
+    # Mock job metadata (primary source)
+    ctx.job = MagicMock()
+    ctx.job.metadata = json.dumps({"project_id": TEST_PROJECT_ID})
     
     mock_participant = MagicMock()
     mock_participant.identity = "user-123"
@@ -45,8 +50,12 @@ def mock_ctx_no_metadata() -> MagicMock:
     ctx = MagicMock()
     ctx.room.name = TEST_ROOM_NAME
     ctx.room.metadata = None
+    ctx.room.remote_participants = {}  # Empty dict for remote participants
     ctx.connect = AsyncMock()
     ctx.wait_for_participant = AsyncMock()
+    
+    # No job metadata
+    ctx.job = None
     
     mock_participant = MagicMock()
     ctx.wait_for_participant.return_value = mock_participant
@@ -56,9 +65,8 @@ def mock_ctx_no_metadata() -> MagicMock:
 
 @pytest.fixture
 def mock_session_components():
-    """Create mocked Agent, AgentSession, and MultilingualModel."""
-    with patch("src.entrypoint.MultilingualModel") as mock_multilingual, \
-         patch("src.entrypoint.AgentSession") as mock_session_class, \
+    """Create mocked Agent and AgentSession."""
+    with patch("src.entrypoint.AgentSession") as mock_session_class, \
          patch("src.entrypoint.Agent") as mock_agent_class:
         
         mock_agent = MagicMock()
@@ -69,15 +77,11 @@ def mock_session_components():
         mock_session_class.__getitem__.return_value = mock_session_class
         mock_session_class.return_value = mock_session
         
-        mock_turn_detector = MagicMock()
-        mock_multilingual.return_value = mock_turn_detector
-        
         yield {
             "agent_class": mock_agent_class,
             "agent": mock_agent,
             "session_class": mock_session_class,
             "session": mock_session,
-            "multilingual": mock_multilingual,
         }
 
 
@@ -117,12 +121,25 @@ def setup_data_handler_capture(ctx: MagicMock) -> dict:
 class TestExtractProjectId:
     """Tests for project_id extraction from room metadata."""
 
+    def _create_mock_ctx(self, room_metadata=None, job_metadata=None):
+        """Helper to create a properly mocked JobContext."""
+        ctx = MagicMock()
+        ctx.room.name = TEST_ROOM_NAME
+        ctx.room.metadata = room_metadata
+        ctx.room.remote_participants = {}
+        if job_metadata is not None:
+            ctx.job = MagicMock()
+            ctx.job.metadata = job_metadata
+        else:
+            ctx.job = None
+        return ctx
+
     @pytest.mark.asyncio
     async def test_extract_valid_project_id(self) -> None:
         """Test extracting a valid project_id from room metadata."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = json.dumps({"project_id": TEST_PROJECT_ID})
+        ctx = self._create_mock_ctx(
+            room_metadata=json.dumps({"project_id": TEST_PROJECT_ID})
+        )
 
         project_id = await _extract_project_id(ctx)
 
@@ -131,9 +148,9 @@ class TestExtractProjectId:
     @pytest.mark.asyncio
     async def test_extract_project_id_dict_metadata(self) -> None:
         """Test extracting project_id when metadata is already a dict."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = {"project_id": TEST_PROJECT_ID}
+        ctx = self._create_mock_ctx(
+            room_metadata={"project_id": TEST_PROJECT_ID}
+        )
 
         project_id = await _extract_project_id(ctx)
 
@@ -142,9 +159,7 @@ class TestExtractProjectId:
     @pytest.mark.asyncio
     async def test_extract_project_id_no_metadata(self) -> None:
         """Test handling when room has no metadata."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = None
+        ctx = self._create_mock_ctx(room_metadata=None)
 
         project_id = await _extract_project_id(ctx)
 
@@ -153,9 +168,7 @@ class TestExtractProjectId:
     @pytest.mark.asyncio
     async def test_extract_project_id_empty_metadata(self) -> None:
         """Test handling when metadata is empty string."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = ""
+        ctx = self._create_mock_ctx(room_metadata="")
 
         project_id = await _extract_project_id(ctx)
 
@@ -163,10 +176,10 @@ class TestExtractProjectId:
 
     @pytest.mark.asyncio
     async def test_extract_project_id_invalid_uuid(self) -> None:
-        """Test handling when project_id is not a valid UUID."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = json.dumps({"project_id": "not-a-uuid"})
+        """Test handling when project_id is too short (invalid format)."""
+        ctx = self._create_mock_ctx(
+            room_metadata=json.dumps({"project_id": "short"})
+        )
 
         project_id = await _extract_project_id(ctx)
 
@@ -175,9 +188,9 @@ class TestExtractProjectId:
     @pytest.mark.asyncio
     async def test_extract_project_id_missing_field(self) -> None:
         """Test handling when project_id field is missing."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = json.dumps({"other_field": "value"})
+        ctx = self._create_mock_ctx(
+            room_metadata=json.dumps({"other_field": "value"})
+        )
 
         project_id = await _extract_project_id(ctx)
 
@@ -186,9 +199,7 @@ class TestExtractProjectId:
     @pytest.mark.asyncio
     async def test_extract_project_id_malformed_json(self) -> None:
         """Test handling when metadata is malformed JSON."""
-        ctx = MagicMock()
-        ctx.room.name = TEST_ROOM_NAME
-        ctx.room.metadata = "{invalid json"
+        ctx = self._create_mock_ctx(room_metadata="{invalid json")
 
         project_id = await _extract_project_id(ctx)
 
@@ -230,7 +241,6 @@ class TestEntrypoint:
         # Should not create agent or session
         mock_session_components["agent_class"].assert_not_called()
         mock_session_components["session_class"].assert_not_called()
-        mock_session_components["multilingual"].assert_not_called()
 
     @pytest.mark.asyncio
     async def test_entrypoint_creates_agent_with_instructions(
@@ -256,7 +266,6 @@ class TestEntrypoint:
         assert "llm" in call_kwargs
         assert "tts" in call_kwargs
         assert "vad" in call_kwargs
-        assert "turn_detection" in call_kwargs
 
 
 # ============================================================================

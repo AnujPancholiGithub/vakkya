@@ -13,7 +13,6 @@ from livekit.agents import (
     inference,
 )
 from livekit.plugins import silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from livekit.agents import ConversationItemAddedEvent
 
@@ -21,7 +20,7 @@ from .config import get_config
 from .models import PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
-from .validation import ValidationException, validate_and_parse_page_context, validate_project_metadata
+from .validation import ValidationException, validate_and_parse_page_context
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +48,7 @@ async def get_rag_service() -> RAGService:
         _rag_service = create_rag_service(
             database_url=config.database_url,
             openai_api_key=config.openai_api_key,
+            openai_base_url=config.openai_base_url,
         )
         await _rag_service.initialize()
         logger.info("RAG service initialized")
@@ -251,13 +251,11 @@ async def entrypoint(ctx: JobContext) -> None:
         
         # Initialize AgentSession with LiveKit Inference models
         # These model descriptors use LiveKit's unified gateway
-        # Note: MultilingualModel() automatically retrieves job context internally
         session = AgentSession[SessionContext](
             stt=inference.STT.from_model_string(STT_MODEL),
             llm=inference.LLM.from_model_string(LLM_MODEL),
             tts=inference.TTS.from_model_string(TTS_MODEL),
             vad=silero.VAD.load(),
-            turn_detection=MultilingualModel(),
             userdata=session_context,
         )
         
@@ -270,7 +268,6 @@ async def entrypoint(ctx: JobContext) -> None:
                 "llm": LLM_MODEL,
                 "tts": TTS_MODEL,
                 "vad": "silero",
-                "turn_detection": "multilingual",
             },
         )
     except Exception as e:
@@ -337,8 +334,44 @@ async def entrypoint(ctx: JobContext) -> None:
     pending_user_query: Optional[str] = None
     
     if session_context.api_conversation_id and session_context.widget_token:
+        import asyncio
+        
+        async def _log_turn_async(user_query: str, agent_response: str) -> None:
+            """Async helper to log turn to API."""
+            try:
+                turn = Turn.create(
+                    session_id=room_name,
+                    user_query=user_query,
+                    agent_response=agent_response,
+                )
+                
+                session_manager = SessionManager(db_pool=None)
+                await session_manager.log_turn_to_api(
+                    conversation_id=session_context.api_conversation_id,
+                    turn=turn,
+                    widget_token=session_context.widget_token,
+                    api_url=api_server_url,
+                )
+                
+                logger.debug(
+                    "Turn logged to API",
+                    extra={
+                        "room": room_name,
+                        "turn_id": turn.turn_id,
+                        "api_conversation_id": session_context.api_conversation_id,
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to log turn to API",
+                    extra={
+                        "room": room_name,
+                        "error": str(e),
+                    },
+                )
+        
         @session.on("conversation_item_added")
-        async def on_conversation_item_added(event: ConversationItemAddedEvent) -> None:
+        def on_conversation_item_added(event: ConversationItemAddedEvent) -> None:
             """
             Log conversation turns to API server.
             
@@ -363,40 +396,11 @@ async def entrypoint(ctx: JobContext) -> None:
                     },
                 )
             elif item.role == "assistant" and pending_user_query:
-                # We have a complete turn - log it
-                try:
-                    turn = Turn.create(
-                        session_id=room_name,
-                        user_query=pending_user_query,
-                        agent_response=text_content,
-                    )
-                    
-                    session_manager = SessionManager(db_pool=None)
-                    await session_manager.log_turn_to_api(
-                        conversation_id=session_context.api_conversation_id,
-                        turn=turn,
-                        widget_token=session_context.widget_token,
-                        api_url=api_server_url,
-                    )
-                    
-                    logger.debug(
-                        "Turn logged to API",
-                        extra={
-                            "room": room_name,
-                            "turn_id": turn.turn_id,
-                            "api_conversation_id": session_context.api_conversation_id,
-                        },
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Failed to log turn to API",
-                        extra={
-                            "room": room_name,
-                            "error": str(e),
-                        },
-                    )
-                finally:
-                    pending_user_query = None
+                # We have a complete turn - log it async
+                asyncio.create_task(
+                    _log_turn_async(pending_user_query, text_content)
+                )
+                pending_user_query = None
     
     try:
         # Start the session - framework handles everything from here!
@@ -428,44 +432,71 @@ async def entrypoint(ctx: JobContext) -> None:
 
 async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Optional[str]]:
     """
-    Extract and validate project_id and widget_token from room metadata.
+    Extract and validate project_id and widget_token from job metadata or participant metadata.
+    
+    The metadata is set on the participant token by the API server when generating
+    LiveKit credentials. We can access it via ctx.job.metadata or from the participant.
     
     Args:
-        ctx: JobContext with room information
+        ctx: JobContext with room and job information
         
     Returns:
         Tuple of (project_id, widget_token) or (None, None) if invalid/missing
     """
+    import json
+    
     try:
-        # Get metadata from room
-        metadata = ctx.room.metadata
+        # First try job metadata (set via room creation)
+        metadata = None
+        
+        # Try to get metadata from the job (if available)
+        if hasattr(ctx, 'job') and ctx.job and hasattr(ctx.job, 'metadata') and ctx.job.metadata:
+            metadata = ctx.job.metadata
+            logger.debug("Got metadata from job", extra={"room": ctx.room.name})
+        
+        # Fall back to room metadata
+        if not metadata and ctx.room.metadata:
+            metadata = ctx.room.metadata
+            logger.debug("Got metadata from room", extra={"room": ctx.room.name})
+        
+        # Try to get from first remote participant's metadata
         if not metadata:
-            logger.warning("Room has no metadata", extra={"room": ctx.room.name})
+            for participant in ctx.room.remote_participants.values():
+                if participant.metadata:
+                    metadata = participant.metadata
+                    logger.debug(
+                        "Got metadata from participant",
+                        extra={"room": ctx.room.name, "participant": participant.identity}
+                    )
+                    break
+        
+        if not metadata:
+            logger.warning("No metadata found in job, room, or participants", extra={"room": ctx.room.name})
             return None, None
         
-        # Validate and parse using validation utility
-        project_metadata = validate_project_metadata(metadata)
-        
-        # Extract widget_token if present (optional for conversation logging)
-        widget_token = None
-        if isinstance(metadata, dict):
-            widget_token = metadata.get("widget_token")
-        elif isinstance(metadata, str):
-            import json
+        # Parse metadata if it's a string
+        if isinstance(metadata, str):
             try:
-                parsed = json.loads(metadata)
-                widget_token = parsed.get("widget_token")
-            except (json.JSONDecodeError, AttributeError):
-                pass
+                metadata = json.loads(metadata)
+            except json.JSONDecodeError:
+                logger.error("Failed to parse metadata JSON", extra={"room": ctx.room.name})
+                return None, None
         
-        return project_metadata.project_id, widget_token
+        # Extract project_id and widget_token
+        project_id = metadata.get("project_id")
+        widget_token = metadata.get("widget_token")
         
-    except ValidationException as e:
-        logger.error(
-            "Invalid project metadata",
-            extra={"room": ctx.room.name, "error": str(e)},
-        )
-        return None, None
+        if not project_id:
+            logger.warning("No project_id in metadata", extra={"room": ctx.room.name})
+            return None, None
+        
+        # Validate project_id format (CUID - starts with 'c' and is alphanumeric)
+        if not isinstance(project_id, str) or len(project_id) < 20:
+            logger.error("Invalid project_id format", extra={"room": ctx.room.name, "project_id": project_id})
+            return None, None
+        
+        return project_id, widget_token
+        
     except Exception as e:
         logger.error(
             "Failed to extract project metadata",

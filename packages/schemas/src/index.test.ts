@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   createProjectSchema,
   createUserSchema,
-  documentUploadSchema,
   MAX_FILE_SIZE,
   MAX_PROJECTS_PER_USER,
   ERROR_CODES,

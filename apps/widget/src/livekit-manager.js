@@ -84,7 +84,7 @@ async function validateToken(token, apiUrl) {
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify({ widgetToken: token }),
   });
   
   if (!response.ok) {
@@ -126,6 +126,9 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   
   /** @type {Function|null} */
   let onStateChangeCallback = null;
+  
+  /** @type {import('livekit-client').RemoteAudioTrack|null} */
+  let remoteAudioTrack = null;
 
   /**
    * Update connection state
@@ -224,6 +227,14 @@ export function createLiveKitManager(widgetToken, apiUrl) {
    * @param {import('livekit-client').RemoteAudioTrack} track
    */
   function handleRemoteAudioTrack(track) {
+    // Clean up previous remote track if exists
+    if (remoteAudioTrack) {
+      remoteAudioTrack.detach();
+    }
+    
+    // Store reference for cleanup
+    remoteAudioTrack = track;
+    
     // Attach track to audio element for playback
     const audioElement = track.attach();
     audioElement.play().catch(err => {
@@ -261,6 +272,12 @@ export function createLiveKitManager(widgetToken, apiUrl) {
    * Disconnect from room and clean up
    */
   async function disconnect() {
+    // Detach and clean up remote audio track
+    if (remoteAudioTrack) {
+      remoteAudioTrack.detach();
+      remoteAudioTrack = null;
+    }
+    
     // Unpublish and stop local track
     if (localAudioTrack) {
       localAudioTrack.stop();

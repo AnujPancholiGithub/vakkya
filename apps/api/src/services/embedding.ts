@@ -18,11 +18,13 @@ let openaiClient: OpenAI | null = null;
 
 /**
  * Get or create OpenAI client instance
+ * Supports OpenRouter via OPENAI_BASE_URL env var
  */
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
     openaiClient = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
+      baseURL: env.OPENAI_BASE_URL || undefined,
     });
   }
   return openaiClient;

@@ -4,17 +4,69 @@ Real-time voice interaction service built with LiveKit Agents SDK 1.0+. Handles 
 
 ## Architecture
 
-The Voice Agent uses LiveKit's AgentSession which automatically handles:
-- **STT**: Speech-to-Text via LiveKit Inference (AssemblyAI, Deepgram)
-- **LLM**: Language model via LiveKit Inference (OpenAI GPT-4o-mini)
-- **TTS**: Text-to-Speech via LiveKit Inference (Cartesia, ElevenLabs)
-- **VAD**: Voice Activity Detection (Silero)
-- **Turn Detection**: Multilingual conversation turn boundaries
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           LiveKit Room                                       │
+│  ┌─────────────┐                                    ┌─────────────────────┐ │
+│  │   Widget    │◄──────── Audio/Data ──────────────►│   Voice Agent       │ │
+│  │  (Browser)  │         (WebRTC)                   │   (Python Worker)   │ │
+│  └─────────────┘                                    └──────────┬──────────┘ │
+└─────────────────────────────────────────────────────────────────┼───────────┘
+                                                                  │
+                    ┌─────────────────────────────────────────────┼───────────┐
+                    │                  AgentSession               │           │
+                    │  ┌──────────────────────────────────────────▼────────┐  │
+                    │  │                                                   │  │
+                    │  │   ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐       │  │
+                    │  │   │ VAD │───►│ STT │───►│ LLM │───►│ TTS │       │  │
+                    │  │   │     │    │     │    │     │    │     │       │  │
+                    │  │   └─────┘    └─────┘    └──┬──┘    └─────┘       │  │
+                    │  │   Silero    AssemblyAI    │      Cartesia        │  │
+                    │  │                           │                       │  │
+                    │  └───────────────────────────┼───────────────────────┘  │
+                    │                              │                          │
+                    │                    ┌─────────▼─────────┐                │
+                    │                    │  search_knowledge │                │
+                    │                    │   (Agent Tool)    │                │
+                    │                    └─────────┬─────────┘                │
+                    └──────────────────────────────┼──────────────────────────┘
+                                                   │
+                    ┌──────────────────────────────┼──────────────────────────┐
+                    │                              │                          │
+                    │  ┌───────────────────────────▼───────────────────────┐  │
+                    │  │                    RAG Service                     │  │
+                    │  │  ┌─────────────┐    ┌──────────────────────────┐  │  │
+                    │  │  │   OpenAI    │    │      PostgreSQL          │  │  │
+                    │  │  │  Embeddings │───►│  pgvector similarity     │  │  │
+                    │  │  │  (1536 dim) │    │  search by projectId     │  │  │
+                    │  │  └─────────────┘    └──────────────────────────┘  │  │
+                    │  └───────────────────────────────────────────────────┘  │
+                    │                                                         │
+                    │                         Custom Logic                    │
+                    └─────────────────────────────────────────────────────────┘
+```
 
-Our custom logic:
+### Components
+
+**LiveKit AgentSession** (automatic pipeline):
+- **VAD**: Silero Voice Activity Detection - detects when user starts/stops speaking
+- **STT**: AssemblyAI Universal Streaming - real-time speech-to-text
+- **LLM**: OpenAI GPT-4o-mini - generates responses with tool calling
+- **TTS**: Cartesia Sonic 3 - low-latency text-to-speech
+- **Turn Detection**: Multilingual model for conversation boundaries
+
+**Custom Logic** (our code):
 - **RAG Service**: PostgreSQL pgvector search for document retrieval
 - **Agent Tool**: `search_knowledge()` function for LLM to query documents
 - **Session Management**: Conversation state and API logging
+
+### Data Flow
+
+1. User speaks → Widget captures audio → WebRTC to LiveKit Room
+2. VAD detects speech → STT transcribes → Text to LLM
+3. LLM decides to call `search_knowledge` tool → RAG queries pgvector
+4. LLM generates response with RAG context → TTS synthesizes audio
+5. Audio streams back to Widget → User hears response
 
 ## Setup
 
@@ -164,13 +216,53 @@ apps/voice-agent/
 
 ## LiveKit Inference Models
 
-The service uses LiveKit Inference with string descriptors for easy provider switching:
+The service uses LiveKit Inference with string descriptors. LiveKit handles all API keys and provider authentication - you only need your LiveKit credentials.
 
-- **STT**: `"assemblyai/universal-streaming:en"` or `"deepgram/nova-2"`
-- **LLM**: `"openai/gpt-4o-mini"` or `"openai/gpt-4o"`
-- **TTS**: `"cartesia/sonic-3:voice-id"` or `"elevenlabs/eleven_turbo_v2"`
+### Model Descriptor Format
 
-No need for separate API keys - LiveKit Inference handles all model access!
+```
+provider/model-name:variant
+```
+
+### Current Configuration
+
+| Component | Descriptor | Provider | Notes |
+|-----------|------------|----------|-------|
+| STT | `assemblyai/universal-streaming:en` | AssemblyAI | Real-time streaming, English |
+| LLM | `openai/gpt-4o-mini` | OpenAI | Fast, cost-effective, tool calling |
+| TTS | `cartesia/sonic-3` | Cartesia | Ultra-low latency (~100ms) |
+| VAD | `silero.VAD.load()` | Silero | Local, no API call |
+| Turn Detection | `MultilingualModel()` | LiveKit | Conversation boundary detection |
+
+### Alternative Models
+
+**STT Options:**
+- `deepgram/nova-2-general` - High accuracy, streaming
+- `deepgram/nova-2-conversationalai` - Optimized for dialogue
+- `assemblyai/universal-streaming:en` - Multi-accent support
+
+**LLM Options:**
+- `openai/gpt-4o` - Higher quality, slower
+- `openai/gpt-4o-mini` - Faster, cheaper (current)
+- `anthropic/claude-3-haiku` - Alternative provider
+
+**TTS Options:**
+- `cartesia/sonic-3` - Lowest latency (current)
+- `elevenlabs/eleven_turbo_v2` - High quality voices
+- `openai/tts-1` - Good quality, moderate latency
+
+### Changing Models
+
+Models are configured in `src/entrypoint.py`:
+
+```python
+# Model descriptors for LiveKit Inference
+STT_MODEL = "assemblyai/universal-streaming:en"
+LLM_MODEL = "openai/gpt-4o-mini"
+TTS_MODEL = "cartesia/sonic-3"
+```
+
+To switch providers, simply change the string descriptor. No code changes needed beyond the constant.
 
 ## License
 

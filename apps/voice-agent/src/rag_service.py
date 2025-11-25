@@ -28,6 +28,7 @@ class RAGConfig:
 
     database_url: str
     openai_api_key: str
+    openai_base_url: str | None = None  # For OpenRouter support
     top_k: int = DEFAULT_TOP_K
 
 
@@ -47,7 +48,10 @@ class RAGService:
         """
         self._config = config
         self._pool: Optional[asyncpg.Pool] = None
-        self._openai_client = openai.AsyncOpenAI(api_key=config.openai_api_key)
+        self._openai_client = openai.AsyncOpenAI(
+            api_key=config.openai_api_key,
+            base_url=config.openai_base_url,
+        )
 
     async def initialize(self) -> None:
         """
@@ -263,13 +267,18 @@ def format_chunks_for_llm(chunks: list[DocumentChunk]) -> str:
 
 
 # Factory function for creating RAG service from config
-def create_rag_service(database_url: str, openai_api_key: str) -> RAGService:
+def create_rag_service(
+    database_url: str,
+    openai_api_key: str,
+    openai_base_url: str | None = None,
+) -> RAGService:
     """
     Create a RAG service instance.
     
     Args:
         database_url: PostgreSQL connection URL
         openai_api_key: OpenAI API key for embeddings
+        openai_base_url: Optional base URL for OpenRouter support
         
     Returns:
         Configured RAGService instance
@@ -277,5 +286,6 @@ def create_rag_service(database_url: str, openai_api_key: str) -> RAGService:
     config = RAGConfig(
         database_url=database_url,
         openai_api_key=openai_api_key,
+        openai_base_url=openai_base_url,
     )
     return RAGService(config)

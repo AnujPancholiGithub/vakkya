@@ -102,7 +102,22 @@ export async function conversationRoutes(app: FastifyInstance, env: Env) {
         return;
       }
 
-      // Add turn (service will validate conversation exists)
+      // Verify conversation belongs to the project associated with the widget token
+      // This prevents a valid token from Project A adding turns to Project B's conversations
+      try {
+        await conversationService.get(params.id, projectConfig.projectId);
+      } catch {
+        reply.code(403).send({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Token does not match conversation project',
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      // Add turn (conversation ownership already validated above)
       const turn = await conversationService.addTurn(params.id, {
         userQuery: body.userQuery,
         agentResponse: body.agentResponse,

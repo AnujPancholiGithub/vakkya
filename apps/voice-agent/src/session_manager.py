@@ -48,6 +48,7 @@ class SessionManager:
     # Configuration constants
     MAX_CONVERSATION_HISTORY = 3
     API_TIMEOUT_SECONDS = 5.0
+    DB_STATEMENT_TIMEOUT_MS = 5000  # 5 seconds for database queries
 
     def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
         """
@@ -80,6 +81,9 @@ class SessionManager:
         
         try:
             async with self.db_pool.acquire() as conn:
+                # Set statement timeout to prevent long-running queries
+                await conn.execute(f"SET statement_timeout = '{self.DB_STATEMENT_TIMEOUT_MS}'")
+                
                 # Use existing conversations table from API schema
                 # Note: Prisma uses camelCase column names in PostgreSQL
                 await conn.execute(
@@ -138,6 +142,9 @@ class SessionManager:
         
         try:
             async with self.db_pool.acquire() as conn:
+                # Set statement timeout to prevent long-running queries
+                await conn.execute(f"SET statement_timeout = '{self.DB_STATEMENT_TIMEOUT_MS}'")
+                
                 # Use existing conversations table with camelCase column names
                 row = await conn.fetchrow(
                     """
@@ -248,6 +255,9 @@ class SessionManager:
         
         try:
             async with self.db_pool.acquire() as conn:
+                # Set statement timeout to prevent long-running queries
+                await conn.execute(f"SET statement_timeout = '{self.DB_STATEMENT_TIMEOUT_MS}'")
+                
                 # Use existing conversation_turns table with camelCase column names
                 # Note: RAG documents are not stored in MVP schema
                 await conn.execute(
