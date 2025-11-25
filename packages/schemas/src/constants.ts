@@ -25,6 +25,7 @@ export const MAX_CONTEXT_LENGTH = 4000;
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_PASSWORD_LENGTH = 100;
 export const JWT_EXPIRES_IN = '7d';
+export const WIDGET_TOKEN_LENGTH = 64; // 32 bytes hex encoded
 
 // API settings
 export const DEFAULT_PAGE_SIZE = 20;

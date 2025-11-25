@@ -21,17 +21,19 @@
   - Export all schemas for use in dashboard and API
   - _Requirements: 2.3, 4.3, 7.2, 7.3_
 
-- [ ] 3. Implement simple authentication
-  - Create (auth)/login page with email/password form
-  - Create (auth)/register page with email/password form
-  - Implement login API call and store token in localStorage
-  - Create middleware.ts for auth protection
-  - Add logout functionality
+- [x] 3. Implement simple authentication
+  - Status: ✅ Complete
+  - Created (auth)/login page with email/password form
+  - Created (auth)/register page with email/password form
+  - Implemented login/signup API calls with token storage (localStorage + cookie)
+  - Created middleware.ts for auth protection on /projects routes
+  - Added logout functionality
+  - All 20 tests passing
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 3.1 Write minimal unit test for authentication
-  - Test login form submission
-  - Test unauthenticated redirect
+- [x] 3.1 Write minimal unit test for authentication
+  - Status: ✅ Complete
+  - 9 auth tests: login, signup, getToken, isAuthenticated, logout
   - _Requirements: 1.1, 1.2_
 
 - [ ] 4. Create API client and React Query setup

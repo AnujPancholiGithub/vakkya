@@ -22,6 +22,9 @@ let openaiClient: OpenAI | null = null;
  */
 function getOpenAIClient(): OpenAI {
   if (!openaiClient) {
+    if (!env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is required for embedding generation');
+    }
     openaiClient = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
       baseURL: env.OPENAI_BASE_URL || undefined,
