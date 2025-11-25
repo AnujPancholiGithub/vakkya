@@ -431,28 +431,47 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 **Overview:** Add RAG tool to Agent for document-based answers. This is the only custom logic we need to add!
 
-- [ ] 4.1 Implement RAG service (Voice Agent spec task 3)
+- [x] 4.1 Implement RAG service (Voice Agent spec task 3)
   - **Execute:** Voice Agent spec task 3 (all subtasks 3.1)
-  - Implement PostgreSQL connection with pgvector
-  - Implement vector similarity search with projectId filtering
-  - Return top 3 relevant chunks formatted as string
+  - Status: ✅ Complete
+  - Created rag_service.py with RAGService class
+  - Implemented PostgreSQL connection with asyncpg pool
+  - Implemented OpenAI embedding generation (text-embedding-3-small, 1536 dims)
+  - Implemented pgvector similarity search with projectId filtering
+  - Returns top 3 relevant chunks formatted as string for LLM context
+  - All 175 tests passing (25 new RAG service tests)
   - _Requirements: 2.2, 2.3_
 
-- [ ] 4.2 Implement Agent with RAG tool (Voice Agent spec task 5)
+- [x] 4.2 Implement Agent with RAG tool (Voice Agent spec task 5)
   - **Execute:** Voice Agent spec task 5 (all subtasks 5.1)
-  - Define Agent with knowledge grounding instructions
-  - Implement @agent.function() decorator for search_knowledge tool
-  - Let LLM decide when to use the tool
+  - Status: ✅ Complete
+  - Defined Agent with knowledge grounding instructions
+  - Implemented @function_tool() decorator for search_knowledge tool
+  - Tool calls RAG service with project_id filtering
+  - LLM decides when to use the tool based on user questions
+  - Added context-aware instructions with page URL
+  - All 183 voice agent tests passing (8 new RAG tool tests)
   - _Requirements: 2.4, 3.1, 3.4_
 
-- [ ] 4.3 Update session management for conversation logging
+- [x] 4.3 Update session management for conversation logging
   - **Execute:** Update Voice Agent spec task 6 to add API logging
-  - Log all turns to API server
+  - Status: ✅ Complete
+  - Updated SessionManager with create_api_conversation() and log_turn_to_api() methods
+  - Integrated conversation logging into entrypoint using conversation_item_added event
+  - Extracts widget_token from room metadata for API authentication
+  - Creates API conversation at session start, logs turns during conversation
+  - Graceful fallback if API logging fails (doesn't interrupt voice session)
+  - All 186 voice agent tests passing (5 new API logging tests)
   - _Requirements: 2.1, 9.2_
 
-- [ ] 4.4 Create Railway deployment config (Voice Agent spec task 14)
+- [x] 4.4 Create Railway deployment config (Voice Agent spec task 14)
   - **Execute:** Voice Agent spec task 14
-  - Use built-in CLI health checks
+  - Status: ✅ Complete
+  - Created Dockerfile with Python 3.12-slim and non-root user
+  - Created railway.json with 300s health timeout for model loading
+  - Created .dockerignore for optimized builds
+  - Updated README with deployment instructions
+  - All 186 tests passing
   - _Requirements: 11.1, 11.2_
 
 - [ ] 4.5 Add documentation (Voice Agent spec task 15)

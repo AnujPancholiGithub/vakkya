@@ -31,6 +31,9 @@ class SessionContext:
 
     project_id: str
     page_context: Optional[PageContext] = None
+    # API conversation tracking (for logging turns)
+    api_conversation_id: Optional[str] = None
+    widget_token: Optional[str] = None
 
 
 @dataclass

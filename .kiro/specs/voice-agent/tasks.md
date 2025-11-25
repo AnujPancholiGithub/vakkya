@@ -19,16 +19,15 @@
   - Test basic serialization
   - _Requirements: 2.1, 10.1_
 
-- [ ] 3. Implement RAG service using PostgreSQL
-  - Create `rag_service.py` for vector search
-  - Implement query embedding using OpenAI text-embedding-3-small
-  - Implement pgvector similarity search with projectId filtering
-  - Return top 3 relevant chunks formatted as string
-  - This is the ONLY custom service we need - framework handles STT/LLM/TTS
-  - Write basic tests for RAG service
-  - Test embedding generation
-  - Test vector search
-  - Test result formatting
+- [x] 3. Implement RAG service using PostgreSQL
+  - Status: ✅ Complete
+  - Created `rag_service.py` for vector search
+  - Implemented query embedding using OpenAI text-embedding-3-small (1536 dimensions)
+  - Implemented pgvector similarity search with projectId filtering
+  - Returns top 3 relevant chunks formatted as string for LLM context
+  - Created RAGService class with async pool management
+  - Created format_chunks_for_llm() helper for LLM-friendly output
+  - All 175 tests passing (25 new RAG service tests)
   - _Requirements: 2.2, 2.3_
 
 - [x] 4. Implement entrypoint function
@@ -46,15 +45,14 @@
   - Test project_id extraction
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 5. Implement Agent with instructions and RAG tool
-  - Define Agent with clear instructions for knowledge grounding
-  - Implement @agent.function() decorator for search_knowledge tool
-  - Tool should call RAG service and return formatted results
-  - Let LLM decide when to use the tool
-  - Write basic tests for Agent tool
-  - Test tool invocation
-  - Test RAG integration
-  - Test result formatting
+- [x] 5. Implement Agent with instructions and RAG tool
+  - Status: ✅ Complete
+  - Defined Agent with knowledge grounding instructions
+  - Implemented @function_tool() decorator for search_knowledge tool
+  - Tool calls RAG service and returns formatted results
+  - LLM decides when to use the tool based on user questions
+  - Added context-aware instructions with page URL when available
+  - All 183 tests passing (8 new RAG tool tests)
   - _Requirements: 2.4, 3.1, 3.4_
 
 - [x] 6. Implement session state management
@@ -132,10 +130,13 @@
   - Ready to proceed to Phase 3 (Widget) or Phase 4 (RAG Integration)
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Create Railway deployment configuration
-  - Create `railway.json` with service configuration
-  - Document required environment variables in README
-  - Use built-in CLI health checks
+- [x] 14. Create Railway deployment configuration
+  - Status: ✅ Complete
+  - Created `Dockerfile` with Python 3.12-slim, non-root user, health checks
+  - Created `railway.json` with service configuration (300s health timeout for model loading)
+  - Created `.dockerignore` for optimized builds
+  - Updated README.md with deployment instructions
+  - All 186 tests passing
   - _Requirements: 11.1, 11.2_
 
 - [ ] 15. Add documentation

@@ -5,8 +5,7 @@
 set -e
 
 # Configuration
-R2_BUCKET="${R2_BUCKET:-vakkya-widget}"
-R2_ENDPOINT="${R2_ENDPOINT:-https://<account-id>.r2.cloudflarestorage.com}"
+R2_BUCKET="${R2_BUCKET:-vakkyaclfbucket}"
 
 # Build the widget
 echo "Building widget..."

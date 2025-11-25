@@ -6,8 +6,6 @@ and provides a centralized configuration object.
 
 import os
 import sys
-from typing import Literal
-
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings
 

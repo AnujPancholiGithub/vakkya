@@ -32,9 +32,9 @@ class TestSessionManager:
     """Tests for SessionManager."""
 
     def test_init_with_none_pool(self):
-        """Test that SessionManager raises ValueError when db_pool is None."""
-        with pytest.raises(ValueError, match="db_pool cannot be None"):
-            SessionManager(db_pool=None)
+        """Test that SessionManager allows None db_pool for API-only usage."""
+        manager = SessionManager(db_pool=None)
+        assert manager.db_pool is None
 
     @pytest.mark.asyncio
     async def test_create_session(self, mock_db_pool):
@@ -288,7 +288,7 @@ class TestSessionManager:
         conn.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_log_to_api_success(self, mock_db_pool):
+    async def test_log_turn_to_api_success(self, mock_db_pool):
         """Test successfully logging a turn to the API."""
         # Arrange
         pool, _ = mock_db_pool
@@ -302,7 +302,7 @@ class TestSessionManager:
         
         # Mock httpx
         mock_response = MagicMock()
-        mock_response.status_code = 200
+        mock_response.status_code = 201
         
         mock_client = MagicMock()
         mock_client.post = AsyncMock(return_value=mock_response)
@@ -311,17 +311,24 @@ class TestSessionManager:
         
         with patch("httpx.AsyncClient", return_value=mock_client):
             # Act
-            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
+            result = await manager.log_turn_to_api(
+                conversation_id="conv-123",
+                turn=turn,
+                widget_token="a" * 64,
+                api_url="https://api.example.com",
+            )
             
             # Assert
+            assert result is True
             mock_client.post.assert_called_once()
             call_args = mock_client.post.call_args
-            assert call_args[0][0] == "https://api.example.com/api/conversations/log"
-            assert call_args[1]["json"]["session_id"] == TEST_SESSION_ID
-            assert call_args[1]["json"]["user_query"] == "Test query"
+            assert call_args[0][0] == "https://api.example.com/conversations/conv-123/turns"
+            assert call_args[1]["json"]["userQuery"] == "Test query"
+            assert call_args[1]["json"]["agentResponse"] == "Test response"
+            assert call_args[1]["json"]["widgetToken"] == "a" * 64
 
     @pytest.mark.asyncio
-    async def test_log_to_api_failure(self, mock_db_pool):
+    async def test_log_turn_to_api_failure(self, mock_db_pool):
         """Test handling API logging failure gracefully."""
         # Arrange
         pool, _ = mock_db_pool
@@ -344,13 +351,19 @@ class TestSessionManager:
         
         with patch("httpx.AsyncClient", return_value=mock_client):
             # Act - should not raise exception
-            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
+            result = await manager.log_turn_to_api(
+                conversation_id="conv-123",
+                turn=turn,
+                widget_token="a" * 64,
+                api_url="https://api.example.com",
+            )
             
-            # Assert - just verify it was called
+            # Assert
+            assert result is False
             mock_client.post.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_log_to_api_exception(self, mock_db_pool):
+    async def test_log_turn_to_api_exception(self, mock_db_pool):
         """Test handling exception during API logging."""
         # Arrange
         pool, _ = mock_db_pool
@@ -365,9 +378,96 @@ class TestSessionManager:
         # Mock httpx to raise exception
         with patch("httpx.AsyncClient", side_effect=Exception("Network error")):
             # Act - should not raise exception
-            await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
+            result = await manager.log_turn_to_api(
+                conversation_id="conv-123",
+                turn=turn,
+                widget_token="a" * 64,
+                api_url="https://api.example.com",
+            )
             
-            # Assert - no exception raised, error logged internally
+            # Assert - returns False, no exception raised
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_api_conversation_success(self, mock_db_pool):
+        """Test successfully creating an API conversation."""
+        # Arrange
+        pool, _ = mock_db_pool
+        manager = SessionManager(db_pool=pool)
+        
+        # Mock httpx
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"conversation": {"id": "conv-123"}}
+        
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock()
+        
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            # Act
+            result = await manager.create_api_conversation(
+                project_id=TEST_PROJECT_ID,
+                session_id="room-123",
+                widget_token="a" * 64,
+                api_url="https://api.example.com",
+            )
+            
+            # Assert
+            assert result == "conv-123"
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert call_args[0][0] == "https://api.example.com/conversations"
+            assert call_args[1]["json"]["projectId"] == TEST_PROJECT_ID
+            assert call_args[1]["json"]["sessionId"] == "room-123"
+
+    @pytest.mark.asyncio
+    async def test_create_api_conversation_failure(self, mock_db_pool):
+        """Test handling API conversation creation failure."""
+        # Arrange
+        pool, _ = mock_db_pool
+        manager = SessionManager(db_pool=pool)
+        
+        # Mock httpx to return error
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock()
+        
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            # Act
+            result = await manager.create_api_conversation(
+                project_id=TEST_PROJECT_ID,
+                session_id="room-123",
+                widget_token="invalid",
+                api_url="https://api.example.com",
+            )
+            
+            # Assert
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_legacy_log_to_api_warns(self, mock_db_pool):
+        """Test that legacy log_to_api method logs a warning."""
+        # Arrange
+        pool, _ = mock_db_pool
+        manager = SessionManager(db_pool=pool)
+        
+        turn = Turn.create(
+            session_id=TEST_SESSION_ID,
+            user_query="Test query",
+            agent_response="Test response",
+        )
+        
+        # Act - should not raise exception, just log warning
+        await manager.log_to_api(TEST_SESSION_ID, turn, "https://api.example.com")
+        
+        # Assert - no exception raised (warning logged internally)
 
 
 

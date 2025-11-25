@@ -3,16 +3,18 @@
 **Last Updated:** 2025-11-25
 
 ## Current Phase
-**Phase 3: Widget Minimal** - ✅ COMPLETE
+**Phase 4: Voice Agent RAG Integration** - IN PROGRESS
 
 ## Last Completed Task
-**Task 3.11:** Final Checkpoint - Widget Minimal Complete ✅
-- All 144 tests passing across 10 test files
-- Widget bundle: 5.1KB gzipped (LiveKit SDK loads from CDN)
-- Core modules: config, container, button, voice-ui, waveform, audio-processor, livekit-manager, errors, widget
+**Task 4.4:** Create Railway deployment config ✅
+- Created Dockerfile with Python 3.12-slim and non-root user
+- Created railway.json with 300s health timeout for model loading
+- Created .dockerignore for optimized builds
+- Updated README with deployment instructions
+- All 186 voice agent tests passing
 
 ## Next Task
-**Phase 4:** Voice Agent RAG Integration (Task 4.1) - Implement RAG service
+**Task 4.5:** Add documentation
 
 ## Phase Completion Status
 
@@ -20,19 +22,14 @@
 ### ✅ Phase 1: API Server Core (Complete - 149 tests)
 ### ✅ Phase 2: Voice Agent Minimal (Complete - 150 tests)
 ### ✅ Phase 3: Widget Minimal (Complete - 144 tests)
-- [x] 3.1 Project structure ✅
-- [x] 3.2 Widget initializer ✅
-- [x] 3.3 Button component ✅
-- [x] 3.4 Voice UI component ✅
-- [x] 3.5 Audio processor ✅
-- [x] 3.6 LiveKit manager ✅
-- [x] 3.7 Error handling ✅
-- [x] 3.8 Checkpoint ✅
-- [x] 3.9 Bundle optimization ✅
-- [x] 3.10 Deployment config ✅
-- [x] 3.11 Final checkpoint ✅
+### ⏳ Phase 4: Voice Agent RAG Integration (In Progress)
+- [x] 4.1 RAG service ✅
+- [x] 4.2 Agent with RAG tool ✅
+- [x] 4.3 Session management for conversation logging ✅
+- [x] 4.4 Railway deployment config ✅
+- [ ] 4.5 Documentation
+- [ ] 4.6 Final checkpoint
 
-### ⏳ Phase 4: Voice Agent RAG Integration (Not Started)
 ### ⏳ Phase 5: Dashboard (Not Started)
 ### ⏳ Phase 6: Deployment & Validation (Not Started)
 

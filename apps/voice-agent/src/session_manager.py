@@ -29,6 +29,7 @@ import logging
 from typing import Optional
 
 import asyncpg
+import httpx
 
 from .models import PageContext, Session, Turn
 
@@ -47,27 +48,14 @@ class SessionManager:
     # Configuration constants
     MAX_CONVERSATION_HISTORY = 3
     API_TIMEOUT_SECONDS = 5.0
-    """
-    Manages conversation session state in PostgreSQL.
-    
-    Responsibilities:
-    - Create and retrieve sessions
-    - Track conversation history (last 3 turns)
-    - Log conversations to API server
-    """
 
-    def __init__(self, db_pool: asyncpg.Pool):
+    def __init__(self, db_pool: Optional[asyncpg.Pool] = None):
         """
-        Initialize session manager with database connection pool.
+        Initialize session manager with optional database connection pool.
         
         Args:
-            db_pool: PostgreSQL connection pool
-            
-        Raises:
-            ValueError: If db_pool is None
+            db_pool: PostgreSQL connection pool (optional for API-only usage)
         """
-        if db_pool is None:
-            raise ValueError("db_pool cannot be None")
         self.db_pool = db_pool
 
     async def create_session(self, project_id: str, room_name: str) -> Session:
@@ -82,8 +70,12 @@ class SessionManager:
             Created session with generated ID and timestamp
             
         Raises:
+            RuntimeError: If db_pool is not configured
             Exception: If database operation fails
         """
+        if self.db_pool is None:
+            raise RuntimeError("Database pool not configured")
+        
         session = Session.create(project_id=project_id, room_name=room_name)
         
         try:
@@ -138,8 +130,12 @@ class SessionManager:
             Session if found, None otherwise
             
         Raises:
+            RuntimeError: If db_pool is not configured
             Exception: If database operation fails
         """
+        if self.db_pool is None:
+            raise RuntimeError("Database pool not configured")
+        
         try:
             async with self.db_pool.acquire() as conn:
                 # Use existing conversations table with camelCase column names
@@ -244,8 +240,12 @@ class SessionManager:
             turn: Conversation turn to add
             
         Raises:
+            RuntimeError: If db_pool is not configured
             Exception: If database operation fails
         """
+        if self.db_pool is None:
+            raise RuntimeError("Database pool not configured")
+        
         try:
             async with self.db_pool.acquire() as conn:
                 # Use existing conversation_turns table with camelCase column names
@@ -311,58 +311,154 @@ class SessionManager:
             extra={"session_id": session_id},
         )
 
-    async def log_to_api(self, session_id: str, turn: Turn, api_url: str) -> None:
+    async def create_api_conversation(
+        self,
+        project_id: str,
+        session_id: str,
+        widget_token: str,
+        api_url: str,
+    ) -> Optional[str]:
+        """
+        Create a conversation in the API server.
+        
+        This should be called at the start of a voice session to create
+        a conversation record that turns can be logged to.
+        
+        Args:
+            project_id: Project identifier
+            session_id: LiveKit room name / session identifier
+            widget_token: Widget token for authentication
+            api_url: API server base URL
+            
+        Returns:
+            Conversation ID if created successfully, None otherwise
+        """
+        
+        try:
+            payload = {
+                "projectId": project_id,
+                "sessionId": session_id,
+                "widgetToken": widget_token,
+            }
+            
+            async with httpx.AsyncClient(timeout=self.API_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    f"{api_url}/conversations",
+                    json=payload,
+                )
+                
+                if response.status_code == 201:
+                    data = response.json()
+                    conversation_id = data.get("conversation", {}).get("id")
+                    logger.info(
+                        "API conversation created",
+                        extra={
+                            "project_id": project_id,
+                            "session_id": session_id,
+                            "conversation_id": conversation_id,
+                        },
+                    )
+                    return conversation_id
+                else:
+                    logger.warning(
+                        "Failed to create API conversation",
+                        extra={
+                            "project_id": project_id,
+                            "session_id": session_id,
+                            "status_code": response.status_code,
+                            "response": response.text[:200] if response.text else None,
+                        },
+                    )
+                    return None
+        except Exception as e:
+            # Don't fail the voice session if API logging fails
+            logger.error(
+                "Error creating API conversation",
+                extra={
+                    "project_id": project_id,
+                    "session_id": session_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
+            )
+            return None
+
+    async def log_turn_to_api(
+        self,
+        conversation_id: str,
+        turn: Turn,
+        widget_token: str,
+        api_url: str,
+    ) -> bool:
         """
         Log a conversation turn to the API server.
         
         This sends the turn data to the main API for storage and analytics.
         
         Args:
-            session_id: Session identifier
+            conversation_id: API conversation ID (from create_api_conversation)
             turn: Conversation turn to log
+            widget_token: Widget token for authentication
             api_url: API server base URL
+            
+        Returns:
+            True if logged successfully, False otherwise
         """
-        import httpx
         
         try:
             payload = {
-                "session_id": session_id,
-                "turn_id": turn.turn_id,
-                "user_query": turn.user_query,
-                "agent_response": turn.agent_response,
-                "timestamp": turn.timestamp.isoformat(),
+                "userQuery": turn.user_query,
+                "agentResponse": turn.agent_response,
+                "widgetToken": widget_token,
             }
             
             async with httpx.AsyncClient(timeout=self.API_TIMEOUT_SECONDS) as client:
                 response = await client.post(
-                    f"{api_url}/api/conversations/log",
+                    f"{api_url}/conversations/{conversation_id}/turns",
                     json=payload,
                 )
                 
-                if response.status_code != 200:
+                if response.status_code == 201:
+                    logger.debug(
+                        "Turn logged to API",
+                        extra={
+                            "conversation_id": conversation_id,
+                            "turn_id": turn.turn_id,
+                        },
+                    )
+                    return True
+                else:
                     logger.warning(
                         "Failed to log turn to API",
                         extra={
-                            "session_id": session_id,
+                            "conversation_id": conversation_id,
                             "turn_id": turn.turn_id,
                             "status_code": response.status_code,
                         },
                     )
-                else:
-                    logger.debug(
-                        "Turn logged to API",
-                        extra={
-                            "session_id": session_id,
-                            "turn_id": turn.turn_id,
-                        },
-                    )
+                    return False
         except Exception as e:
             # Don't fail the conversation if logging fails
             logger.error(
                 "Error logging turn to API",
                 extra={
-                    "session_id": session_id,
+                    "conversation_id": conversation_id,
                     "turn_id": turn.turn_id,
                     "error": str(e),
+                    "error_type": type(e).__name__,
                 },
             )
+            return False
+
+    # Legacy method for backwards compatibility
+    async def log_to_api(self, session_id: str, turn: Turn, api_url: str) -> None:
+        """
+        Legacy method - use log_turn_to_api instead.
+        
+        This method is kept for backwards compatibility but does nothing
+        since it doesn't have the required conversation_id and widget_token.
+        """
+        logger.warning(
+            "log_to_api called without conversation_id - use log_turn_to_api instead",
+            extra={"session_id": session_id, "turn_id": turn.turn_id},
+        )
