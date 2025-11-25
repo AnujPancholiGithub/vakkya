@@ -156,8 +156,10 @@ class TestEntrypoint:
         ctx.wait_for_participant.assert_called_once()
         mock_agent_class.assert_called_once()
         mock_session_class.assert_called_once()
+        # AgentSession.start() only takes room and agent parameters
+        # The framework automatically handles participant connections
         mock_session.start.assert_called_once_with(
-            room=ctx.room, agent=mock_agent, participant=mock_participant
+            room=ctx.room, agent=mock_agent
         )
 
     @pytest.mark.asyncio

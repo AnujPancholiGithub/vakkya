@@ -76,13 +76,22 @@ async def entrypoint(ctx: JobContext) -> None:
         raise  # Let framework handle retry
     
     # Extract project_id from room metadata
+    # In console mode, use a default project_id for testing
     project_id = await _extract_project_id(ctx)
     if not project_id:
-        logger.error(
-            "No valid project_id in room metadata - cannot proceed",
-            extra={"room": room_name},
-        )
-        return  # Permanent error - don't retry
+        # Check if this is console mode (mock room)
+        if room_name == "mock_room":
+            logger.info(
+                "Console mode detected - using default project_id for testing",
+                extra={"room": room_name},
+            )
+            project_id = "00000000-0000-0000-0000-000000000000"  # Default for console mode
+        else:
+            logger.error(
+                "No valid project_id in room metadata - cannot proceed",
+                extra={"room": room_name},
+            )
+            return  # Permanent error - don't retry
     
     logger.info(
         "Extracted project metadata",
@@ -195,7 +204,9 @@ async def entrypoint(ctx: JobContext) -> None:
     
     try:
         # Start the session - framework handles everything from here!
-        await session.start(room=ctx.room, agent=agent, participant=participant)
+        # Note: AgentSession.start() only takes room and agent parameters
+        # The framework automatically handles participant connections
+        await session.start(room=ctx.room, agent=agent)
         
         logger.info(
             "AgentSession started",

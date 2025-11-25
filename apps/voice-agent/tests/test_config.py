@@ -129,11 +129,12 @@ class TestConfigValidation:
             Config()
     
     def test_missing_openai_api_key(self, valid_env, monkeypatch):
-        """Test that missing OPENAI_API_KEY raises validation error."""
+        """Test that missing OPENAI_API_KEY is allowed (optional for Phase 2)."""
         monkeypatch.delenv("OPENAI_API_KEY")
         
-        with pytest.raises(Exception):
-            Config()
+        # Should not raise - OPENAI_API_KEY is optional until RAG is implemented
+        config = Config()
+        assert config.openai_api_key is None
     
     def test_invalid_livekit_url_format(self, valid_env, monkeypatch):
         """Test that invalid LIVEKIT_URL format raises validation error."""

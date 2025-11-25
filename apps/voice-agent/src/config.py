@@ -29,8 +29,8 @@ class Config(BaseSettings):
     # Database Configuration (required)
     database_url: str = Field(..., min_length=1, description="PostgreSQL connection URL")
     
-    # OpenAI Configuration (required for embeddings)
-    openai_api_key: str = Field(..., min_length=1, description="OpenAI API key for embeddings")
+    # OpenAI Configuration (optional - only needed for RAG embeddings in Phase 4)
+    openai_api_key: str | None = Field(default=None, description="OpenAI API key for embeddings (optional until RAG is implemented)")
     
     # API Server Configuration (required for conversation logging)
     api_server_url: str = Field(

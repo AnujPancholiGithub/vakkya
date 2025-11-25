@@ -1,28 +1,27 @@
 # Vakkya Build Status - Quick Reference
 
-**Last Updated:** 2025-11-21 12:10
+**Last Updated:** 2025-11-25 (Current Session)
 
 ## Current Phase
-**Phase 2: Voice Agent Minimal** - In Progress
+**Phase 2: Voice Agent Minimal** - ✅ COMPLETE
 
 ## Last Completed Task
-**Task 2.9:** Implement environment validation (Voice Agent spec task 11) ✅
-- Created config.py with pydantic-settings validation
-- Validates all required environment variables with fail-fast error messages
-- All 142 tests passing (27 new config tests)
+**Task 2.11:** Checkpoint - Voice Agent Minimal Complete ✅
+- All 150 tests passing across 9 test files
+- Core modules: config, entrypoint, logging_config, main, models, session_manager, validation
+- Voice agent ready for Widget integration (Phase 3) or RAG integration (Phase 4)
 
 ## Next Task
-**Task 2.10:** Implement main entry point (Voice Agent spec task 12)
+**Phase 3:** Widget Minimal (Task 3.1) - Set up project structure
 
-## Recent Fixes (2025-11-21)
-**Critical Schema Alignment:**
-- Fixed SessionManager to use existing API database schema (conversations/conversation_turns)
-- Corrected all SQL queries to use Prisma's camelCase column names ("projectId", "sessionId", "conversationId", etc.)
-- Added comprehensive schema documentation in session_manager.py header
-- All 57 tests passing with correct schema alignment
-- Page context and session status marked as TODO for task 7 (not in MVP schema yet)
+## Recent Fixes (2025-11-25)
+**Test Fix:**
+- Fixed test_entrypoint_successful_flow to match LiveKit Agents SDK 1.2 API
+- AgentSession.start() only takes `room` and `agent` parameters (not `participant`)
+- All 150 voice-agent tests passing
+- All 149 API server tests passing
 
-**Schema Reference:**
+## Schema Reference
 - conversations: id, projectId, sessionId (stores room name), startedAt, turnCount
 - conversation_turns: id, conversationId, userQuery, agentResponse, timestamp
 
@@ -56,7 +55,18 @@
 - [x] 1.17 Railway deployment (Task 19) ✅
 - [x] 1.18 Final checkpoint (Task 20) ✅
 
-### ⏳ Phase 2: Voice Agent Minimal (Not Started)
+### ✅ Phase 2: Voice Agent Minimal (Complete - 100%)
+- [x] 2.1 Set up project structure (Task 1) ✅
+- [x] 2.2 Implement data models (Task 2) ✅
+- [x] 2.3 Implement entrypoint function (Task 4) ✅
+- [x] 2.4 Implement session state management (Task 6) ✅
+- [x] 2.5 Implement data channel handling (Task 7) ✅
+- [x] 2.6 Implement error handling (Task 8) ✅
+- [x] 2.7 Implement logging (Task 9) ✅
+- [x] 2.8 Implement input validation (Task 10) ✅
+- [x] 2.9 Implement environment validation (Task 11) ✅
+- [x] 2.10 Implement main entry point (Task 12) ✅
+- [x] 2.11 Checkpoint (Task 13) ✅
 ### ⏳ Phase 3: Widget Minimal (Not Started)
 ### ⏳ Phase 4: Voice Agent RAG Integration (Not Started)
 ### ⏳ Phase 5: Dashboard (Not Started)
