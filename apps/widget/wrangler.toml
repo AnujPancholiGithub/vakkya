@@ -1,0 +1,11 @@
+# Cloudflare R2 configuration for widget CDN
+name = "vakkya-widget"
+compatibility_date = "2024-01-01"
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "WIDGET_BUCKET"
+bucket_name = "vakkya-widget"
+
+# Custom domain (configure in Cloudflare dashboard)
+# routes = [{ pattern = "cdn.vakkya.ai/*", zone_name = "vakkya.ai" }]
