@@ -28,6 +28,8 @@ function getOpenAIClient(): OpenAI {
     openaiClient = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
       baseURL: env.OPENAI_BASE_URL || undefined,
+      timeout: 30000, // 30 second timeout
+      maxRetries: 2, // Retry transient failures
     });
   }
   return openaiClient;

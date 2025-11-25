@@ -36,37 +36,38 @@
   - 9 auth tests: login, signup, getToken, isAuthenticated, logout
   - _Requirements: 1.1, 1.2_
 
-- [ ] 4. Create API client and React Query setup
-  - Implement API client with fetch wrappers in lib/api-client.ts
-  - Add basic error handling and response parsing
-  - Configure React Query provider with default options
-  - Implement query hooks in lib/queries.ts (projects, documents, conversations)
-  - Implement mutation hooks (create, delete operations)
+- [x] 4. Create API client and React Query setup
+  - Status: ✅ Complete (done in task 1)
+  - Created lib/api-client.ts with fetch wrappers and error handling
+  - Configured React Query provider in app/providers.tsx
+  - Created lib/queries.ts with all hooks (projects, documents, conversations)
+  - All 20 tests passing
   - _Requirements: 2.1, 2.3, 2.5, 4.1, 4.4, 4.6, 6.1, 7.2, 7.3_
 
-- [ ] 5. Implement dashboard layout and navigation
-  - Create (dashboard)/layout.tsx with simple navigation
-  - Add navigation links (Projects, Logout)
-  - Style with Tailwind CSS
+- [x] 5. Implement dashboard layout and navigation
+  - Status: ✅ Complete
+  - Created (dashboard)/layout.tsx with header navigation
+  - Added Projects nav link and Logout button
+  - Styled with Tailwind CSS
   - _Requirements: 9.1, 9.2_
 
-- [ ] 6. Build projects list page
-  - Create (dashboard)/page.tsx for projects list
-  - Fetch projects using useProjects hook
-  - Display project cards with name
-  - Add "Create Project" button
-  - Handle loading and empty states
-  - Implement click navigation to project detail
+- [x] 6. Build projects list page
+  - Status: ✅ Complete
+  - Created (dashboard)/projects/page.tsx
+  - Fetches projects using useProjects hook
+  - Displays project cards with name and date
+  - Create Project button opens dialog
+  - Loading and empty states handled
+  - Click navigates to project detail
   - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 7. Implement create project dialog
-  - Create CreateProjectDialog component with react-hook-form
-  - Add form field: project name
-  - Implement Zod validation with error display
-  - Call useCreateProject mutation on submit
-  - Display widget token on success
-  - Show success toast notification
-  - Close dialog and refresh projects list
+- [x] 7. Implement create project dialog
+  - Status: ✅ Complete
+  - Created CreateProjectDialog with react-hook-form + zod
+  - Form validates project name (1-100 chars)
+  - Calls useCreateProject mutation
+  - Shows widget token with copy button on success
+  - Toast notifications for success/error
   - _Requirements: 2.2, 2.3_
 
 - [ ] 8. Build project detail page with tabs

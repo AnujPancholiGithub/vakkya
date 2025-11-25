@@ -520,20 +520,28 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - All 20 tests passing
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 5.3 Create API client (Dashboard spec task 4)
+- [x] 5.3 Create API client (Dashboard spec task 4)
   - **Execute:** Dashboard spec task 4
+  - Status: ✅ Complete (done in task 5.1)
+  - API client and React Query hooks already created
   - _Requirements: 2.1, 2.3, 2.5, 4.1, 4.4, 4.6, 6.1, 7.2, 7.3_
 
-- [ ] 5.4 Implement layout (Dashboard spec task 5)
+- [x] 5.4 Implement layout (Dashboard spec task 5)
   - **Execute:** Dashboard spec task 5
+  - Status: ✅ Complete
+  - Created dashboard layout with header navigation
   - _Requirements: 9.1, 9.2_
 
-- [ ] 5.5 Build projects list page (Dashboard spec task 6)
+- [x] 5.5 Build projects list page (Dashboard spec task 6)
   - **Execute:** Dashboard spec task 6
+  - Status: ✅ Complete
+  - Projects list with cards, loading/empty states
   - _Requirements: 2.1, 2.2, 2.4_
 
-- [ ] 5.6 Implement create project dialog (Dashboard spec task 7)
+- [x] 5.6 Implement create project dialog (Dashboard spec task 7)
   - **Execute:** Dashboard spec task 7
+  - Status: ✅ Complete
+  - Form with validation, token display on success
   - _Requirements: 2.2, 2.3_
 
 - [ ] 5.7 Build project detail page (Dashboard spec task 8)
