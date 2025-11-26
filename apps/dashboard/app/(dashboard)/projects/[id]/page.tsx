@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { Copy, Check, Loader2, ArrowLeft } from 'lucide-react'
+import { useParams, useRouter } from 'next/navigation'
+import { Copy, Check, Loader2, ArrowLeft, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -10,16 +10,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useProject } from '@/lib/queries'
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
+import { useProject, useDeleteProject } from '@/lib/queries'
 import { DocumentsTab } from '@/components/documents/documents-tab'
 import { ConversationsTab } from '@/components/conversations/conversations-tab'
 
 export default function ProjectDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const projectId = params.id as string
   const { data: project, isLoading, error } = useProject(projectId)
+  const deleteProject = useDeleteProject()
   const [copiedToken, setCopiedToken] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -52,6 +56,16 @@ export default function ProjectDetailPage() {
     toast.success('Embed code copied!')
   }
 
+  const handleDeleteProject = async () => {
+    try {
+      await deleteProject.mutateAsync(projectId)
+      toast.success('Project deleted')
+      router.push('/projects')
+    } catch {
+      toast.error('Failed to delete project')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -76,18 +90,29 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/projects">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{project.name}</h1>
-          <p className="text-muted-foreground">
-            Created {new Date(project.createdAt).toLocaleDateString()}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/projects">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">{project.name}</h1>
+            <p className="text-muted-foreground">
+              Created {new Date(project.createdAt).toLocaleDateString()}
+            </p>
+          </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowDeleteDialog(true)}
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete Project
+        </Button>
       </div>
 
       <Card>
@@ -147,6 +172,15 @@ export default function ProjectDetailPage() {
           <ConversationsTab projectId={projectId} />
         </TabsContent>
       </Tabs>
+
+      <DeleteConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDeleteProject}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? All documents and conversations will be permanently removed. This action cannot be undone."
+        isLoading={deleteProject.isPending}
+      />
     </div>
   )
 }

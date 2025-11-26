@@ -13,13 +13,14 @@ class ApiError extends Error {
 
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  skipContentType = false
 ): Promise<T> {
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(skipContentType ? {} : { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   }
@@ -66,8 +67,7 @@ export const api = {
     request<T>(endpoint, {
       method: 'POST',
       body: formData,
-      headers: {},
-    }),
+    }, true),
 }
 
 export { ApiError }

@@ -150,7 +150,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
 
       <DeleteConfirmDialog
         open={!!deleteDocId}
-        onOpenChange={(open) => !open && setDeleteDocId(null)}
+        onOpenChange={(open: boolean) => !open && setDeleteDocId(null)}
         onConfirm={handleDelete}
         title="Delete Document"
         description="Are you sure you want to delete this document? This action cannot be undone."
