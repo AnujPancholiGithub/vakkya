@@ -616,11 +616,11 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ## Phase 6: Deployment & Final Validation
 
-- [ ] 6.1 Deploy API Server to Railway
-  - Use API spec task 19 deployment config
-  - Configure environment variables
-  - Deploy from GitHub
-  - Verify /health endpoint returns 200
+- [x] 6.1 Deploy API Server to Railway
+  - Status: ✅ Complete
+  - Deployed to: https://vakkyaapi-production.up.railway.app
+  - Health check: /health returns {"status":"ok"}
+  - Database: connected, pgvector: enabled
   - _Requirements: 9.4_
 
 - [ ] 6.2 Deploy Voice Agent to Railway
