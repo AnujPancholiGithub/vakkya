@@ -12,6 +12,9 @@ describe('Logger Configuration', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
+        LIVEKIT_URL: 'wss://test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-api-key',
+        LIVEKIT_API_SECRET: 'test-api-secret',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
 
@@ -31,6 +34,9 @@ describe('Logger Configuration', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
+        LIVEKIT_URL: 'wss://test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-api-key',
+        LIVEKIT_API_SECRET: 'test-api-secret',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
 
@@ -46,6 +52,9 @@ describe('Logger Configuration', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
+        LIVEKIT_URL: 'wss://test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-api-key',
+        LIVEKIT_API_SECRET: 'test-api-secret',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
 
@@ -61,6 +70,9 @@ describe('Logger Configuration', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
+        LIVEKIT_URL: 'wss://test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-api-key',
+        LIVEKIT_API_SECRET: 'test-api-secret',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
 
@@ -76,6 +88,9 @@ describe('Logger Configuration', () => {
         JWT_SECRET: 'test-secret',
         JWT_EXPIRES_IN: '7d',
         OPENAI_API_KEY: 'test-key',
+        LIVEKIT_URL: 'wss://test.livekit.cloud',
+        LIVEKIT_API_KEY: 'test-api-key',
+        LIVEKIT_API_SECRET: 'test-api-secret',
         ALLOWED_ORIGINS: ['http://localhost:3000'],
       };
 
