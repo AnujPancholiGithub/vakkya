@@ -1,5 +1,6 @@
 # Voice Agent Dockerfile for Railway deployment
 # Uses Python 3.12 with LiveKit Agents SDK
+# Build context is repo root, Dockerfile is at apps/voice-agent/
 
 FROM python:3.12-slim
 
@@ -21,14 +22,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY apps/voice-agent/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY src/ ./src/
-COPY pyproject.toml .
+COPY apps/voice-agent/src/ ./src/
+COPY apps/voice-agent/pyproject.toml .
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash agent && \
