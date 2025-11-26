@@ -73,6 +73,14 @@ Transform any website into an interactive, voice-first experience with a single 
 - Unanswered questions report
 - RAG hit rate metrics
 
+**Observability**
+- Structured JSON logging across services
+- Voice pipeline latency tracking (STT/RAG/LLM/TTS)
+- Conversation metrics and token usage tracking
+- LLM cost estimation per session
+- Langfuse integration for LLM tracing (post-MVP)
+- Sentry integration for error tracking (post-MVP)
+
 **Integrations**
 - MCP Server for IDE integration
 - Webhooks

@@ -134,7 +134,7 @@ ruff check src/ tests/
 ### Local Development
 
 ```bash
-python -m src.main
+python -m src.main dev
 ```
 
 The service validates all required environment variables on startup and fails fast with clear error messages if any are missing or invalid.
