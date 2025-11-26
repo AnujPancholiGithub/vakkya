@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Start the voice agent worker
 # LiveKit Agents CLI handles worker lifecycle, health checks, and graceful shutdown
-CMD ["python", "-m", "src.main"]
+CMD ["python", "-m", "src.main", "start"]
