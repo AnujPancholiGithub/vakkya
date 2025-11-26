@@ -42,7 +42,7 @@ export async function createApp(env: Env, _logger: Logger) {
 
   // CORS
   await app.register(cors, {
-    origin: env.ALLOWED_ORIGINS,
+    origin: '*', // Allows all domains
     credentials: true,
   });
 
