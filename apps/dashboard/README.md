@@ -15,15 +15,17 @@ pnpm dev
 |----------|-------------|----------|
 | `NEXT_PUBLIC_API_URL` | API server URL | Yes |
 
-## Deployment (Cloudflare Pages)
+## Deployment (Vercel)
 
-1. Connect GitHub repository to Cloudflare Pages
-2. Configure build settings:
-   - Build command: `pnpm --filter @vakkya/dashboard build`
-   - Build output directory: `apps/dashboard/.next`
-   - Root directory: `/`
+1. Import project from GitHub in Vercel dashboard
+2. Configure project settings:
+   - Framework Preset: Next.js
+   - Root Directory: `apps/dashboard`
 3. Set environment variables:
-   - `NEXT_PUBLIC_API_URL`: Production API URL
+   - `NEXT_PUBLIC_API_URL`: `https://vakkyaapi-production.up.railway.app`
+4. Deploy
+
+Vercel will auto-detect Next.js and use the `vercel.json` configuration.
 
 ## Testing
 

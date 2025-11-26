@@ -623,11 +623,11 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - Database: connected, pgvector: enabled
   - _Requirements: 9.4_
 
-- [ ] 6.2 Deploy Voice Agent to Railway
-  - Use Voice Agent spec task 16 deployment config
-  - Configure environment variables
-  - Deploy from GitHub
-  - Verify /health endpoint returns 200
+- [x] 6.2 Deploy Voice Agent to Railway
+  - Status: ✅ Complete
+  - Deployed to Railway with Dockerfile
+  - Environment variables configured
+  - Health check timeout set to 300s for model loading
   - _Requirements: 9.4_
 
 - [ ] 6.3 Deploy Dashboard to Cloudflare Pages
