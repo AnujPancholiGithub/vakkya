@@ -157,62 +157,78 @@
   - Test processing flow
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 11. Checkpoint - Ensure all tests pass
+- [x] 11. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 12. Implement conversation service
-- [ ] 12.1 Create simple conversation service
+- [x] 12. Implement conversation service
+- [x] 12.1 Create simple conversation service
   - Implement create conversation
   - Implement add turn (append to conversation)
   - Implement list (no pagination for MVP)
   - Implement get conversation with all turns
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed transaction race condition in addTurn()
+    - Added getWithOwnership() method for single-query ownership validation
+    - Added input sanitization (trim, max length validation)
+    - See CODE_QUALITY_FIXES.md for details
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 12.2 Write basic tests for conversation service
+- [x] 12.2 Write basic tests for conversation service
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed test cleanup order to prevent foreign key violations
+    - Added 3 new ownership validation tests
+    - All 149 tests passing
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 13. Implement conversation API routes
-- [ ] 13.1 Create Zod schemas for conversation endpoints
+- [x] 13. Implement conversation API routes
+- [x] 13.1 Create Zod schemas for conversation endpoints
   - ConversationTurnSchema
+  - **Quality Improvements Applied (2025-11-18):**
+    - Added max length validation (5000 chars userQuery, 10000 agentResponse)
+    - Added .trim() to prevent whitespace-only inputs
   - _Requirements: 10.1_
 
-- [ ] 13.2 Create conversation routes
+- [x] 13.2 Create conversation routes
   - GET /projects/:projectId/conversations - List conversations
   - GET /conversations/:id - Get conversation detail
   - POST /conversations - Create conversation (called by voice agent)
+  - **Quality Improvements Applied (2025-11-18):**
+    - Fixed N+1 query vulnerability in GET /conversations/:id
+    - Now uses single query with JOIN for ownership validation
+    - Eliminated potential DoS vector
   - POST /conversations/:id/turns - Add turn (called by voice agent)
   - Dashboard routes require authentication, voice agent routes require token validation
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 13.3 Write basic API tests for conversation routes
+- [x] 13.3 Write basic API tests for conversation routes
   - Test conversation creation
   - Test turn appending
   - Test list and get operations
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 14. Implement widget token validation endpoint
-- [ ] 14.1 Create token validation route
+- [x] 14. Implement widget token validation endpoint
+- [x] 14.1 Create token validation route
   - POST /validate-token - Validate widget token and return project config
   - Use project service token validation
   - Return 401 for invalid tokens
   - Include projectId and allowedDomains in response
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 14.2 Write basic tests for token validation
+- [x] 14.2 Write basic tests for token validation
   - Test valid token returns config
   - Test invalid token returns 401
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 15. Implement simple health check endpoint
-- [ ] 15.1 Create basic health check route
+- [x] 15. Implement simple health check endpoint
+- [x] 15.1 Create basic health check route
   - GET /health - Return "ok" with 200 status
   - _Requirements: 9.1_
 
-- [ ] 16. Implement global error handling
-- [ ] 16.1 Create error handler middleware
+- [x] 16. Implement global error handling
+- [x] 16.1 Create error handler middleware
   - Catch all unhandled errors
   - Transform errors into consistent JSON format
   - Log errors with Pino
@@ -220,51 +236,51 @@
   - Never expose secrets or internal details
   - _Requirements: 8.4, 8.6_
 
-- [ ] 16.2 Create validation error handler
+- [x] 16.2 Create validation error handler
   - Catch Zod validation errors
   - Transform into 400 Bad Request with field details
   - _Requirements: 8.4, 10.1_
 
-- [ ] 16.3 Write basic tests for error handlers
+- [x] 16.3 Write basic tests for error handlers
   - Test error transformation
   - Test validation error handling
   - _Requirements: 8.4, 8.6_
 
-- [ ] 17. Implement security middleware
-- [ ] 17.1 Configure Helmet for security headers
+- [x] 17. Implement security middleware
+- [x] 17.1 Configure Helmet for security headers
   - Install and configure @fastify/helmet
   - Set appropriate CSP, HSTS, etc.
   - _Requirements: 10.2_
 
-- [ ] 17.2 Configure CORS
+- [x] 17.2 Configure CORS
   - Install @fastify/cors
   - Whitelist dashboard and widget origins from env vars
   - _Requirements: 10.3_
 
-- [ ] 17.3 Write basic tests for security
+- [x] 17.3 Write basic tests for security
   - Test CORS headers
   - Test security headers
   - _Requirements: 10.2, 10.3_
 
-- [ ] 18. Configure Pino logging
+- [x] 18. Configure Pino logging
   - Set up structured JSON logging
   - Configure log levels per environment
   - Add request ID to all logs
   - Never log sensitive data
   - _Requirements: 10.6_
 
-- [ ] 19. Create Railway deployment configuration
-- [ ] 19.1 Create Dockerfile
+- [x] 19. Create Railway deployment configuration
+- [x] 19.1 Create Dockerfile
   - Use Node.js 24 alpine image
   - Install dependencies
   - Generate Prisma client
   - Expose port 3000
   - _Requirements: All_
 
-- [ ] 19.2 Create database migration script
+- [x] 19.2 Create database migration script
   - Add migration command to build process
   - Use `prisma migrate deploy`
   - _Requirements: All_
 
-- [ ] 20. Final checkpoint - Ensure all tests pass
+- [x] 20. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

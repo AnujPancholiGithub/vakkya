@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+.env.test
+*.log
+coverage
+.DS_Store
+README.md
+vitest.config.ts
+vitest.setup.ts
+**/*.test.ts
+test-fixtures

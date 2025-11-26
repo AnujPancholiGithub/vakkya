@@ -54,11 +54,44 @@ Transform any website into an interactive, voice-first experience with a single 
 - Conversation logs + transcripts in dashboard
 
 ### Deferred to V2 (Post-Launch)
-- Emotion detection from voice tone (Hume AI)
+
+**Security & Control**
+- Domain whitelisting for widget embedding
+- Usage quotas per project
+
+**Agent Customization**
+- Custom system prompts (agent personality/tone)
+- Voice selection (different TTS voices)
+- Widget theming (colors, position, branding)
+
+**Knowledge Base**
+- URL scraping (crawl website for docs)
+- Notion/Confluence sync
+
+**Analytics & Insights**
 - Advanced analytics with charts
+- Unanswered questions report
+- RAG hit rate metrics
+
+**Observability**
+- Structured JSON logging across services
+- Voice pipeline latency tracking (STT/RAG/LLM/TTS)
+- Conversation metrics and token usage tracking
+- LLM cost estimation per session
+- Langfuse integration for LLM tracing (post-MVP)
+- Sentry integration for error tracking (post-MVP)
+
+**Integrations**
+- MCP Server for IDE integration
+- Webhooks
+- Handoff to human (escalation trigger)
+
+**Monetization**
 - Billing/subscriptions
 - Team collaboration
-- Webhooks
+
+**Advanced**
+- Emotion detection from voice tone (Hume AI)
 - Multi-language support
 - Mobile SDKs
 

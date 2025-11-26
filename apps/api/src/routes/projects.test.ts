@@ -8,7 +8,7 @@ import bcrypt from 'bcrypt';
 describe('Project API Routes', () => {
   let app: Awaited<ReturnType<typeof createApp>>;
   let authToken: string;
-  let userId: string | undefined;
+  let userId: string;
   const testEmail = `test-projects-${Date.now()}@example.com`;
 
   beforeEach(async () => {

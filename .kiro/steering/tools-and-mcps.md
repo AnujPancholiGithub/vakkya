@@ -1,29 +1,94 @@
 ---
-title: External Tools & MCP Usage
 inclusion: always
 ---
 
-# External Tools & MCPs
+# External Tools & MCP Usage Guidelines
 
-- Use internet-connected MCPs (Perplexity, Tavily, etc.) **only when**:
-  - Up-to-date information is required (APIs, SDK versions, service pricing).
-  - Concrete examples from external docs or blogs are needed.
-  - There is genuine uncertainty that cannot be resolved from existing repo context.
+## When to Use MCPs
 
-## Usage Guidelines
+Use internet-connected MCPs (Gemini, Perplexity, Tavily) **only** for:
 
-- Prefer **repo context first**, then MCPs only as a supplement.
-- When using MCPs, pull out **specific, actionable details** (endpoints, flags, version notes), not generic advice.
-- Do not mirror long external docs; extract only what is required to complete the current task.
+- **Version-specific information**: Latest API changes, breaking changes in dependencies, SDK updates
+- **Error resolution**: Unfamiliar error messages, production deployment issues, platform-specific bugs
+- **Security best practices**: Current vulnerability patterns, authentication standards, rate limiting strategies
+- **Performance patterns**: Real-world optimization techniques for specific libraries (LiveKit, Fastify, Prisma)
 
-## Code Generation with Tools
+## When NOT to Use MCPs
 
-- Never blindly follow external snippets; **adapt them** to the existing architecture and stack.
-- When external examples conflict with `tech.md`, **follow `tech.md`**.
-- If a provider offers multiple options, pick the simplest that fits our chosen stack (no “framework shopping”).
+Do **not** use MCPs for:
 
-## Performance & Cost Awareness
+- Questions answered in steering files (`tech.md`, `product.md`, `development-philosophy.md`)
+- Basic syntax or language features (TypeScript, Python, JavaScript)
+- Architecture decisions already defined in this codebase
+- Generic "how to" questions that don't require current information
+- Exploring alternative frameworks or libraries not in our stack
 
-- Avoid patterns that significantly increase API calls (OpenAI, Pinecone, etc.) unless absolutely necessary.
-- Prefer batching (embeddings, upserts) when it clearly reduces cost and complexity.
-- Do not introduce heavy dependencies just because external examples use them.
+## Decision Priority
+
+When information conflicts, follow this hierarchy:
+
+1. **Steering files** (`tech.md`, `product.md`) — our architectural decisions
+2. **Existing codebase patterns** — established conventions in this repo
+3. **MCP research** — external best practices adapted to our context
+4. **External examples** — only as inspiration, never copy-paste
+
+## Using MCP Results Effectively
+
+### Extract Specifics
+- Pull out concrete details: API endpoints, configuration flags, version numbers
+- Ignore generic advice like "use error handling" or "add logging"
+- Focus on actionable changes that solve the immediate problem
+
+### Adapt to Our Stack
+- **Never** introduce new frameworks or libraries without explicit approval
+- Translate external patterns to match our existing architecture
+- If an example uses Redis and we use Postgres, adapt the pattern to Postgres
+- If an example uses Express and we use Fastify, convert the middleware pattern
+
+### Minimize Dependencies
+- Prefer built-in solutions over new packages
+- If a package is suggested, check if existing dependencies already solve it
+- Avoid "framework shopping" — stick to the chosen stack in `tech.md`
+
+## Cost & Performance Awareness
+
+### API Call Optimization
+- Batch operations when possible (embeddings, database upserts)
+- Avoid patterns that multiply API calls (N+1 queries, per-request embeddings)
+- Cache expensive operations only after measuring real bottlenecks
+
+### Bundle Size
+- Widget must stay under 100KB gzipped
+- Avoid heavy dependencies in frontend code
+- Use dynamic imports for optional features
+
+### Database Queries
+- Prefer single queries with joins over multiple round trips
+- Use Prisma's `include` and `select` to minimize data transfer
+- Avoid loading full documents when only metadata is needed
+
+## Security Considerations
+
+When researching security patterns:
+
+- Always validate inputs with Zod (TypeScript) or Pydantic (Python)
+- Never log tokens, API keys, or user content
+- Enforce domain whitelisting for widget embeds
+- Use parameterized queries (Prisma handles this)
+- Implement rate limiting on public endpoints
+
+## Example Scenarios
+
+### ✅ Good MCP Usage
+- "What's the latest LiveKit Agents SDK breaking change in v0.8?"
+- "How do Railway's health checks work for Node.js apps?"
+- "What's the recommended pgvector index type for cosine similarity?"
+
+### ❌ Bad MCP Usage
+- "How do I write a TypeScript function?" (basic syntax)
+- "Should I use Fastify or Express?" (already decided in `tech.md`)
+- "What's the best way to structure a monorepo?" (already established)
+
+## Summary
+
+**Repo context first, MCPs as a supplement.** Use external tools to fill knowledge gaps, not to redesign the architecture.

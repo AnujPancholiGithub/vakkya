@@ -6,9 +6,22 @@ import rateLimit from '@fastify/rate-limit';
 import type { Env } from './config/env.js';
 import type { Logger } from 'pino';
 
-export async function createApp(env: Env, logger: Logger) {
+export async function createApp(env: Env, _logger: Logger) {
+  const isDevelopment = env.NODE_ENV === 'development';
+  const isTest = env.NODE_ENV === 'test';
+  
   const app = Fastify({
-    logger: env.NODE_ENV === 'test' ? false : logger,
+    logger: isTest ? false : {
+      level: isDevelopment ? 'debug' : 'info',
+      transport: isDevelopment ? {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'HH:MM:ss',
+          ignore: 'pid,hostname',
+        },
+      } : undefined,
+    },
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     disableRequestLogging: false,
@@ -45,6 +58,10 @@ export async function createApp(env: Env, logger: Logger) {
   await app.register(rateLimit, {
     global: false, // Enable per-route
   });
+
+  // Global error handler
+  const { errorHandler } = await import('./middleware/error-handler.js');
+  app.setErrorHandler(errorHandler);
 
   // Health check routes (no auth required)
   app.get('/health', async () => {
@@ -91,6 +108,14 @@ export async function createApp(env: Env, logger: Logger) {
   // Register document routes
   const { documentRoutes } = await import('./routes/documents.js');
   await documentRoutes(app, env);
+
+  // Register conversation routes
+  const { conversationRoutes } = await import('./routes/conversations.js');
+  await conversationRoutes(app, env);
+
+  // Register widget routes
+  const { widgetRoutes } = await import('./routes/widget.js');
+  await widgetRoutes(app, env);
 
   return app;
 }

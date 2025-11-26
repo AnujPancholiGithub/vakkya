@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createApp } from '../app.js';
-import { env } from '../config/env.js';
-import { logger } from '../config/logger.js';
+import { validateEnv } from '../config/env.js';
+import { createLogger } from '../config/logger.js';
 import { prisma } from '../lib/prisma.js';
 import { signToken } from '../lib/jwt.js';
 import FormData from 'form-data';
@@ -43,6 +43,8 @@ describe('Document Routes', () => {
   let authToken: string;
 
   beforeEach(async () => {
+    const env = validateEnv();
+    const logger = createLogger(env);
     app = await createApp(env, logger);
 
     // Create test user

@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Execute Next Task : Build Sequence Orchestrator",
+  "description": "Monitors build-sequence/tasks.md for changes and orchestrates task execution by enforcing correct order, delegating to service-level specs, and maintaining STATUS.md with minimal progress updates (last task, timestamp, single note). Uses Gemini search when needed for information.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "You are managing a build process defined in build-sequence/tasks.md. Follow these rules strictly:\n1. Execution Order\n\nReview build-sequence/tasks.md and execute tasks in the exact sequence defined\nComplete one parent task and all its subtasks per session\nSTOP and ask for permission before moving to the next parent task\n\n2. Implementation Approach\n\nDelegate detailed implementation to the corresponding service-level specification files\nDo NOT implement details yourself - reference the specs instead\nVerify that the current task is working smoothly before proceeding to the next\n\n3. Status Tracking\n\nMark tasks as completed in build-sequence/tasks.md when finished\nUpdate the status of all linked service-level tasks\nAfter every completion, update STATUS.md with ONLY:\n\nLast completed task\nTimestamp\nOne essential progress note (keep minimal)\n\n4. Decision Making\n\nUse Gemini search when you need information to make informed decisions\n\n5. Quality Standards\n\nPrioritize stability and robustness in every task\nTest and confirm each task works correctly before marking complete\nWork thoughtfully with careful attention to detail\n\nCurrent Action Required:\nReview build-sequence/tasks.md, identify the next task to execute, and proceed according to these guidelines."
+  },
+  "workspaceFolderName": "vakkya_v1",
+  "shortName": "build-sequence-orchestrator"
+}

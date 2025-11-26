@@ -94,7 +94,11 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().url('Invalid database URL'),
   JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  OPENAI_API_KEY: z.string().startsWith('sk-', 'Invalid OpenAI API key'),
+  OPENAI_API_KEY: z.string().min(1, 'OpenAI API key is required'),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  LIVEKIT_URL: z.string().startsWith('wss://', 'LiveKit URL must start with wss://'),
+  LIVEKIT_API_KEY: z.string().min(1, 'LiveKit API key is required'),
+  LIVEKIT_API_SECRET: z.string().min(1, 'LiveKit API secret is required'),
   ALLOWED_ORIGINS: z.string().transform((val) => val.split(',')),
 });
 

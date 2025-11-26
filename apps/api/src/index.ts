@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { validateEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createApp } from './app.js';

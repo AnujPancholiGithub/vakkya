@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "name": "Code Quality Review",
+  "description": "Analyzes modified source code files for code smells, architectural issues, missing best practices, and readability/maintainability/performance concerns. Provides actionable improvement suggestions without changing functionality.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Code Quality Review Instructions\nAnalyze the modified code in the changed file(s) and provide a comprehensive quality assessment.\nBefore Starting:\n\nReview tasks.md to understand the project specs and planned implementations\nCheck if issues you identify might be intentionally handled in upcoming tasks\nUse Gemini or Perplexity search for unfamiliar patterns, frameworks, or conventions\n\nEvaluation Criteria:\n1. Code Smells\n\nDuplicated code blocks\nLong functions/methods (>50 lines)\nLarge classes with too many responsibilities\nExcessive parameters (>4-5)\nPoor naming (unclear, misleading, or inconsistent)\nMagic numbers/strings without explanation\nDead or commented-out code\n\n2. Architecture & Design\n\nSOLID principle violations\nPoor separation of concerns\nTight coupling between components\nMissing or unnecessary abstractions\nInconsistencies with architecture defined in tech.md\n\n3. Best Practices\n\nMissing error handling or inadequate error messages\nLack of input validation\nInsufficient logging for debugging\nSecurity vulnerabilities (SQL injection, XSS, exposed secrets)\nMissing type safety (type hints, interfaces)\nDeviations from project's development philosophy\n\n4. Readability & Maintainability\n\nCode clarity and logical flow\nComment quality (too many, too few, or outdated)\nNaming convention consistency\nFunction/file length appropriateness\nOverall code organization and structure\n\n5. Performance\n\nUnnecessary computations or redundant operations\nInefficient algorithms (O(n²) where O(n) possible)\nMissing caching opportunities\nExcessive API/database calls\nPotential memory leaks or resource exhaustion\n\nOutput Requirements:\n\nCategorize issues by severity: Critical → Important → Minor\nProvide specific, actionable suggestions with code examples where helpful\nExplain WHY each change matters (maintainability, performance, security, etc.)\nFocus ONLY on quality improvements - no feature additions or functionality changes\nFlag issues that may intentionally be handled in later tasks (check tasks.md)\nSuggest only necessary changes that won't break existing flow or functionality"
+  },
+  "workspaceFolderName": "vakkya_v1",
+  "shortName": "code-quality-review"
+}

@@ -14,8 +14,13 @@ out/
 
 # Environment
 .env
+.env.local
+.env.test
+.env.development
+.env.production
 .env*.local
-.env*.test
+# Keep .env.example files for documentation
+!.env.example
 
 # Logs
 logs/

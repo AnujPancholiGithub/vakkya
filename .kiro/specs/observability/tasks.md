@@ -1,0 +1,128 @@
+# Implementation Plan
+
+## Phase 2: Structured Logging & Observability
+
+- [ ] 1. Set up Python JSON logging infrastructure
+  - [ ] 1.1 Create JSON log formatter for Voice Agent
+    - Create `apps/voice-agent/src/logging_config.py` with `JSONFormatter` class
+    - Match Pino output structure (level, time, msg, extra fields)
+    - Configure root logger to use JSON output
+    - _Requirements: 6.1, 6.3, 6.4, 6.5_
+  - [ ] 1.2 Write property test for JSON format validity
+    - **Property 7: JSON Format Validity**
+    - **Validates: Requirements 6.1, 6.2, 6.5**
+  - [ ] 1.3 Update Voice Agent entrypoint to use JSON logging
+    - Import and call `configure_logging()` at startup
+    - Ensure all existing loggers output JSON
+    - _Requirements: 6.1_
+
+- [ ] 2. Implement pipeline metrics tracking
+  - [ ] 2.1 Create metrics data classes
+    - Create `apps/voice-agent/src/metrics.py` with `PipelineMetrics` dataclass
+    - Implement `total_latency_ms()` calculation method
+    - _Requirements: 1.6_
+  - [ ] 2.2 Write property test for latency calculation
+    - **Property 2: Total Latency Consistency**
+    - **Validates: Requirements 1.6**
+  - [ ] 2.3 Create MetricsLogger class
+    - Implement `log_stt_complete()`, `log_rag_complete()`, `log_llm_complete()`, `log_tts_complete()`
+    - Implement `log_turn_complete()` with total latency
+    - Use consistent field naming (`duration_ms`, `event_type`)
+    - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 6.3, 6.5_
+  - [ ] 2.4 Write property test for pipeline stage logging
+    - **Property 1: Pipeline Stage Logging Completeness**
+    - **Validates: Requirements 1.2, 1.3, 1.4, 1.5**
+  - [ ] 2.5 Write property test for field naming consistency
+    - **Property 8: Field Naming Consistency**
+    - **Validates: Requirements 6.3**
+
+- [ ] 3. Implement conversation metrics tracking
+  - [ ] 3.1 Create ConversationMetrics dataclass
+    - Track session_id, project_id, start_time, turn_count, token totals
+    - Track interruption_count and termination_reason
+    - _Requirements: 2.1, 2.2, 3.4_
+  - [ ] 3.2 Create ConversationLogger class
+    - Implement `log_conversation_start()` and `log_conversation_end()`
+    - Implement `log_interruption()` with context
+    - _Requirements: 2.1, 2.2, 2.4, 2.5_
+  - [ ] 3.3 Write property test for conversation lifecycle
+    - **Property 3: Conversation Lifecycle Logging**
+    - **Validates: Requirements 2.1, 2.2**
+  - [ ] 3.4 Write property test for turn sequence
+    - **Property 4: Turn Sequence Monotonicity**
+    - **Validates: Requirements 2.3**
+  - [ ] 3.5 Write property test for token accumulation
+    - **Property 5: Token Count Accumulation**
+    - **Validates: Requirements 3.1, 3.2, 3.4**
+
+- [ ] 4. Integrate metrics into Voice Agent pipeline
+  - [ ] 4.1 Add timing instrumentation to entrypoint
+    - Wrap STT, RAG, LLM, TTS calls with timing
+    - Create PipelineMetrics instance per turn
+    - Log each stage completion
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+  - [ ] 4.2 Add conversation lifecycle logging
+    - Log conversation_start when session begins
+    - Log conversation_end when session terminates
+    - Track and accumulate token counts across turns
+    - _Requirements: 2.1, 2.2, 3.4_
+  - [ ] 4.3 Add interruption detection logging
+    - Hook into LiveKit interruption events
+    - Log interruption with turn context
+    - _Requirements: 2.4_
+
+- [ ] 5. Enhance RAG service metrics
+  - [ ] 5.1 Add timing to RAG search
+    - Track embedding generation time separately
+    - Track vector search time
+    - Log result count and top similarity score
+    - _Requirements: 4.1, 4.2_
+  - [ ] 5.2 Add RAG miss logging
+    - Log rag_miss event when no results found
+    - Include query metadata (length, not content)
+    - _Requirements: 4.3_
+  - [ ] 5.3 Write property test for RAG result logging
+    - **Property 6: RAG Result Logging Consistency**
+    - **Validates: Requirements 4.2, 4.3**
+  - [ ] 5.4 Add RAG error logging
+    - Log error type without sensitive data
+    - Ensure query content is not logged
+    - _Requirements: 4.4_
+
+- [ ] 6. Checkpoint - Verify Voice Agent logging
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 7. Enhance API request logging
+  - [ ] 7.1 Create request logger middleware
+    - Create `apps/api/src/middleware/request-logger.ts`
+    - Track request duration in milliseconds
+    - Add correlation ID header handling
+    - _Requirements: 5.1, 5.3_
+  - [ ] 7.2 Register middleware in Fastify app
+    - Add request logger as preHandler hook
+    - Ensure it runs for all routes
+    - _Requirements: 5.1_
+  - [ ] 7.3 Enhance widget token validation logging
+    - Log validation result (success/failure)
+    - Include project_id in log
+    - _Requirements: 5.2_
+  - [ ] 7.4 Enhance conversation turn logging
+    - Include session_id correlation in turn logs
+    - Log turn creation with identifiers
+    - _Requirements: 5.3_
+  - [ ] 7.5 Write property test for identifier consistency
+    - **Property 9: Identifier Field Consistency**
+    - **Validates: Requirements 6.4**
+
+- [ ] 8. Add error logging enhancements
+  - [ ] 8.1 Enhance API error handler logging
+    - Add error_category field to error logs
+    - Ensure sensitive data is redacted
+    - _Requirements: 5.4_
+  - [ ] 8.2 Add Voice Agent error categorization
+    - Categorize errors (connection, validation, llm, rag, tts)
+    - Log error type without exposing internals
+    - _Requirements: 4.4, 5.4_
+
+- [ ] 9. Final Checkpoint - Verify all logging
+  - Ensure all tests pass, ask the user if questions arise.

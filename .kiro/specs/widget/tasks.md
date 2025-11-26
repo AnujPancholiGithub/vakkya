@@ -1,154 +1,166 @@
 # Implementation Plan - Widget (MVP)
 
-- [ ] 1. Set up project structure and build configuration
+- [x] 1. Set up project structure and build configuration
   - Initialize Vite project with vanilla JavaScript
   - Configure Rollup for IIFE bundle format
   - Configure Terser for minification
   - Set up development server
+  - Status: ✅ Complete
   - _Requirements: 7.1, 7.2_
 
-- [ ] 2. Implement widget initializer
-- [ ] 2.1 Create configuration parser
-  - Parse script tag data-token attribute
-  - Validate required token attribute
-  - _Requirements: 1.1_
+- [x] 2. Implement widget initializer
+  - [x] 2.1 Create configuration parser
+    - Parse script tag data-token attribute
+    - Validate required token attribute
+    - Status: ✅ Complete
+    - _Requirements: 1.1_
+  - [x] 2.2 Create Shadow DOM container
+    - Create shadow root attached to document.body
+    - Inject base styles into shadow root
+    - Ensure style isolation from host page
+    - Status: ✅ Complete
+    - _Requirements: 1.3_
+  - [x] 2.3 Write minimal smoke test for initialization
+    - Test widget initializes with valid token
+    - Status: ✅ Complete (44 tests)
+    - _Requirements: 1.1_
 
-- [ ] 2.2 Create Shadow DOM container
-  - Create shadow root attached to document.body
-  - Inject base styles into shadow root
-  - Ensure style isolation from host page
-  - _Requirements: 1.3_
+- [x] 3. Implement button component
+  - [x] 3.1 Create simple button UI
+    - Render floating button in shadow root (fixed bottom-right)
+    - Use fixed blue color (#3B82F6)
+    - Make responsive for mobile and desktop
+    - Status: ✅ Complete
+    - _Requirements: 2.1_
+  - [x] 3.2 Implement button click handler
+    - Expand to voice UI on click
+    - Request microphone permission
+    - Handle permission grant/deny
+    - Status: ✅ Complete
+    - _Requirements: 2.2, 2.3, 2.4_
 
-- [ ]* 2.3 Write minimal smoke test for initialization
-  - Test widget initializes with valid token
-  - _Requirements: 1.1_
+- [x] 4. Implement voice UI component
+  - [x] 4.1 Create basic voice UI layout
+    - Create expanded UI container
+    - Add waveform canvas
+    - Add close button
+    - Make responsive
+    - Status: ✅ Complete
+    - _Requirements: 3.1, 5.1_
+  - [x] 4.2 Implement simple waveform visualization
+    - Use Canvas API for drawing
+    - Implement animation loop with requestAnimationFrame
+    - Use single color for visualization
+    - Status: ✅ Complete
+    - _Requirements: 3.1, 3.2_
+  - [x] 4.3 Implement close handler
+    - Close button handler
+    - Status: ✅ Complete
+    - _Requirements: 5.1_
 
-- [ ] 3. Implement button component
-- [ ] 3.1 Create simple button UI
-  - Render floating button in shadow root (fixed bottom-right)
-  - Use fixed blue color (#3B82F6)
-  - Make responsive for mobile and desktop
-  - _Requirements: 2.1_
+- [x] 5. Implement audio processor
+  - [x] 5.1 Create audio processor with Web Audio API
+    - Create AudioContext
+    - Create AnalyserNode
+    - Connect microphone stream to analyser
+    - Extract frequency data for waveform
+    - Status: ✅ Complete
+    - _Requirements: 3.1, 3.2_
 
-- [ ] 3.2 Implement button click handler
-  - Expand to voice UI on click
-  - Request microphone permission
-  - Handle permission grant/deny
-  - _Requirements: 2.2, 2.3, 2.4_
+- [x] 6. Implement LiveKit manager
+  - [x] 6.1 Create lazy loading for LiveKit SDK
+    - Use dynamic import for livekit-client
+    - Load only on button click, not page load
+    - Handle import errors
+    - Status: ✅ Complete
+    - _Requirements: 7.2, 7.3_
+  - [x] 6.2 Implement token validation with API
+    - Call API server to validate widget token
+    - Receive LiveKit room token
+    - Handle invalid token errors
+    - Status: ✅ Complete
+    - _Requirements: 6.1_
+  - [x] 6.3 Implement LiveKit room connection
+    - Connect to LiveKit room with token
+    - Handle connection states (connecting, connected, disconnected)
+    - Status: ✅ Complete
+    - _Requirements: 2.5, 6.2_
+  - [x] 6.4 Implement audio track publishing
+    - Create local audio track from microphone
+    - Publish track to room
+    - Status: ✅ Complete
+    - _Requirements: 2.5_
+  - [x] 6.5 Implement audio track subscription
+    - Subscribe to remote audio tracks (agent)
+    - Play audio through speakers
+    - Pass audio data to waveform visualizer
+    - Status: ✅ Complete
+    - _Requirements: 3.2_
+  - [x] 6.6 Send page URL via data channel
+    - Send page URL once on connection
+    - Status: ✅ Complete
+    - _Requirements: 4.1_
+  - [x] 6.7 Implement graceful disconnection
+    - Disconnect from room on close
+    - Release microphone
+    - Clean up tracks and listeners
+    - Status: ✅ Complete
+    - _Requirements: 5.1, 5.4_
 
-- [ ] 4. Implement voice UI component
-- [ ] 4.1 Create basic voice UI layout
-  - Create expanded UI container
-  - Add waveform canvas
-  - Add close button
-  - Make responsive
-  - _Requirements: 3.1, 5.1_
+- [x] 7. Implement basic error handling
+  - [x] 7.1 Handle microphone permission errors
+    - Handle permission denied
+    - Show user-friendly error message
+    - Status: ✅ Complete
+    - _Requirements: 2.4, 6.3_
+  - [x] 7.2 Handle connection errors
+    - Handle LiveKit connection failures
+    - Handle invalid token
+    - Show error message
+    - Status: ✅ Complete
+    - _Requirements: 6.1, 6.2_
+  - [x] 7.3 Implement error isolation
+    - Wrap widget code in try-catch
+    - Prevent errors from crashing host page
+    - Status: ✅ Complete
+    - _Requirements: 6.5_
 
-- [ ] 4.2 Implement simple waveform visualization
-  - Use Canvas API for drawing
-  - Implement animation loop with requestAnimationFrame
-  - Use single color for visualization
-  - _Requirements: 3.1, 3.2_
-
-- [ ] 4.3 Implement close handler
-  - Close button handler
-  - _Requirements: 5.1_
-
-- [ ] 5. Implement audio processor
-- [ ] 5.1 Create audio processor with Web Audio API
-  - Create AudioContext
-  - Create AnalyserNode
-  - Connect microphone stream to analyser
-  - Extract frequency data for waveform
-  - _Requirements: 3.1, 3.2_
-
-- [ ] 6. Implement LiveKit manager
-- [ ] 6.1 Create lazy loading for LiveKit SDK
-  - Use dynamic import for livekit-client
-  - Load only on button click, not page load
-  - Handle import errors
-  - _Requirements: 7.2, 7.3_
-
-- [ ] 6.2 Implement token validation with API
-  - Call API server to validate widget token
-  - Receive LiveKit room token
-  - Handle invalid token errors
-  - _Requirements: 6.1_
-
-- [ ] 6.3 Implement LiveKit room connection
-  - Connect to LiveKit room with token
-  - Handle connection states (connecting, connected, disconnected)
-  - _Requirements: 2.5, 6.2_
-
-- [ ] 6.4 Implement audio track publishing
-  - Create local audio track from microphone
-  - Publish track to room
-  - _Requirements: 2.5_
-
-- [ ] 6.5 Implement audio track subscription
-  - Subscribe to remote audio tracks (agent)
-  - Play audio through speakers
-  - Pass audio data to waveform visualizer
-  - _Requirements: 3.2_
-
-- [ ] 6.6 Send page URL via data channel
-  - Send page URL once on connection
-  - _Requirements: 4.1_
-
-- [ ] 6.7 Implement graceful disconnection
-  - Disconnect from room on close
-  - Release microphone
-  - Clean up tracks and listeners
-  - _Requirements: 5.1, 5.4_
-
-- [ ] 7. Implement basic error handling
-- [ ] 7.1 Handle microphone permission errors
-  - Handle permission denied
-  - Show user-friendly error message
-  - _Requirements: 2.4, 6.3_
-
-- [ ] 7.2 Handle connection errors
-  - Handle LiveKit connection failures
-  - Handle invalid token
-  - Show error message
-  - _Requirements: 6.1, 6.2_
-
-- [ ] 7.3 Implement error isolation
-  - Wrap widget code in try-catch
-  - Prevent errors from crashing host page
-  - _Requirements: 6.5_
-
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - Status: ✅ Complete - 144 tests passing
 
-- [ ] 9. Optimize bundle size
-- [ ] 9.1 Configure tree-shaking and minification
-  - Ensure Rollup tree-shaking is enabled
-  - Use Terser for minification
-  - Remove console logs in production
-  - _Requirements: 7.1_
+- [x] 9. Optimize bundle size
+  - [x] 9.1 Configure tree-shaking and minification
+    - Ensure Rollup tree-shaking is enabled
+    - Use Terser for minification
+    - Remove console logs in production
+    - Status: ✅ Complete
+    - _Requirements: 7.1_
+  - [x] 9.2 Verify bundle size
+    - Ensure total bundle < 100KB gzipped
+    - Status: ✅ Complete - 5.1KB gzipped
+    - _Requirements: 7.1_
 
-- [ ] 9.2 Verify bundle size
-  - Ensure total bundle < 100KB gzipped
-  - _Requirements: 7.1_
+- [x] 10. Create deployment configuration
+  - [x] 10.1 Configure Vite build
+    - Set up production build command
+    - Configure output directory
+    - Status: ✅ Complete
+    - _Requirements: All_
+  - [x] 10.2 Create CDN deployment script
+    - Upload to Cloudflare R2
+    - Set cache headers (1 hour TTL)
+    - Enable gzip compression
+    - Set CORS headers
+    - Status: ✅ Complete
+    - _Requirements: 7.5_
 
-- [ ] 10. Create deployment configuration
-- [ ] 10.1 Configure Vite build
-  - Set up production build command
-  - Configure output directory
-  - _Requirements: All_
+- [ ] 11. Create basic Playwright test
+  - [ ] 11.1 Test simple widget flow
+    - Load page → click button → grant permission → close
+    - _Requirements: 1.1, 2.1, 2.2, 2.3, 5.1_
+    - Note: Deferred - requires browser automation setup
 
-- [ ] 10.2 Create CDN deployment script
-  - Upload to Cloudflare R2
-  - Set cache headers (1 hour TTL)
-  - Enable gzip compression
-  - Set CORS headers
-  - _Requirements: 7.5_
-
-- [ ]* 11. Create basic Playwright test
-- [ ]* 11.1 Test simple widget flow
-  - Load page → click button → grant permission → close
-  - _Requirements: 1.1, 2.1, 2.2, 2.3, 5.1_
-
-- [ ] 12. Final checkpoint - Ensure all tests pass
+- [x] 12. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - Status: ✅ Complete - 144 unit tests passing

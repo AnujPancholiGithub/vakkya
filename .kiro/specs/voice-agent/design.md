@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Voice Agent Service is a Python-based microservice that orchestrates real-time voice conversations. Built on LiveKit Agents SDK, it uses LiveKit's built-in STT/TTS, OpenAI GPT-4o for LLM, and PostgreSQL pgvector for RAG—all while maintaining sub-500ms latency. This MVP version simplifies the architecture by using LiveKit's built-in capabilities instead of third-party providers.
+The Voice Agent Service is a Python-based microservice that orchestrates real-time voice conversations. Built on LiveKit Agents SDK 1.0+, it uses the AgentSession class which automatically handles the STT→LLM→TTS pipeline via LiveKit Inference. The service focuses on custom RAG logic while the framework handles all voice pipeline complexity, maintaining sub-500ms latency.
 
 ## Architecture
 
@@ -15,18 +15,25 @@ The Voice Agent Service is a Python-based microservice that orchestrates real-ti
        │ WebRTC Audio + Data Channel
 ┌──────▼──────────────────────────────────┐
 │         LiveKit Cloud                    │
-│  (Rooms, Tracks, Built-in STT/TTS)      │
+│  (Rooms, Tracks, WebRTC)                │
 └──────┬──────────────────────────────────┘
-       │ LiveKit Agents SDK
+       │ LiveKit Agents SDK 1.0+
 ┌──────▼──────────────────────────────────┐
 │    Voice Agent Service (Python)         │
 │  ┌────────────────────────────────────┐ │
-│  │   Agent Orchestrator                │ │
-│  └─┬──────────────────────────────────┘ │
-│    ├─► STT Handler (LiveKit)            │
-│    ├─► LLM Adapter (OpenAI GPT-4o)      │
-│    ├─► TTS Handler (LiveKit)            │
-│    └─► RAG Service (PostgreSQL pgvector)│
+│  │   AgentSession (Framework)          │ │
+│  │   - STT (LiveKit Inference)         │ │
+│  │   - LLM (LiveKit Inference)         │ │
+│  │   - TTS (LiveKit Inference)         │ │
+│  │   - VAD (Silero)                    │ │
+│  │   - Turn Detection (Multilingual)   │ │
+│  └────────────────────────────────────┘ │
+│  ┌────────────────────────────────────┐ │
+│  │   Custom Logic                      │ │
+│  │   - Agent (instructions + tools)    │ │
+│  │   - RAG Service (pgvector)          │ │
+│  │   - Session State                   │ │
+│  └────────────────────────────────────┘ │
 └──────────────────────────────────────────┘
        │
        └─► PostgreSQL (Session State + Vectors)
@@ -37,132 +44,125 @@ The Voice Agent Service is a Python-based microservice that orchestrates real-ti
 ```
 User speaks
     ↓
-[1] Audio Stream → LiveKit STT
+[1] AgentSession: Audio → STT (LiveKit Inference)
     ↓
-[2] Transcript chunks → VAD detects end-of-turn
+[2] AgentSession: VAD + Turn Detection → Finalized query
     ↓
-[3] Finalized query → PostgreSQL pgvector search
+[3] Agent Tool: search_knowledge(query) → pgvector search
     ↓
-[4] Context assembly: query + page data + RAG results
+[4] Agent Tool: Return RAG results to LLM
     ↓
-[5] OpenAI GPT-4o (streaming) → Response tokens
+[5] AgentSession: LLM (LiveKit Inference) → Streaming tokens
     ↓
-[6] Tokens → LiveKit TTS → Audio chunks
+[6] AgentSession: Tokens → TTS (LiveKit Inference) → Audio
     ↓
-[7] Audio → User hears response
+[7] User hears response
 ```
 
+**Key Insight:** Steps 1, 2, 5, 6 are handled automatically by AgentSession. We only implement step 3-4 (RAG tool).
+
 **Latency Budget (P95):**
-- STT finalization: <300ms
-- pgvector query: <100ms
-- LLM first token: <200ms
-- TTS first audio byte: <200ms
+- STT finalization: <300ms (framework optimized)
+- pgvector query: <100ms (our responsibility)
+- LLM first token: <200ms (framework optimized)
+- TTS first audio byte: <200ms (framework optimized)
 - **Total: <500ms**
 
 ## Components and Interfaces
 
-### 1. Agent Orchestrator
+### 1. Entrypoint Function
 
-**Responsibility:** Coordinates the voice pipeline using LiveKit Agents SDK.
-
-```python
-class VoiceAgent:
-    async def on_room_connected(self, room: Room) -> None:
-        """Initialize session when user joins"""
-        
-    async def on_audio_received(self, audio_frame: AudioFrame) -> None:
-        """Stream audio to LiveKit STT"""
-        
-    async def on_transcript_received(self, transcript: str, is_final: bool) -> None:
-        """Process transcript chunks"""
-        
-    async def on_turn_complete(self, query: str) -> None:
-        """Orchestrate RAG → LLM → TTS"""
-        
-    async def on_data_received(self, data: dict) -> None:
-        """Receive page context from widget"""
-        
-    async def on_interruption_detected(self) -> None:
-        """Cancel ongoing TTS"""
-```
-
-### 2. STT Handler (LiveKit)
-
-**Responsibility:** Handle LiveKit's built-in STT.
+**Responsibility:** Initialize AgentSession and Agent when a participant joins.
 
 ```python
-class STTHandler:
-    async def handle_transcript(self, transcript: str, is_final: bool) -> None:
-        """Process transcript from LiveKit"""
-        
-    def detect_end_of_turn(self) -> bool:
-        """Use VAD to detect when user stops speaking"""
+async def entrypoint(ctx: JobContext) -> None:
+    """Main entrypoint for LiveKit agent worker"""
+    await ctx.connect()
+    participant = await ctx.wait_for_participant()
+    
+    # Extract project_id from room metadata
+    project_id = ctx.room.metadata.get("project_id")
+    
+    # Initialize RAG service
+    rag = RAGService(db_connection)
+    
+    # Create agent with instructions
+    agent = Agent(
+        instructions="""You are a helpful assistant for website visitors.
+        Use the search_knowledge tool to find relevant information from uploaded documents.
+        Only answer based on the provided context.
+        If information is not available, say 'I don't have that information'.
+        Be concise and conversational."""
+    )
+    
+    # Define RAG tool
+    @agent.function()
+    async def search_knowledge(query: str) -> str:
+        """Search the knowledge base for relevant information."""
+        results = await rag.search(query, project_id)
+        return format_results(results)
+    
+    # Create session with LiveKit Inference
+    session = AgentSession(
+        stt="assemblyai/universal-streaming:en",
+        llm="openai/gpt-4o-mini",
+        tts="cartesia/sonic-3:voice-id",
+        vad=silero.VAD.load(),
+        turn_detection=MultilingualModel()
+    )
+    
+    # Framework handles everything else!
+    await session.start(room=ctx.room, agent=agent)
 ```
 
-### 3. LLM Adapter (OpenAI)
+### 2. RAG Service (PostgreSQL pgvector)
 
-**Responsibility:** Generate responses using GPT-4o.
-
-```python
-class LLMAdapter:
-    async def generate_response(
-        self, 
-        query: str, 
-        context: Context
-    ) -> AsyncIterator[str]:
-        """Stream response tokens"""
-        
-    def build_prompt(self, query: str, context: Context) -> list[dict]:
-        """Construct messages with system prompt"""
-```
-
-**System Prompt:**
-- "Only answer based on provided context"
-- "If information is not in context, say 'I don't have that information'"
-- "Be concise and conversational"
-
-### 4. TTS Handler (LiveKit)
-
-**Responsibility:** Use LiveKit's built-in TTS.
-
-```python
-class TTSHandler:
-    async def synthesize_stream(
-        self, 
-        text_stream: AsyncIterator[str]
-    ) -> AsyncIterator[bytes]:
-        """Stream audio from text tokens"""
-        
-    async def cancel_synthesis(self) -> None:
-        """Stop for interruption"""
-```
-
-### 5. RAG Service (PostgreSQL pgvector)
-
-**Responsibility:** Retrieve relevant document chunks.
+**Responsibility:** Retrieve relevant document chunks (only custom logic we need).
 
 ```python
 class RAGService:
-    async def query(
+    def __init__(self, db_connection):
+        self.db = db_connection
+        
+    async def search(
         self, 
         query_text: str, 
         project_id: str,
         top_k: int = 3
     ) -> list[DocumentChunk]:
         """Search pgvector for relevant documents"""
+        # 1. Generate embedding via OpenAI (or LiveKit Inference)
+        embedding = await self.embed_query(query_text)
+        
+        # 2. Query pgvector with project filter
+        results = await self.db.fetch("""
+            SELECT content, metadata
+            FROM document_chunks
+            WHERE project_id = $1
+            ORDER BY embedding <=> $2
+            LIMIT $3
+        """, project_id, embedding, top_k)
+        
+        return [DocumentChunk(**r) for r in results]
         
     async def embed_query(self, text: str) -> list[float]:
         """Generate embedding using OpenAI"""
+        # Use OpenAI text-embedding-3-small
+        response = await openai.embeddings.create(
+            model="text-embedding-3-small",
+            input=text
+        )
+        return response.data[0].embedding
 ```
 
 **Query Flow:**
 1. Embed query text → OpenAI embedding API
 2. Query PostgreSQL pgvector with projectId filter
-3. Return top 3 results
+3. Return top 3 results formatted as string
 
-### 6. Session State Manager
+### 3. Session State Manager
 
-**Responsibility:** Maintain conversation state.
+**Responsibility:** Maintain conversation state and log to API.
 
 ```python
 class SessionState:
@@ -176,7 +176,7 @@ class SessionManager:
     async def create_session(self, room_name: str, project_id: str) -> SessionState
     async def get_session(self, session_id: str) -> Optional[SessionState]
     async def add_turn(self, session_id: str, turn: Turn) -> None
-    async def end_session(self, session_id: str) -> None
+    async def log_to_api(self, session_id: str, turn: Turn) -> None
 ```
 
 **Storage:** PostgreSQL (no Redis for MVP)
@@ -491,15 +491,25 @@ LOG_LEVEL=INFO
 
 ```
 # requirements.txt
-livekit-agents==1.0.0
-livekit==0.10.0
-openai==1.0.0
+# Core framework with VAD and turn detection
+livekit-agents[silero,turn-detector]~=1.2
+
+# Database
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
+
+# Validation and config
 pydantic==2.5.0
 python-dotenv==1.0.0
+
+# Logging
 structlog==24.1.0
+
+# Testing
 pytest==7.4.0
 pytest-asyncio==0.21.0
 hypothesis==6.92.0
+
+# Note: No separate openai, deepgram, cartesia packages needed!
+# LiveKit Inference handles all AI model access
 ```
