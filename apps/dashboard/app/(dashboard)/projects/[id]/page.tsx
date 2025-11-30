@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Copy, Check, Loader2, ArrowLeft, Trash2 } from 'lucide-react'
+import { Copy, Check, Loader2, ArrowLeft, Trash2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
-import { useProject, useDeleteProject } from '@/lib/queries'
+import { useProject, useDeleteProject, useUpdateProject } from '@/lib/queries'
 import { DocumentsTab } from '@/components/documents/documents-tab'
 import { ConversationsTab } from '@/components/conversations/conversations-tab'
 
@@ -21,9 +21,31 @@ export default function ProjectDetailPage() {
   const projectId = params.id as string
   const { data: project, isLoading, error } = useProject(projectId)
   const deleteProject = useDeleteProject()
+  const updateProject = useUpdateProject(projectId)
   const [copiedToken, setCopiedToken] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  
+  // Agent settings state
+  const [agentName, setAgentName] = useState('')
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [hasAgentChanges, setHasAgentChanges] = useState(false)
+
+  // Initialize agent settings when project loads
+  useEffect(() => {
+    if (project) {
+      setAgentName(project.systemPrompt ? (project.agentName || '') : '')
+      setSystemPrompt(project.systemPrompt || '')
+    }
+  }, [project])
+
+  // Track changes
+  useEffect(() => {
+    if (!project) return
+    const nameChanged = agentName !== (project.agentName || '')
+    const promptChanged = systemPrompt !== (project.systemPrompt || '')
+    setHasAgentChanges(nameChanged || promptChanged)
+  }, [agentName, systemPrompt, project])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -63,6 +85,19 @@ export default function ProjectDetailPage() {
       router.push('/projects')
     } catch {
       toast.error('Failed to delete project')
+    }
+  }
+
+  const handleSaveAgentSettings = async () => {
+    try {
+      await updateProject.mutateAsync({
+        agentName: agentName.trim() || null,
+        systemPrompt: systemPrompt.trim() || null,
+      })
+      toast.success('Agent settings saved')
+      setHasAgentChanges(false)
+    } catch {
+      toast.error('Failed to save agent settings')
     }
   }
 
@@ -156,6 +191,58 @@ export default function ProjectDetailPage() {
                 )}
               </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Settings</CardTitle>
+          <CardDescription>
+            Customize how your voice agent behaves and responds
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="agentName">Agent Name</Label>
+            <Input
+              id="agentName"
+              placeholder="e.g., Sarah from Acme Support"
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+              maxLength={100}
+            />
+            <p className="text-xs text-muted-foreground">
+              Give your agent a personality with a custom name
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="systemPrompt">Custom Instructions</Label>
+            <textarea
+              id="systemPrompt"
+              className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="e.g., You are a friendly real estate assistant. Help visitors find their dream home. Be warm, professional, and knowledgeable about the local market."
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              maxLength={2000}
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Define your agent&apos;s personality, tone, and behavior</span>
+              <span>{systemPrompt.length}/2000</span>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSaveAgentSettings}
+              disabled={!hasAgentChanges || updateProject.isPending}
+            >
+              {updateProject.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Settings
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -3,15 +3,21 @@
 **Last Updated:** 2025-11-30
 
 ## Current Phase
-**Phase 7: Voice Forms** - Not Started
+**Phase 7: Voice Forms** - In Progress
 
 ## Last Completed Task
-**Task 6.5:** End-to-End Production Test ✅
-- MVP fully deployed and verified
-- All services stable in production
+**Task 7.1.1:** Add page context to widget ✅
+- Context collector in livekit-manager.js with property tests
+- Added `get_page_context` tool for dynamic page awareness
+- **Bonus:** Custom Agent Configuration feature added:
+  - Database: `systemPrompt` and `agentName` fields on Project
+  - API: Token validation returns agent config in room metadata
+  - Voice Agent: Dynamic instructions from custom prompts
+  - Dashboard: Agent Settings UI with save functionality
+  - Security: Prompt sanitization, length limits, injection protection
 
 ## Next Task
-**Task 7.1.1:** Add page context to widget
+**Task 7.1.2:** Implement capability orchestrator in voice agent
 
 ## Phase Completion Status
 

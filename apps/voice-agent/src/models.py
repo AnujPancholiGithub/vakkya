@@ -21,6 +21,14 @@ class PageContext:
 
 
 @dataclass
+class AgentConfig:
+    """Custom agent configuration from project settings."""
+
+    system_prompt: Optional[str] = None
+    agent_name: Optional[str] = None
+
+
+@dataclass
 class SessionContext:
     """
     Session-level context stored in AgentSession.userdata.
@@ -34,6 +42,8 @@ class SessionContext:
     # API conversation tracking (for logging turns)
     api_conversation_id: Optional[str] = None
     widget_token: Optional[str] = None
+    # Custom agent configuration
+    agent_config: Optional[AgentConfig] = None
 
 
 @dataclass

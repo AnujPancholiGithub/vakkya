@@ -7,10 +7,14 @@ import type { Env } from '../config/env.js';
 // Zod schemas for validation
 const CreateProjectSchema = z.object({
   name: z.string().min(1).max(100),
+  systemPrompt: z.string().max(2000).optional(),
+  agentName: z.string().max(100).optional(),
 });
 
 const UpdateProjectSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  systemPrompt: z.string().max(2000).nullable().optional(),
+  agentName: z.string().max(100).nullable().optional(),
 });
 
 const ProjectIdParamSchema = z.object({
@@ -38,6 +42,8 @@ export async function projectRoutes(app: FastifyInstance, env: Env) {
           id: project.id,
           name: project.name,
           widgetToken: project.widgetToken,
+          systemPrompt: project.systemPrompt,
+          agentName: project.agentName,
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
         },
@@ -92,6 +98,8 @@ export async function projectRoutes(app: FastifyInstance, env: Env) {
           id: p.id,
           name: p.name,
           widgetToken: p.widgetToken,
+          systemPrompt: p.systemPrompt,
+          agentName: p.agentName,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
         })),
@@ -125,6 +133,8 @@ export async function projectRoutes(app: FastifyInstance, env: Env) {
           id: project.id,
           name: project.name,
           widgetToken: project.widgetToken,
+          systemPrompt: project.systemPrompt,
+          agentName: project.agentName,
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
         },
@@ -182,6 +192,8 @@ export async function projectRoutes(app: FastifyInstance, env: Env) {
           id: project.id,
           name: project.name,
           widgetToken: project.widgetToken,
+          systemPrompt: project.systemPrompt,
+          agentName: project.agentName,
           createdAt: project.createdAt,
           updatedAt: project.updatedAt,
         },

@@ -2,14 +2,16 @@
 
 ## Phase 1: Foundation - Voice FAQ Improvements
 
-- [ ] 1. Add page context to widget
-  - [ ] 1.1 Create context collector module in widget
+- [x] 1. Add page context to widget
+  - [x] 1.1 Create context collector module in widget
     - Collect pageUrl, pageTitle, timestamp
     - Send via LiveKit data channel to agent
     - _Requirements: 1.1, 2.A_
-  - [ ] 1.2 Write property test for context collection
+    - **Status:** Already implemented in livekit-manager.js sendPageContext()
+  - [x] 1.2 Write property test for context collection
     - **Property 1: Widget Initialization**
     - **Validates: Requirement 1**
+    - **Status:** Added 5 property tests in livekit-manager.test.js
 
 - [ ] 2. Implement capability orchestrator in voice agent
   - [ ] 2.1 Create Capability base class and interface

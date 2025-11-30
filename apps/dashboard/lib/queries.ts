@@ -6,6 +6,8 @@ export interface Project {
   id: string
   name: string
   widgetToken: string
+  systemPrompt: string | null
+  agentName: string | null
   createdAt: string
   updatedAt: string
 }
@@ -13,6 +15,13 @@ export interface Project {
 // Mapped type for UI (token alias)
 export interface ProjectWithToken extends Omit<Project, 'widgetToken'> {
   token: string
+}
+
+// Update project input
+export interface UpdateProjectInput {
+  name?: string
+  systemPrompt?: string | null
+  agentName?: string | null
 }
 
 // API response wrappers
@@ -114,6 +123,20 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/projects/${id}`),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
+export function useUpdateProject(id: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: UpdateProjectInput) => {
+      const res = await api.patch<ProjectResponse>(`/projects/${id}`, data)
+      return mapProject(res.project)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', id] })
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
   })

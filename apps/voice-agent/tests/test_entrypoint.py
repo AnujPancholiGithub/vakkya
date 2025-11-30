@@ -417,6 +417,60 @@ class TestSearchKnowledgeTool:
 
 
 # ============================================================================
+# TestGetPageContextTool
+# ============================================================================
+
+
+class TestGetPageContextTool:
+    """Tests for the get_page_context tool."""
+
+    @pytest.mark.asyncio
+    async def test_get_page_context_returns_url(self) -> None:
+        """Test get_page_context returns the current page URL."""
+        from src.entrypoint import get_page_context
+        from src.models import PageContext, SessionContext
+        
+        mock_context = MagicMock()
+        mock_context.userdata = SessionContext(
+            project_id=TEST_PROJECT_ID,
+            page_context=PageContext(url="https://example.com/pricing"),
+        )
+        
+        result = await get_page_context(mock_context)
+        
+        assert "https://example.com/pricing" in result
+        assert "viewing" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_page_context_no_session_context(self) -> None:
+        """Test get_page_context handles missing session context."""
+        from src.entrypoint import get_page_context
+        
+        mock_context = MagicMock()
+        mock_context.userdata = None
+        
+        result = await get_page_context(mock_context)
+        
+        assert "don't have information" in result.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_page_context_no_page_context(self) -> None:
+        """Test get_page_context handles missing page context."""
+        from src.entrypoint import get_page_context
+        from src.models import SessionContext
+        
+        mock_context = MagicMock()
+        mock_context.userdata = SessionContext(
+            project_id=TEST_PROJECT_ID,
+            page_context=None,
+        )
+        
+        result = await get_page_context(mock_context)
+        
+        assert "don't have information" in result.lower()
+
+
+# ============================================================================
 # TestBuildAgentInstructions
 # ============================================================================
 
@@ -443,7 +497,54 @@ class TestBuildAgentInstructions:
         
         assert "helpful voice assistant" in instructions
         assert "https://example.com/docs/getting-started" in instructions
-        assert "viewing:" in instructions
+        assert "is viewing:" in instructions
+
+    def test_build_instructions_with_custom_system_prompt(self) -> None:
+        """Test building instructions with custom system prompt."""
+        from src.entrypoint import _build_agent_instructions
+        from src.models import AgentConfig
+        
+        agent_config = AgentConfig(
+            system_prompt="You help customers find the perfect home. Be warm and professional.",
+            agent_name="Sarah from ABC Realty",
+        )
+        
+        instructions = _build_agent_instructions(agent_config=agent_config)
+        
+        assert "Sarah from ABC Realty" in instructions
+        assert "find the perfect home" in instructions
+        assert "search_knowledge" in instructions  # Capabilities still included
+
+    def test_build_instructions_with_custom_prompt_and_page_url(self) -> None:
+        """Test building instructions with both custom prompt and page context."""
+        from src.entrypoint import _build_agent_instructions
+        from src.models import AgentConfig
+        
+        agent_config = AgentConfig(
+            system_prompt="You are a technical support specialist.",
+            agent_name="TechBot",
+        )
+        
+        instructions = _build_agent_instructions(
+            page_url="https://docs.example.com/api",
+            agent_config=agent_config,
+        )
+        
+        assert "TechBot" in instructions
+        assert "technical support" in instructions
+        assert "https://docs.example.com/api" in instructions
+
+    def test_build_instructions_with_agent_name_only(self) -> None:
+        """Test building instructions with only agent name (no custom prompt)."""
+        from src.entrypoint import _build_agent_instructions
+        from src.models import AgentConfig
+        
+        agent_config = AgentConfig(agent_name="Helper Bot")
+        
+        instructions = _build_agent_instructions(agent_config=agent_config)
+        
+        # Should use default instructions since no system_prompt
+        assert "helpful voice assistant" in instructions
 
 
 # ============================================================================
@@ -501,14 +602,15 @@ class TestAgentWithRagTool:
     async def test_agent_created_with_tools(
         self, mock_ctx: MagicMock, mock_session_components: dict
     ) -> None:
-        """Test that Agent is created with search_knowledge tool."""
-        from src.entrypoint import search_knowledge
+        """Test that Agent is created with search_knowledge and get_page_context tools."""
+        from src.entrypoint import get_page_context, search_knowledge
         
         await entrypoint(mock_ctx)
 
         call_kwargs = mock_session_components["agent_class"].call_args.kwargs
         assert "tools" in call_kwargs
         assert search_knowledge in call_kwargs["tools"]
+        assert get_page_context in call_kwargs["tools"]
 
 
 # ============================================================================
