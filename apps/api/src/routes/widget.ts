@@ -55,10 +55,12 @@ export async function widgetRoutes(app: FastifyInstance, env: Env) {
       const roomName = `vakkya-${projectConfig.projectId}-${roomSuffix}`;
       const participantIdentity = `user-${randomBytes(8).toString('hex')}`;
       
-      // Room metadata for voice agent (widget_token needed for API logging)
+      // Room metadata for voice agent (includes agent config for dynamic instructions)
       const roomMetadata = JSON.stringify({
         project_id: projectConfig.projectId,
         widget_token: body.widgetToken,
+        system_prompt: projectConfig.systemPrompt,
+        agent_name: projectConfig.agentName,
       });
       
       // Create room with metadata (so voice agent can read it)

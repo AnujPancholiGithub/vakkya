@@ -3,6 +3,8 @@
 import logging
 from typing import Optional
 
+from dataclasses import dataclass
+
 from livekit import rtc
 from livekit.agents import (
     Agent,
@@ -17,7 +19,7 @@ from livekit.plugins import silero
 from livekit.agents import ConversationItemAddedEvent
 
 from .config import get_config
-from .models import PageContext, SessionContext, Turn
+from .models import AgentConfig, PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
 from .validation import ValidationException, validate_and_parse_page_context
@@ -53,6 +55,28 @@ async def get_rag_service() -> RAGService:
         await _rag_service.initialize()
         logger.info("RAG service initialized")
     return _rag_service
+
+
+@function_tool()
+async def get_page_context(
+    context: RunContext[SessionContext],
+) -> str:
+    """Get information about the page the user is currently viewing.
+    
+    Use this tool when the user asks about:
+    - What page they're on
+    - The current URL or page title
+    - Context about where they are on the website
+    
+    Returns:
+        Information about the current page URL, or a message if not available.
+    """
+    session_context = context.userdata
+    if not session_context or not session_context.page_context:
+        return "I don't have information about which page you're viewing right now."
+    
+    page_url = session_context.page_context.url
+    return f"You are currently viewing: {page_url}"
 
 
 @function_tool()
@@ -163,9 +187,13 @@ async def entrypoint(ctx: JobContext) -> None:
         )
         raise  # Let framework handle retry
     
-    # Extract project_id and widget_token from room metadata
+    # Extract project_id, widget_token, and agent config from room metadata
     # In console mode, use defaults for testing
-    project_id, widget_token = await _extract_project_metadata(ctx)
+    metadata_result = await _extract_project_metadata(ctx)
+    project_id = metadata_result.project_id
+    widget_token = metadata_result.widget_token
+    agent_config = metadata_result.agent_config
+    
     if not project_id:
         # Check if this is console mode (mock room)
         if room_name == "mock_room":
@@ -187,6 +215,7 @@ async def entrypoint(ctx: JobContext) -> None:
             "room": room_name,
             "project_id": project_id,
             "has_widget_token": widget_token is not None,
+            "has_agent_config": agent_config is not None,
         },
     )
     
@@ -196,6 +225,7 @@ async def entrypoint(ctx: JobContext) -> None:
         project_id=project_id,
         page_context=None,  # Will be populated by data channel handler
         widget_token=widget_token,
+        agent_config=agent_config,
     )
     
     # Create API conversation for logging (if widget_token is available)
@@ -239,14 +269,17 @@ async def entrypoint(ctx: JobContext) -> None:
             )
     
     try:
-        # Build context-aware instructions
+        # Build context-aware instructions with custom agent config
         page_url = session_context.page_context.url if session_context.page_context else None
-        instructions = _build_agent_instructions(page_url)
+        instructions = _build_agent_instructions(
+            page_url=page_url,
+            agent_config=agent_config,
+        )
         
-        # Create agent with RAG tool for knowledge grounding
+        # Create agent with tools for knowledge grounding and page context
         agent = Agent(
             instructions=instructions,
-            tools=[search_knowledge],
+            tools=[search_knowledge, get_page_context],
         )
         
         # Initialize AgentSession with LiveKit Inference models
@@ -430,9 +463,17 @@ async def entrypoint(ctx: JobContext) -> None:
         raise  # Let framework handle cleanup
 
 
-async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Optional[str]]:
+@dataclass
+class ProjectMetadataResult:
+    """Result of extracting project metadata from room."""
+    project_id: Optional[str] = None
+    widget_token: Optional[str] = None
+    agent_config: Optional[AgentConfig] = None
+
+
+async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
     """
-    Extract and validate project_id and widget_token from job metadata or participant metadata.
+    Extract and validate project_id, widget_token, and agent config from metadata.
     
     The metadata is set on the participant token by the API server when generating
     LiveKit credentials. We can access it via ctx.job.metadata or from the participant.
@@ -441,9 +482,11 @@ async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Opt
         ctx: JobContext with room and job information
         
     Returns:
-        Tuple of (project_id, widget_token) or (None, None) if invalid/missing
+        ProjectMetadataResult with extracted values (None if invalid/missing)
     """
     import json
+    
+    result = ProjectMetadataResult()
     
     try:
         # First try job metadata (set via room creation)
@@ -472,7 +515,7 @@ async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Opt
         
         if not metadata:
             logger.warning("No metadata found in job, room, or participants", extra={"room": ctx.room.name})
-            return None, None
+            return result
         
         # Parse metadata if it's a string
         if isinstance(metadata, str):
@@ -480,7 +523,7 @@ async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Opt
                 metadata = json.loads(metadata)
             except json.JSONDecodeError:
                 logger.error("Failed to parse metadata JSON", extra={"room": ctx.room.name})
-                return None, None
+                return result
         
         # Extract project_id and widget_token
         project_id = metadata.get("project_id")
@@ -488,21 +531,42 @@ async def _extract_project_metadata(ctx: JobContext) -> tuple[Optional[str], Opt
         
         if not project_id:
             logger.warning("No project_id in metadata", extra={"room": ctx.room.name})
-            return None, None
+            return result
         
         # Validate project_id format (CUID - starts with 'c' and is alphanumeric)
         if not isinstance(project_id, str) or len(project_id) < 20:
             logger.error("Invalid project_id format", extra={"room": ctx.room.name, "project_id": project_id})
-            return None, None
+            return result
         
-        return project_id, widget_token
+        result.project_id = project_id
+        result.widget_token = widget_token
+        
+        # Extract agent config (optional)
+        system_prompt = metadata.get("system_prompt")
+        agent_name = metadata.get("agent_name")
+        
+        if system_prompt or agent_name:
+            result.agent_config = AgentConfig(
+                system_prompt=system_prompt,
+                agent_name=agent_name,
+            )
+            logger.info(
+                "Agent config loaded",
+                extra={
+                    "room": ctx.room.name,
+                    "has_system_prompt": system_prompt is not None,
+                    "agent_name": agent_name,
+                },
+            )
+        
+        return result
         
     except Exception as e:
         logger.error(
             "Failed to extract project metadata",
             extra={"room": ctx.room.name, "error": str(e)},
         )
-        return None, None
+        return result
 
 
 # Keep legacy function for backwards compatibility with tests
@@ -512,26 +576,52 @@ async def _extract_project_id(ctx: JobContext) -> Optional[str]:
     
     Legacy function - use _extract_project_metadata for full metadata extraction.
     """
-    project_id, _ = await _extract_project_metadata(ctx)
-    return project_id
+    result = await _extract_project_metadata(ctx)
+    return result.project_id
 
 
-def _build_agent_instructions(page_url: Optional[str] = None) -> str:
+def _build_agent_instructions(
+    page_url: Optional[str] = None,
+    agent_config: Optional[AgentConfig] = None,
+) -> str:
     """
-    Build agent instructions with optional page context.
+    Build agent instructions with optional page context and custom configuration.
     
     Args:
         page_url: Current page URL the user is viewing (optional)
+        agent_config: Custom agent configuration from project settings (optional)
         
     Returns:
         Agent instructions string
     """
-    base_instructions = """You are a helpful voice assistant for website visitors.
+    # Use custom system prompt if provided, otherwise use default
+    if agent_config and agent_config.system_prompt:
+        # Custom prompt - wrap with essential capabilities
+        agent_name = agent_config.agent_name or "a helpful voice assistant"
+        base_instructions = f"""You are {agent_name}.
+
+{agent_config.system_prompt}
+
+IMPORTANT CAPABILITIES (always available):
+- Use the search_knowledge tool to find information from uploaded documents when answering questions
+- Use the get_page_context tool when users ask what page they're viewing
+
+Communication style:
+- Be conversational and concise
+- Speak naturally as if having a real conversation
+- Keep responses brief unless more detail is needed"""
+    else:
+        # Default instructions
+        base_instructions = """You are a helpful voice assistant for website visitors.
 
 Your primary role is to answer questions using the knowledge base. When a user asks a question:
 1. Use the search_knowledge tool to find relevant information from the uploaded documents
 2. Base your answer on the search results
 3. If no relevant documents are found, be honest and say you don't have that information
+
+You also have access to page context:
+- Use the get_page_context tool when users ask what page they're on or need context about their location
+- The page context updates dynamically as users navigate
 
 Communication style:
 - Be conversational, friendly, and concise
@@ -543,7 +633,6 @@ Communication style:
     if page_url:
         base_instructions += f"""
 
-Context: The user is currently viewing: {page_url}
-Consider this when answering questions - they may be asking about content on this page."""
+Current context: The user is viewing: {page_url}"""
 
     return base_instructions

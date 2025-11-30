@@ -27,6 +27,8 @@ model Project {
   userId        String
   name          String
   widgetToken   String         @unique
+  systemPrompt  String?        @db.Text // Custom agent instructions (max 2000 chars)
+  agentName     String?        // Custom agent name, e.g., "Sarah from Acme"
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)

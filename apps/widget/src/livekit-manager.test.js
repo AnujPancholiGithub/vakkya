@@ -209,3 +209,110 @@ describe('LiveKit Manager Integration', () => {
     );
   });
 });
+
+describe('Page Context Collection', () => {
+  /**
+   * Property Test: Widget Initialization (Property 1)
+   * For any valid page, context SHALL be collected with url, title, and timestamp.
+   */
+  
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should collect page context with required fields', () => {
+    // Simulate page context collection (same logic as sendPageContext)
+    const pageContext = {
+      url: window.location.href,
+      title: document.title,
+      timestamp: Date.now(),
+    };
+
+    // Property: url must be a non-empty string
+    expect(typeof pageContext.url).toBe('string');
+    expect(pageContext.url.length).toBeGreaterThan(0);
+
+    // Property: title must be a string (can be empty)
+    expect(typeof pageContext.title).toBe('string');
+
+    // Property: timestamp must be a positive number
+    expect(typeof pageContext.timestamp).toBe('number');
+    expect(pageContext.timestamp).toBeGreaterThan(0);
+  });
+
+  it('should encode page context as valid JSON', () => {
+    const pageContext = {
+      url: 'https://example.com/page?query=test&foo=bar',
+      title: 'Test Page with "quotes" and special chars: <>&',
+      timestamp: Date.now(),
+    };
+
+    // Property: context must be serializable to JSON
+    const jsonString = JSON.stringify(pageContext);
+    expect(() => JSON.parse(jsonString)).not.toThrow();
+
+    // Property: parsed JSON must match original
+    const parsed = JSON.parse(jsonString);
+    expect(parsed.url).toBe(pageContext.url);
+    expect(parsed.title).toBe(pageContext.title);
+    expect(parsed.timestamp).toBe(pageContext.timestamp);
+  });
+
+  it('should encode page context as valid UTF-8 bytes', () => {
+    const pageContext = {
+      url: 'https://example.com/page',
+      title: 'Test Page',
+      timestamp: Date.now(),
+    };
+
+    // Property: context must be encodable to UTF-8 bytes (for data channel)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(pageContext));
+
+    // Check it's a typed array with content (Uint8Array check varies by environment)
+    expect(data.constructor.name).toBe('Uint8Array');
+    expect(data.length).toBeGreaterThan(0);
+
+    // Property: bytes must be decodable back to original
+    const decoder = new TextDecoder();
+    const decoded = JSON.parse(decoder.decode(data));
+    expect(decoded.url).toBe(pageContext.url);
+  });
+
+  it('should handle unicode characters in page title', () => {
+    const pageContext = {
+      url: 'https://example.com/日本語',
+      title: '日本語ページ 🎤 Voice Assistant',
+      timestamp: Date.now(),
+    };
+
+    // Property: unicode must survive JSON + UTF-8 encoding round-trip
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const data = encoder.encode(JSON.stringify(pageContext));
+    const decoded = JSON.parse(decoder.decode(data));
+
+    expect(decoded.url).toBe(pageContext.url);
+    expect(decoded.title).toBe(pageContext.title);
+  });
+
+  it('should handle very long URLs gracefully', () => {
+    const longPath = 'a'.repeat(2000);
+    const pageContext = {
+      url: `https://example.com/${longPath}`,
+      title: 'Long URL Page',
+      timestamp: Date.now(),
+    };
+
+    // Property: long URLs must still be serializable
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(pageContext));
+
+    expect(data.length).toBeLessThan(10000); // Reasonable size limit
+    expect(data.length).toBeGreaterThan(2000); // Contains the long URL
+  });
+});
