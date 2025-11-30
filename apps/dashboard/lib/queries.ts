@@ -10,11 +10,15 @@ export interface Project {
   agentName: string | null
   createdAt: string
   updatedAt: string
+  documentCount?: number
+  conversationCount?: number
 }
 
 // Mapped type for UI (token alias)
 export interface ProjectWithToken extends Omit<Project, 'widgetToken'> {
   token: string
+  documentCount: number
+  conversationCount: number
 }
 
 // Update project input
@@ -64,6 +68,7 @@ export interface Conversation {
   sessionId: string
   turnCount: number
   startedAt: string
+  firstQuery: string | null
 }
 
 export interface ConversationTurn {
@@ -80,7 +85,12 @@ export interface ConversationDetail extends Conversation {
 
 // Helper to map project response to UI format
 function mapProject(p: Project): ProjectWithToken {
-  return { ...p, token: p.widgetToken }
+  return {
+    ...p,
+    token: p.widgetToken,
+    documentCount: p.documentCount ?? 0,
+    conversationCount: p.conversationCount ?? 0,
+  }
 }
 
 // Project hooks

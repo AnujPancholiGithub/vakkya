@@ -85,15 +85,27 @@ export class ConversationService {
 
   /**
    * List all conversations for a project
+   * Includes first turn's user query for preview
    * No pagination for MVP
    */
   async list(projectId: string) {
     const conversations = await prisma.conversation.findMany({
       where: { projectId },
       orderBy: { startedAt: 'desc' },
+      include: {
+        turns: {
+          orderBy: { timestamp: 'asc' },
+          take: 1,
+          select: { userQuery: true },
+        },
+      },
     });
 
-    return conversations;
+    return conversations.map((c) => ({
+      ...c,
+      firstQuery: c.turns[0]?.userQuery || null,
+      turns: undefined, // Remove turns from response
+    }));
   }
 
   /**

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
+import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Copy, Check } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,8 +31,7 @@ interface CreateProjectDialogProps {
 }
 
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
-  const [createdToken, setCreatedToken] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const router = useRouter()
   const createProject = useCreateProject()
 
   const {
@@ -47,109 +46,72 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const onSubmit = async (data: CreateProjectForm) => {
     try {
       const project = await createProject.mutateAsync(data)
-      setCreatedToken(project.token)
-      toast.success('Project created successfully!')
+      toast.success('Project created! Let\'s set it up.')
+      reset()
+      onOpenChange(false)
+      // Redirect to project page to continue setup
+      router.push(`/projects/${project.id}`)
     } catch {
       toast.error('Failed to create project')
     }
   }
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    if (!copied) return
-    const timer = setTimeout(() => setCopied(false), 2000)
-    return () => clearTimeout(timer)
-  }, [copied])
-
-  const handleCopy = async () => {
-    if (!createdToken) return
-    try {
-      await navigator.clipboard.writeText(createdToken)
-      setCopied(true)
-      toast.success('Token copied to clipboard')
-    } catch {
-      toast.error('Failed to copy token')
-    }
-  }
-
   const handleClose = () => {
     reset()
-    setCreatedToken(null)
-    setCopied(false)
     onOpenChange(false)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent>
-        {createdToken ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Project Created!</DialogTitle>
-              <DialogDescription>
-                Save your widget token. You&apos;ll need it to embed the voice widget.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Widget Token</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={createdToken}
-                    readOnly
-                    className="font-mono text-sm"
-                  />
-                  <Button variant="outline" size="icon" onClick={handleCopy}>
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <DialogHeader>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Sparkles className="h-5 w-5 text-primary" />
             </div>
-            <DialogFooter>
-              <Button onClick={handleClose}>Done</Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <DialogHeader>
-              <DialogTitle>Create Project</DialogTitle>
-              <DialogDescription>
-                Create a new voice agent project
+            <div className="flex-1">
+              <DialogTitle className="text-lg font-semibold text-zinc-100">
+                Create Voice Agent
+              </DialogTitle>
+              <DialogDescription className="text-sm text-zinc-400 mt-1">
+                Give your agent a name to get started
               </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
-                <Input
-                  id="name"
-                  placeholder="My Voice Agent"
-                  {...register('name')}
-                  disabled={createProject.isPending}
-                />
-                {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name.message}</p>
-                )}
-              </div>
             </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-sm font-medium text-zinc-300">
+                Project Name
+              </Label>
+              <Input
+                id="name"
+                placeholder="e.g., Acme Support Agent"
+                {...register('name')}
                 disabled={createProject.isPending}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createProject.isPending}>
-                {createProject.isPending ? 'Creating...' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
+                autoFocus
+              />
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name.message}</p>
+              )}
+              <p className="text-xs text-zinc-500">
+                You can change this later in project settings
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClose}
+              disabled={createProject.isPending}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createProject.isPending}>
+              {createProject.isPending ? 'Creating...' : 'Create & Continue'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

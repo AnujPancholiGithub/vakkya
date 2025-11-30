@@ -189,6 +189,7 @@ export async function conversationRoutes(app: FastifyInstance, env: Env) {
           sessionId: c.sessionId,
           startedAt: c.startedAt,
           turnCount: c.turnCount,
+          firstQuery: c.firstQuery,
         })),
       });
     } catch (error) {

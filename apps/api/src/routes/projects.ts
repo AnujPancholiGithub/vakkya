@@ -102,6 +102,8 @@ export async function projectRoutes(app: FastifyInstance, env: Env) {
           agentName: p.agentName,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
+          documentCount: p._count.documents,
+          conversationCount: p._count.conversations,
         })),
       });
     } catch (error) {

@@ -95,12 +95,20 @@ export class ProjectService {
   }
 
   /**
-   * List all projects for a user
+   * List all projects for a user with document and conversation counts
    */
   async list(userId: string) {
     const projects = await prisma.project.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: {
+            documents: true,
+            conversations: true,
+          },
+        },
+      },
     });
 
     return projects;
