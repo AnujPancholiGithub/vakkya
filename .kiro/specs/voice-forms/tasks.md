@@ -13,19 +13,19 @@
     - **Validates: Requirement 1**
     - **Status:** Added 5 property tests in livekit-manager.test.js
 
-- [ ] 2. Implement capability orchestrator in voice agent
-  - [ ] 2.1 Create Capability base class and interface
+- [x] 2. Implement capability orchestrator in voice agent
+  - [x] 2.1 Create Capability base class and interface
     - Abstract methods: can_handle(), handle()
     - _Requirements: Architecture Principle_
-  - [ ] 2.2 Create CapabilityOrchestrator class
+  - [x] 2.2 Create CapabilityOrchestrator class
     - Route to highest-confidence capability
     - Fallback response for unknown inputs
     - _Requirements: Architecture Principle_
-  - [ ] 2.3 Refactor existing RAG logic into RAGCapability
+  - [x] 2.3 Refactor existing RAG logic into RAGCapability
     - Move current RAG code into capability module
     - Implement can_handle() and handle()
     - _Requirements: 2.A_
-  - [ ] 2.4 Write unit tests for orchestrator
+  - [x] 2.4 Write unit tests for orchestrator
     - Test capability routing logic
     - Test fallback behavior
     - _Requirements: Architecture Principle_

@@ -6,18 +6,14 @@
 **Phase 7: Voice Forms** - In Progress
 
 ## Last Completed Task
-**Task 7.1.1:** Add page context to widget ✅
-- Context collector in livekit-manager.js with property tests
-- Added `get_page_context` tool for dynamic page awareness
-- **Bonus:** Custom Agent Configuration feature added:
-  - Database: `systemPrompt` and `agentName` fields on Project
-  - API: Token validation returns agent config in room metadata
-  - Voice Agent: Dynamic instructions from custom prompts
-  - Dashboard: Agent Settings UI with save functionality
-  - Security: Prompt sanitization, length limits, injection protection
+**Task 7.1.2:** Implement capability orchestrator in voice agent ✅
+- Created Capability base class with can_handle()/handle() interface
+- Created CapabilityOrchestrator for routing to highest-confidence capability
+- Refactored RAG logic into RAGCapability module
+- Added 20 unit tests for orchestrator and capabilities (212 total tests)
 
 ## Next Task
-**Task 7.1.2:** Implement capability orchestrator in voice agent
+**Task 7.1.3:** Improve RAG responses
 
 ## Phase Completion Status
 
