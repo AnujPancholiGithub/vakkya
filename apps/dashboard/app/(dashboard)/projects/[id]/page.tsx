@@ -47,7 +47,7 @@ export default function ProjectDetailPage() {
   }
 
   const embedCode = project
-    ? `<script src="https://cdn.vakkya.ai/widget.js" data-token="${project.token}"></script>`
+    ? `<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="${project.token}"></script>`
     : ''
 
   const handleCopyEmbed = async () => {

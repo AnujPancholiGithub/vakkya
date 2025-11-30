@@ -16,14 +16,14 @@ Transform any website into an interactive, voice-first experience with a single 
 - **Use Case:** Voice FAQ assistant for docs sites
 
 ### Secondary: Service Business Founders
-- **Goal:** Automate customer inquiries, 24/7 availability
-- **Pain:** No technical team, budget constraints
-- **Use Case:** Voice booking for clinics, gyms, laundries
+- **Goal:** Automate customer inquiries, 24/7 lead capture
+- **Pain:** No technical team, budget constraints, missed leads after hours
+- **Use Case:** Conversational forms for lead qualification (real estate, recruitors, healthcare, B2B)
 
 ### Tertiary: E-commerce Store Owners
 - **Goal:** Increase conversions, interactive shopping
 - **Pain:** High cart abandonment, support ticket volume
-- **Use Case:** Product recommendations via voice
+- **Use Case:** Product recommendations via voice, voice FAQ
 
 ## Core Value Propositions
 
@@ -42,16 +42,29 @@ Transform any website into an interactive, voice-first experience with a single 
    - Scales to 1000+ concurrent conversations
    - Works on all modern browsers + mobile
 
-## Key Features (MVP - 4 Week Build)
+## Key Features (MVP)
 
-### Must-Have (Week 1-4)
+### Use Case A: Voice FAQ Assistant
 - One-line JavaScript embed
 - Dashboard for project creation + token generation
 - RAG document upload (PDF, TXT, MD) - **inline processing, no queue**
 - Real-time voice pipeline (STT → LLM → TTS via LiveKit)
 - Widget UI with waveform visualization
-- User behavior tracking (page URL, scroll depth, time spent)
+- Page context awareness (URL, title)
 - Conversation logs + transcripts in dashboard
+
+### Use Case B: Conversational Forms (Hybrid Voice + Visual)
+- Typeform-style one-question-at-a-time experience
+- Voice OR keyboard input (accessibility)
+- Form schema builder in dashboard
+- Field types: string, email, phone, number, enum, text
+- Webhook delivery to Zapier/Make/CRM (5000+ integrations)
+- Form submissions view in dashboard
+
+### Architecture
+- **Capability-based**: Pluggable modules (RAG, Forms, future: Booking)
+- **Extensible**: Add new capabilities without code changes
+- **Webhook-first**: Universal connector for all integrations
 
 ### Deferred to V2 (Post-Launch)
 
@@ -73,27 +86,15 @@ Transform any website into an interactive, voice-first experience with a single 
 - Unanswered questions report
 - RAG hit rate metrics
 
-**Observability**
-- Structured JSON logging across services
-- Voice pipeline latency tracking (STT/RAG/LLM/TTS)
-- Conversation metrics and token usage tracking
-- LLM cost estimation per session
-- Langfuse integration for LLM tracing (post-MVP)
-- Sentry integration for error tracking (post-MVP)
-
-**Integrations**
-- MCP Server for IDE integration
-- Webhooks
-- Handoff to human (escalation trigger)
+**Future Capabilities** (plug into existing architecture)
+- BookingCapability (Calendly/Cal.com integration)
+- ProductCapability (e-commerce recommendations)
+- HandoffCapability (escalate to human)
+- TranslationCapability (multi-language)
 
 **Monetization**
 - Billing/subscriptions
 - Team collaboration
-
-**Advanced**
-- Emotion detection from voice tone (Hume AI)
-- Multi-language support
-- Mobile SDKs
 
 ## Success Metrics
 
@@ -127,14 +128,24 @@ Transform any website into an interactive, voice-first experience with a single 
 4. **Performance is Non-Negotiable:** <500ms latency is a hard requirement
 5. **Security by Default:** Domain whitelisting, token validation, rate limiting
 
-## User Journey
+## User Journeys
 
+### Journey A: Voice FAQ
 1. Developer signs up on dashboard.vakkya.ai
 2. Creates project, uploads 3 PDFs (product docs)
 3. Copies embed code: `<script src="cdn.vakkya.ai/widget.js" data-token="xxx"></script>`
 4. Pastes into website `<body>` tag
 5. Visitor clicks widget, asks "How do I reset password?"
 6. Agent responds in voice with answer from uploaded docs
+
+### Journey B: Conversational Forms
+1. Business owner signs up on dashboard.vakkya.ai
+2. Creates project, creates form schema (name, email, budget, timeline)
+3. Configures webhook URL (Zapier, HubSpot, etc.)
+4. Copies embed code, pastes into website
+5. Visitor clicks widget, voice agent asks questions one-by-one
+6. Visitor speaks OR types answers
+7. On completion, data sent to CRM via webhook
 
 ## Constraints for Kiro
 - **Solo Development:** Optimize for single developer velocity

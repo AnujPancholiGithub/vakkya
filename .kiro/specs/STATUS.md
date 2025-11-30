@@ -1,17 +1,17 @@
 # Vakkya Build Status - Quick Reference
 
-**Last Updated:** 2025-11-26
+**Last Updated:** 2025-11-30
 
 ## Current Phase
-**Phase 6: Deployment & Final Validation** - In Progress
+**Phase 7: Voice Forms** - Not Started
 
 ## Last Completed Task
-**Task 6.2:** Deploy Voice Agent to Railway ✅
-- Voice Agent deployed to Railway
-- Health check timeout configured (300s)
+**Task 6.5:** End-to-End Production Test ✅
+- MVP fully deployed and verified
+- All services stable in production
 
 ## Next Task
-**Task 6.3:** Deploy Dashboard to Cloudflare Pages
+**Task 7.1.1:** Add page context to widget
 
 ## Phase Completion Status
 
@@ -21,14 +21,24 @@
 ### ✅ Phase 3: Widget Minimal (Complete - 143 tests)
 ### ✅ Phase 4: Voice Agent RAG Integration (Complete - 186 tests)
 ### ✅ Phase 5: Dashboard (Complete - 20 tests)
+### ✅ Phase 6: Deployment & Validation (Complete)
 
-### ⏳ Phase 6: Deployment & Validation (In Progress)
-- [x] 6.1 Deploy API Server to Railway
-- [x] 6.2 Deploy Voice Agent to Railway
-- [ ] 6.3 Deploy Dashboard to Cloudflare Pages
-- [ ] 6.4 Deploy Widget to CDN
-- [ ] 6.5 End-to-End Production Test
+**MVP Total: ~648 tests passing**
+
+### ⏳ Phase 7: Voice Forms (Not Started)
+- [ ] 7.1 Foundation - Voice FAQ Improvements
+- [ ] 7.2 Form Schema Backend
+- [ ] 7.3 Webhook Delivery
+- [ ] 7.4 Form Capability (Voice Agent)
+- [ ] 7.5 Hybrid Form UI (Widget)
+- [ ] 7.6 Dashboard Form Builder
 
 ## Quick Links
 - Build Sequence: `.kiro/specs/build-sequence/tasks.md`
+- Voice Forms Spec: `.kiro/specs/voice-forms/tasks.md`
 - Dashboard Spec: `.kiro/specs/dashboard/tasks.md`
+
+## Production URLs
+- **API:** https://vakkyaapi-production.up.railway.app
+- **Dashboard:** Vercel (configured)
+- **Widget CDN:** Cloudflare R2
