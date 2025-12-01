@@ -259,5 +259,152 @@ describe('Form Schema Validation', () => {
       });
       expect(result.success).toBe(true);
     });
+
+    it('should validate submission with conversationId', () => {
+      const result = formSubmissionSchema.safeParse({
+        data: { name: 'John' },
+        conversationId: 'clx1234567890abcdefgh',
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+});
+
+describe('Form Schema V2 Validation - Property Tests', () => {
+  describe('Property 19: Form Schema Validation', () => {
+    it('should validate form with all V2 fields', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Lead Capture Form',
+        description: 'Collect leads for sales team',
+        fields: [
+          { name: 'name', type: 'string', label: 'Name', required: true },
+          { name: 'email', type: 'email', label: 'Email', required: true },
+        ],
+        triggerPhrases: ['I want to sign up', 'interested in demo', 'contact sales'],
+        greetingMessage: 'Hi! I can help you get started.',
+        completionMessage: 'Thanks! Our team will reach out soon.',
+        webhookUrl: 'https://example.com/webhook',
+        webhookSecret: 'secret123',
+        isActive: true,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.triggerPhrases).toHaveLength(3);
+        expect(result.data.isActive).toBe(true);
+      }
+    });
+
+    it('should validate form with minimal V2 fields', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Simple Form',
+        fields: [{ name: 'email', type: 'email', label: 'Email', required: true }],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Optional fields are undefined at schema level, defaults applied in form.service.ts
+        expect(result.data.triggerPhrases).toBeUndefined();
+        expect(result.data.isActive).toBeUndefined();
+      }
+    });
+
+    it('should reject description over 500 characters', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        description: 'a'.repeat(501),
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject more than 20 trigger phrases', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        triggerPhrases: Array.from({ length: 21 }, (_, i) => `phrase ${i}`),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject empty trigger phrases', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        triggerPhrases: ['valid phrase', '', 'another phrase'],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject trigger phrase over 100 characters', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        triggerPhrases: ['a'.repeat(101)],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject greeting message over 500 characters', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        greetingMessage: 'a'.repeat(501),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject completion message over 500 characters', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        completionMessage: 'a'.repeat(501),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject webhook secret over 100 characters', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        webhookSecret: 'a'.repeat(101),
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should allow empty strings for optional text fields', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+        description: '',
+        greetingMessage: '',
+        completionMessage: '',
+        webhookUrl: '',
+        webhookSecret: '',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should allow isActive to be optional (defaults applied at service layer)', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // isActive is optional at schema level, defaults applied in form.service.ts
+        expect(result.data.isActive).toBeUndefined();
+      }
+    });
+
+    it('should allow triggerPhrases to be optional (defaults applied at service layer)', () => {
+      const result = createFormSchemaSchema.safeParse({
+        name: 'Form',
+        fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // triggerPhrases is optional at schema level, defaults applied in form.service.ts
+        expect(result.data.triggerPhrases).toBeUndefined();
+      }
+    });
   });
 });

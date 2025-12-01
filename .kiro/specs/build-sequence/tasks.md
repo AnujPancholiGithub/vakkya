@@ -188,26 +188,41 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ### 8.1 Database Schema & API Foundation (V2 Phase 1)
 
-- [ ] 8.1.1 Extend database schema for V2 forms
+- [x] 8.1.1 Extend database schema for V2 forms
   - **Execute:** Conversational Forms V2 task 1 (subtasks 1.1-1.5)
   - Add description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive
   - Add FormEvent table for analytics
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 11.1-11.4_
+  - ✅ Prisma migration created and applied
+  - ✅ Zod schemas updated with V2 fields
+  - ✅ 12 property tests added (Property 19)
+  - ✅ All 184 API tests passing, 40 schema tests passing
 
-- [ ] 8.1.2 Implement trigger phrase conflict detection
+- [x] 8.1.2 Implement trigger phrase conflict detection
   - **Execute:** Conversational Forms V2 task 2 (subtasks 2.1-2.2)
   - _Requirements: 9.5_
+  - ✅ checkTriggerPhraseConflicts() method in form.service.ts
+  - ✅ TriggerPhraseConflictError class with conflict details
+  - ✅ Conflict detection on create and update (case-insensitive)
+  - ✅ 8 property tests added (Property 20)
 
-- [ ] 8.1.3 Implement form event logging service
+- [x] 8.1.3 Implement form event logging service
   - **Execute:** Conversational Forms V2 task 3 (subtasks 3.1-3.2)
   - _Requirements: 11.1-11.4_
+  - ✅ form-event.service.ts with logFormActivation, logFieldCollected, logFormSubmitted, logFormAbandoned
+  - ✅ Event retrieval methods for form, conversation, and session
+  - ✅ 14 property tests added (Property 22)
 
-- [ ] 8.1.4 Update form API endpoints for V2
+- [x] 8.1.4 Update form API endpoints for V2
   - **Execute:** Conversational Forms V2 task 4 (subtasks 4.1-4.3)
   - _Requirements: 2.1, 9.1-9.4_
+  - ✅ POST/PUT endpoints accept all V2 fields (description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive)
+  - ✅ GET /internal/projects/:projectId/forms/all returns all active forms with trigger phrases
+  - ✅ Unit tests for all V2 endpoint functionality
 
-- [ ] 8.1.5 Checkpoint
+- [x] 8.1.5 Checkpoint
   - **Execute:** Conversational Forms V2 task 5
+  - ✅ All 754 tests passing (schemas: 40, api: 215, voice-agent: 258, widget: 188, dashboard: 53)
 
 ### 8.2 Widget Form State Manager (V2 Phase 2)
 

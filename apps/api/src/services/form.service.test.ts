@@ -312,4 +312,166 @@ describe('FormService', () => {
       expect(form).toBeNull();
     });
   });
+
+  /**
+   * Property 20: Trigger Phrase Conflict Detection
+   * Validates: Requirements 9.5
+   * 
+   * WHEN editing a form THEN the Conversational_Forms_System SHALL validate
+   * that trigger phrases do not conflict with other forms in the project
+   */
+  describe('Trigger Phrase Conflict Detection (Property 20)', () => {
+    it('should detect conflict when creating form with duplicate trigger phrase', async () => {
+      // Create first form with trigger phrases
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Contact Form',
+        fields: [{ name: 'email', type: 'email', label: 'Email', required: true }],
+        triggerPhrases: ['contact us', 'get in touch'],
+      });
+
+      // Attempt to create second form with conflicting phrase
+      await expect(
+        formService.createFormSchema(testUserId, testProjectId, {
+          name: 'Support Form',
+          fields: [{ name: 'issue', type: 'text', label: 'Issue', required: true }],
+          triggerPhrases: ['contact us', 'need help'],
+        })
+      ).rejects.toThrow('Trigger phrase conflict');
+    });
+
+    it('should detect conflict case-insensitively', async () => {
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form A',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['Book Appointment'],
+      });
+
+      await expect(
+        formService.createFormSchema(testUserId, testProjectId, {
+          name: 'Form B',
+          fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+          triggerPhrases: ['book appointment'],
+        })
+      ).rejects.toThrow('Trigger phrase conflict');
+    });
+
+    it('should detect conflict when updating form with duplicate trigger phrase', async () => {
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form A',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['schedule meeting'],
+      });
+
+      const formB = await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form B',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['request demo'],
+      });
+
+      await expect(
+        formService.updateFormSchema(testUserId, testProjectId, formB.id, {
+          triggerPhrases: ['schedule meeting'],
+        })
+      ).rejects.toThrow('Trigger phrase conflict');
+    });
+
+    it('should allow same trigger phrase in different projects', async () => {
+      // Create form in test project
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form A',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['contact us'],
+      });
+
+      // Create form with same phrase in other project (different user)
+      const form = await formService.createFormSchema(otherUserId, otherProjectId, {
+        name: 'Form B',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['contact us'],
+      });
+
+      expect(form.triggerPhrases).toContain('contact us');
+    });
+
+    it('should allow updating form with its own trigger phrases', async () => {
+      const form = await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form A',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['contact us', 'reach out'],
+      });
+
+      // Update with same phrases should not conflict
+      const updated = await formService.updateFormSchema(
+        testUserId,
+        testProjectId,
+        form.id,
+        { triggerPhrases: ['contact us', 'reach out', 'get in touch'] }
+      );
+
+      expect(updated.triggerPhrases).toHaveLength(3);
+    });
+
+    it('should allow forms without trigger phrases', async () => {
+      const form1 = await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form 1',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+      });
+
+      const form2 = await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form 2',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+      });
+
+      expect(form1.triggerPhrases).toEqual([]);
+      expect(form2.triggerPhrases).toEqual([]);
+    });
+
+    it('should return conflict details in error', async () => {
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Contact Form',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['contact us'],
+      });
+
+      try {
+        await formService.createFormSchema(testUserId, testProjectId, {
+          name: 'Support Form',
+          fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+          triggerPhrases: ['contact us'],
+        });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('contact us');
+        expect((error as Error).message).toContain('Contact Form');
+      }
+    });
+
+    it('should detect multiple conflicts at once', async () => {
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form A',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['phrase one'],
+      });
+
+      await formService.createFormSchema(testUserId, testProjectId, {
+        name: 'Form B',
+        fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+        triggerPhrases: ['phrase two'],
+      });
+
+      try {
+        await formService.createFormSchema(testUserId, testProjectId, {
+          name: 'Form C',
+          fields: [{ name: 'f', type: 'string', label: 'F', required: true }],
+          triggerPhrases: ['phrase one', 'phrase two', 'phrase three'],
+        });
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain('phrase one');
+        expect((error as Error).message).toContain('phrase two');
+      }
+    });
+  });
 });

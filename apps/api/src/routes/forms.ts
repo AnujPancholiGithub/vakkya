@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
-import { formService } from '../services/form.service.js';
+import { formService, TriggerPhraseConflictError } from '../services/form.service.js';
 import { webhookService } from '../services/webhook.service.js';
 import {
   createFormSchemaSchema,
@@ -13,6 +13,10 @@ import type { Env } from '../config/env.js';
 const FormIdParamsSchema = z.object({
   id: z.string().cuid(),
   formId: z.string().cuid(),
+});
+
+const InternalProjectIdSchema = z.object({
+  projectId: z.string().cuid(),
 });
 
 export async function formRoutes(app: FastifyInstance, env: Env) {
@@ -33,8 +37,14 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
           id: formSchema.id,
           projectId: formSchema.projectId,
           name: formSchema.name,
+          description: formSchema.description,
           fields: formSchema.fields,
+          triggerPhrases: formSchema.triggerPhrases,
+          greetingMessage: formSchema.greetingMessage,
+          completionMessage: formSchema.completionMessage,
           webhookUrl: formSchema.webhookUrl,
+          webhookSecret: formSchema.webhookSecret,
+          isActive: formSchema.isActive,
           createdAt: formSchema.createdAt,
           updatedAt: formSchema.updatedAt,
         },
@@ -52,6 +62,17 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
         return;
       }
 
+      if (error instanceof TriggerPhraseConflictError) {
+        reply.code(409).send({
+          error: {
+            code: 'TRIGGER_PHRASE_CONFLICT',
+            message: error.message,
+            conflicts: error.conflicts,
+            requestId: request.id,
+          },
+        });
+        return;
+      }
 
       if (error instanceof Error && error.message.includes('not found')) {
         reply.code(404).send({
@@ -91,8 +112,13 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
           id: f.id,
           projectId: f.projectId,
           name: f.name,
+          description: f.description,
           fields: f.fields,
+          triggerPhrases: f.triggerPhrases,
+          greetingMessage: f.greetingMessage,
+          completionMessage: f.completionMessage,
           webhookUrl: f.webhookUrl,
+          isActive: f.isActive,
           createdAt: f.createdAt,
           updatedAt: f.updatedAt,
           submissionCount: f._count.submissions,
@@ -121,6 +147,49 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
     }
   });
 
+  // GET /internal/projects/:projectId/forms/all - Get all active forms for agent
+  // No auth required - called by voice agent to get available forms
+  app.get('/internal/projects/:projectId/forms/all', async (request, reply) => {
+    try {
+      const params = InternalProjectIdSchema.parse(request.params);
+
+      const forms = await formService.getActiveFormsForProject(params.projectId);
+
+      reply.send({
+        forms: forms.map((f) => ({
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          fields: f.fields,
+          triggerPhrases: f.triggerPhrases,
+          greetingMessage: f.greetingMessage,
+          completionMessage: f.completionMessage,
+        })),
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        reply.code(400).send({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid parameters',
+            details: error.errors,
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      request.log.error(error, 'Get all forms error');
+      reply.code(500).send({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get forms',
+          requestId: request.id,
+        },
+      });
+    }
+  });
+
   // GET /projects/:id/forms/:formId - Get form schema
   app.get('/projects/:id/forms/:formId', async (request, reply) => {
     try {
@@ -137,8 +206,14 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
           id: form.id,
           projectId: form.projectId,
           name: form.name,
+          description: form.description,
           fields: form.fields,
+          triggerPhrases: form.triggerPhrases,
+          greetingMessage: form.greetingMessage,
+          completionMessage: form.completionMessage,
           webhookUrl: form.webhookUrl,
+          webhookSecret: form.webhookSecret,
+          isActive: form.isActive,
           createdAt: form.createdAt,
           updatedAt: form.updatedAt,
         },
@@ -178,7 +253,6 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
     }
   });
 
-
   // PUT /projects/:id/forms/:formId - Update form schema
   app.put('/projects/:id/forms/:formId', async (request, reply) => {
     try {
@@ -196,8 +270,14 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
           id: form.id,
           projectId: form.projectId,
           name: form.name,
+          description: form.description,
           fields: form.fields,
+          triggerPhrases: form.triggerPhrases,
+          greetingMessage: form.greetingMessage,
+          completionMessage: form.completionMessage,
           webhookUrl: form.webhookUrl,
+          webhookSecret: form.webhookSecret,
+          isActive: form.isActive,
           createdAt: form.createdAt,
           updatedAt: form.updatedAt,
         },
@@ -209,6 +289,18 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
             code: 'VALIDATION_ERROR',
             message: 'Invalid request',
             details: error.errors,
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      if (error instanceof TriggerPhraseConflictError) {
+        reply.code(409).send({
+          error: {
+            code: 'TRIGGER_PHRASE_CONFLICT',
+            message: error.message,
+            conflicts: error.conflicts,
             requestId: request.id,
           },
         });
@@ -356,10 +448,6 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
 
   // GET /internal/projects/:projectId/active-form - Get active form for project (from voice agent)
   // No auth required - called by voice agent to check if form mode should be active
-  const InternalProjectIdSchema = z.object({
-    projectId: z.string().cuid(),
-  });
-
   app.get('/internal/projects/:projectId/active-form', async (request, reply) => {
     try {
       const params = InternalProjectIdSchema.parse(request.params);

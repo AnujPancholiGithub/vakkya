@@ -1,20 +1,19 @@
 # Vakkya Build Status - Quick Reference
 
-**Last Updated:** 2025-12-01
+**Last Updated:** 2025-12-01 17:46
 
 ## Current Phase
-**Phase 7: Voice Forms** - Complete ✅
+**Phase 8: Conversational Forms V2** - In Progress 🚧
 
 ## Last Completed Task
-**Task 7.6.3:** Dashboard Form Builder Final Checkpoint ✅
-- Forms list page at /projects/[id]/forms
-- FormEditorDialog with field editor (all types supported)
-- Webhook URL configuration with test button
-- Form detail page with submissions table
-- **Total: 710 tests passing** (schemas: 27, api: 184, voice-agent: 258, widget: 188, dashboard: 53)
+**Task 8.1.3:** Implement form event logging service ✅
+- form-event.service.ts with logFormActivation, logFieldCollected, logFormSubmitted, logFormAbandoned
+- Event retrieval methods for form, conversation, and session
+- 14 property tests added (Property 22)
+- **Total: 246 tests passing** (schemas: 40, api: 206)
 
 ## Next Task
-None - Voice Forms feature complete. Ready for next feature or deployment.
+**Task 8.1.4:** Update form API endpoints for V2
 
 ## Phase Completion Status
 

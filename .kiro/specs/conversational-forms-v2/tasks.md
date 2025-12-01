@@ -2,50 +2,50 @@
 
 ## Phase 1: Database Schema & API Foundation
 
-- [ ] 1. Extend database schema for V2 forms
-  - [ ] 1.1 Create Prisma migration for FormSchema V2 fields
+- [x] 1. Extend database schema for V2 forms
+  - [x] 1.1 Create Prisma migration for FormSchema V2 fields
     - Add description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ] 1.2 Create Prisma migration for FormEvent table
+  - [x] 1.2 Create Prisma migration for FormEvent table
     - Track form lifecycle events (activated, field_collected, submitted, abandoned)
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
-  - [ ] 1.3 Create Prisma migration for FormSubmission enhancements
+  - [x] 1.3 Create Prisma migration for FormSubmission enhancements
     - Add conversationId, webhookAttempts, status fields
     - _Requirements: 6.6, 11.3_
-  - [ ] 1.4 Update Zod schemas in packages/schemas
+  - [x] 1.4 Update Zod schemas in packages/schemas
     - Add validation for new fields, trigger phrase arrays
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ] 1.5 Write property test for form schema validation
+  - [x] 1.5 Write property test for form schema validation
     - **Property 19: Form Schema Validation**
     - **Validates: Requirements 9.1, 9.2, 9.3, 9.4**
 
-- [ ] 2. Implement trigger phrase conflict detection
-  - [ ] 2.1 Add conflict detection to form.service.ts
+- [x] 2. Implement trigger phrase conflict detection
+  - [x] 2.1 Add conflict detection to form.service.ts
     - Check trigger phrases against other forms in project
     - Return validation error on conflict
     - _Requirements: 9.5_
-  - [ ] 2.2 Write property test for conflict detection
+  - [x] 2.2 Write property test for conflict detection
     - **Property 20: Trigger Phrase Conflict Detection**
     - **Validates: Requirements 9.5**
 
-- [ ] 3. Implement form event logging service
-  - [ ] 3.1 Create form-event.service.ts
+- [x] 3. Implement form event logging service
+  - [x] 3.1 Create form-event.service.ts
     - logFormActivation, logFieldCollected, logFormSubmitted, logFormAbandoned
     - _Requirements: 11.1, 11.2, 11.3, 11.4_
-  - [ ] 3.2 Write property test for event logging
+  - [x] 3.2 Write property test for event logging
     - **Property 22: Event Logging Completeness**
     - **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
 
-- [ ] 4. Update form API endpoints for V2
-  - [ ] 4.1 Update POST/PUT /projects/:id/forms for new fields
+- [x] 4. Update form API endpoints for V2
+  - [x] 4.1 Update POST/PUT /projects/:id/forms for new fields
     - Accept description, triggerPhrases, greetingMessage, completionMessage
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ] 4.2 Add GET /projects/:id/forms/all endpoint
+  - [x] 4.2 Add GET /projects/:id/forms/all endpoint
     - Return all active forms with trigger phrases for agent
     - _Requirements: 2.1_
-  - [ ] 4.3 Write unit tests for updated endpoints
+  - [x] 4.3 Write unit tests for updated endpoints
 
-- [ ] 5. Checkpoint - Ensure all tests pass
+- [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---

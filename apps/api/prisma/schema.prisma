@@ -72,13 +72,15 @@ model DocumentChunk {
 }
 
 model Conversation {
-  id        String             @id @default(cuid())
-  projectId String
-  sessionId String
-  startedAt DateTime           @default(now())
-  turnCount Int                @default(0)
-  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  turns     ConversationTurn[]
+  id              String             @id @default(cuid())
+  projectId       String
+  sessionId       String
+  startedAt       DateTime           @default(now())
+  turnCount       Int                @default(0)
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  turns           ConversationTurn[]
+  formSubmissions FormSubmission[]
+  formEvents      FormEvent[]
 
   @@index([projectId])
   @@index([sessionId])
@@ -98,30 +100,64 @@ model ConversationTurn {
 }
 
 model FormSchema {
-  id          String            @id @default(cuid())
-  projectId   String
-  name        String
-  fields      Json              // [{name, type, label, required, options?}]
-  webhookUrl  String?           @db.Text
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  submissions FormSubmission[]
+  id                String            @id @default(cuid())
+  projectId         String
+  name              String
+  description       String?           @db.Text // Help text for agent understanding
+  fields            Json              // [{name, type, label, required, options?}]
+  triggerPhrases    String[]          @default([]) // Natural language patterns to activate form
+  greetingMessage   String?           @db.Text // Custom message when form starts
+  completionMessage String?           @db.Text // Custom message after submission
+  webhookUrl        String?           @db.Text
+  webhookSecret     String?           // Optional secret for HMAC signing
+  isActive          Boolean           @default(true) // Whether form is available to agent
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submissions       FormSubmission[]
+  events            FormEvent[]
 
   @@index([projectId])
+  @@index([projectId, isActive])
   @@map("form_schemas")
 }
 
 model FormSubmission {
-  id           String     @id @default(cuid())
-  formSchemaId String
-  sessionId    String
-  data         Json       // {name: "John", email: "john@x.com"}
-  webhookSent  Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  formSchema   FormSchema @relation(fields: [formSchemaId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  formSchemaId    String
+  sessionId       String
+  conversationId  String?      // Link to conversation for analytics
+  data            Json         // {name: "John", email: "john@x.com"}
+  webhookSent     Boolean      @default(false)
+  webhookAttempts Int          @default(0) // Number of webhook delivery attempts
+  status          String       @default("pending") // pending, completed, failed
+  createdAt       DateTime     @default(now())
+  formSchema      FormSchema   @relation(fields: [formSchemaId], references: [id], onDelete: Cascade)
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([formSchemaId])
   @@index([sessionId])
+  @@index([conversationId])
   @@map("form_submissions")
+}
+
+model FormEvent {
+  id             String       @id @default(cuid())
+  formSchemaId   String
+  conversationId String?
+  sessionId      String
+  eventType      String       // activated, field_collected, submitted, abandoned
+  fieldName      String?      // For field_collected events
+  fieldValue     String?      @db.Text // For field_collected events
+  attemptCount   Int?         // Number of attempts for this field
+  metadata       Json?        // Additional context (trigger reason, error details, etc.)
+  timestamp      DateTime     @default(now())
+  formSchema     FormSchema   @relation(fields: [formSchemaId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([formSchemaId])
+  @@index([conversationId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@map("form_events")
 }

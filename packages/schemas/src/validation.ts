@@ -117,15 +117,40 @@ export const createFormSchemaSchema = z.object({
     .string()
     .min(1, 'Form name is required')
     .max(100, 'Form name must be less than 100 characters'),
+  description: z
+    .string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
   fields: z
     .array(formFieldSchema)
     .min(1, 'At least one field is required')
     .max(50, 'Maximum 50 fields allowed'),
+  triggerPhrases: z
+    .array(z.string().min(1, 'Trigger phrase cannot be empty').max(100))
+    .max(20, 'Maximum 20 trigger phrases allowed')
+    .optional(),
+  greetingMessage: z
+    .string()
+    .max(500, 'Greeting message must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
+  completionMessage: z
+    .string()
+    .max(500, 'Completion message must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
   webhookUrl: z
     .string()
     .url('Invalid webhook URL')
     .optional()
     .or(z.literal('')),
+  webhookSecret: z
+    .string()
+    .max(100, 'Webhook secret must be less than 100 characters')
+    .optional()
+    .or(z.literal('')),
+  isActive: z.boolean().optional(),
 });
 
 export const updateFormSchemaSchema = z.object({
@@ -134,16 +159,41 @@ export const updateFormSchemaSchema = z.object({
     .min(1, 'Form name is required')
     .max(100, 'Form name must be less than 100 characters')
     .optional(),
+  description: z
+    .string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
   fields: z
     .array(formFieldSchema)
     .min(1, 'At least one field is required')
     .max(50, 'Maximum 50 fields allowed')
     .optional(),
+  triggerPhrases: z
+    .array(z.string().min(1, 'Trigger phrase cannot be empty').max(100))
+    .max(20, 'Maximum 20 trigger phrases allowed')
+    .optional(),
+  greetingMessage: z
+    .string()
+    .max(500, 'Greeting message must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
+  completionMessage: z
+    .string()
+    .max(500, 'Completion message must be less than 500 characters')
+    .optional()
+    .or(z.literal('')),
   webhookUrl: z
     .string()
     .url('Invalid webhook URL')
     .optional()
     .or(z.literal('')),
+  webhookSecret: z
+    .string()
+    .max(100, 'Webhook secret must be less than 100 characters')
+    .optional()
+    .or(z.literal('')),
+  isActive: z.boolean().optional(),
 });
 
 export const formSubmissionSchema = z.object({
@@ -151,6 +201,22 @@ export const formSubmissionSchema = z.object({
     (data) => Object.keys(data).length > 0,
     { message: 'Submission data cannot be empty' }
   ),
+  conversationId: z.string().cuid('Invalid conversation ID').optional(),
+});
+
+export const formSubmissionStatusSchema = z.enum(['pending', 'completed', 'failed']);
+
+export const formEventTypeSchema = z.enum(['activated', 'field_collected', 'submitted', 'abandoned']);
+
+export const createFormEventSchema = z.object({
+  formSchemaId: z.string().cuid('Invalid form schema ID'),
+  conversationId: z.string().cuid('Invalid conversation ID').optional(),
+  sessionId: z.string().min(1, 'Session ID is required'),
+  eventType: formEventTypeSchema,
+  fieldName: z.string().max(100).optional(),
+  fieldValue: z.string().optional(),
+  attemptCount: z.number().int().min(1).optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export const formIdParamSchema = z.object({
@@ -185,3 +251,6 @@ export type FormField = z.infer<typeof formFieldSchema>;
 export type CreateFormSchemaInput = z.infer<typeof createFormSchemaSchema>;
 export type UpdateFormSchemaInput = z.infer<typeof updateFormSchemaSchema>;
 export type FormSubmissionInput = z.infer<typeof formSubmissionSchema>;
+export type FormSubmissionStatus = z.infer<typeof formSubmissionStatusSchema>;
+export type FormEventType = z.infer<typeof formEventTypeSchema>;
+export type CreateFormEventInput = z.infer<typeof createFormEventSchema>;
