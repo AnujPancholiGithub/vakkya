@@ -117,5 +117,9 @@ export async function createApp(env: Env, _logger: Logger) {
   const { widgetRoutes } = await import('./routes/widget.js');
   await widgetRoutes(app, env);
 
+  // Register form routes
+  const { formRoutes } = await import('./routes/forms.js');
+  await formRoutes(app, env);
+
   return app;
 }

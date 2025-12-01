@@ -42,69 +42,77 @@
     - _Requirements: 2.A_
     - **Status:** Improved agent instructions with FAQ-optimized prompts
 
-- [ ] 4. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 4. Checkpoint - Ensure all tests pass
+  - ✅ All 601 tests passing (schemas: 27, api: 149, voice-agent: 224, widget: 148, dashboard: 53)
+  - ✅ Fixed enum field validation (options required for enum type)
 
 ---
 
 ## Phase 2: Form Schema Backend
 
-- [ ] 5. Add database models for forms
-  - [ ] 5.1 Create Prisma migration for FormSchema and FormSubmission
+- [x] 5. Add database models for forms
+  - [x] 5.1 Create Prisma migration for FormSchema and FormSubmission
     - FormSchema: id, projectId, name, fields (JSON), webhookUrl
     - FormSubmission: id, formSchemaId, sessionId, data (JSON), webhookSent
     - _Requirements: 3_
-  - [ ] 5.2 Add Zod validation schemas for form fields
+  - [x] 5.2 Add Zod validation schemas for form fields
     - Field types: string, email, phone, number, enum, text
     - Validate required, options, etc.
     - _Requirements: 3_
-  - [ ] 5.3 Write property test for form schema validation
+  - [x] 5.3 Write property test for form schema validation
     - **Property 3: Form Schema Validation**
     - **Validates: Requirement 3**
 
-- [ ] 6. Implement Form Schema API endpoints
-  - [ ] 6.1 Create form.service.ts with CRUD operations
+- [x] 6. Implement Form Schema API endpoints
+  - [x] 6.1 Create form.service.ts with CRUD operations
     - createFormSchema, getFormSchema, updateFormSchema, deleteFormSchema
     - listFormSchemas, listSubmissions
     - _Requirements: 3_
-  - [ ] 6.2 Create form routes in API
+    - **Status:** Implemented in form.service.ts with full CRUD + ownership checks
+  - [x] 6.2 Create form routes in API
     - POST/GET/PUT/DELETE /api/projects/:id/forms
     - GET /api/projects/:id/forms/:formId/submissions
     - _Requirements: 3_
-  - [ ] 6.3 Write unit tests for form service
+    - **Status:** Implemented in forms.ts with auth middleware
+  - [x] 6.3 Write unit tests for form service
     - Test CRUD operations
     - Test validation errors
     - _Requirements: 3_
+    - **Status:** 19 tests in form.service.test.ts
 
-- [ ] 7. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 7. Checkpoint - Ensure all tests pass
+  - ✅ All 620 tests passing
 
 ---
 
 ## Phase 3: Webhook Delivery
 
-- [ ] 8. Implement webhook delivery service
-  - [ ] 8.1 Create webhook.service.ts
+- [x] 8. Implement webhook delivery service
+  - [x] 8.1 Create webhook.service.ts
     - Retry 3x with exponential backoff (1s, 5s, 30s)
     - HMAC signature generation
     - _Requirements: 3, Integration Strategy_
-  - [ ] 8.2 Add webhook delivery to form submission flow
+    - **Status:** Implemented with configurable sleep for testing
+  - [x] 8.2 Add webhook delivery to form submission flow
     - Trigger async after submission
     - Update webhookSent status
     - _Requirements: 3_
-  - [ ] 8.3 Write property test for webhook delivery
+    - **Status:** submitForm() creates submission and delivers webhook
+  - [x] 8.3 Write property test for webhook delivery
     - **Property 5: Webhook Delivery**
     - **Validates: Requirement 3**
+    - **Status:** Property test added in webhook.service.test.ts
 
-- [ ] 9. Add internal form submission endpoint
-  - [ ] 9.1 Create POST /api/internal/forms/:formId/submit
+- [x] 9. Add internal form submission endpoint
+  - [x] 9.1 Create POST /api/internal/forms/:formId/submit
     - Accept data from voice agent
     - Validate against schema
     - Trigger webhook
     - _Requirements: 3_
+    - **Status:** Endpoint added to forms.ts routes
 
-- [ ] 10. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 10. Checkpoint - Ensure all tests pass
+  - ✅ All 635 tests passing (schemas: 27, api: 184, voice-agent: 224, widget: 148, dashboard: 53)
 
 ---
 

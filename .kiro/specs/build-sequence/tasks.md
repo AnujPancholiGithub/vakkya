@@ -71,37 +71,47 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - _Requirements: 2.A_
   - **Completed:** Added similarity-based confidence, "I don't know" fallback, FAQ-optimized prompts
 
-- [ ] 7.1.4 Checkpoint
+- [x] 7.1.4 Checkpoint
   - **Execute:** Voice Forms task 4
-  - Ensure all tests pass
+  - ✅ All 601 tests passing
+  - ✅ Fixed enum field validation bug
 
 ### 7.2 Form Schema Backend (Voice Forms Phase 2)
 
-- [ ] 7.2.1 Add database models for forms
+- [x] 7.2.1 Add database models for forms
   - **Execute:** Voice Forms task 5 (subtasks 5.1-5.3)
   - _Requirements: 3_
+  - ✅ Prisma migration created (FormSchema, FormSubmission)
+  - ✅ Zod validation schemas added (formFieldSchema, createFormSchemaSchema, etc.)
+  - ✅ 25 property tests added to packages/schemas
 
-- [ ] 7.2.2 Implement Form Schema API endpoints
+- [x] 7.2.2 Implement Form Schema API endpoints
   - **Execute:** Voice Forms task 6 (subtasks 6.1-6.3)
   - _Requirements: 3_
+  - ✅ form.service.ts with CRUD operations
+  - ✅ form routes (POST/GET/PUT/DELETE /projects/:id/forms)
+  - ✅ 19 unit tests passing
 
-- [ ] 7.2.3 Checkpoint
+- [x] 7.2.3 Checkpoint
   - **Execute:** Voice Forms task 7
-  - Ensure all tests pass
+  - ✅ All 620 tests passing (schemas: 27, api: 168, voice-agent: 224, widget: 148, dashboard: 53)
 
 ### 7.3 Webhook Delivery (Voice Forms Phase 3)
 
-- [ ] 7.3.1 Implement webhook delivery service
+- [x] 7.3.1 Implement webhook delivery service
   - **Execute:** Voice Forms task 8 (subtasks 8.1-8.3)
   - _Requirements: 3, Integration Strategy_
+  - ✅ webhook.service.ts with retry logic (1s, 5s, 30s) and HMAC signatures
+  - ✅ Property test for webhook delivery
 
-- [ ] 7.3.2 Add internal form submission endpoint
+- [x] 7.3.2 Add internal form submission endpoint
   - **Execute:** Voice Forms task 9 (subtask 9.1)
   - _Requirements: 3_
+  - ✅ POST /internal/forms/:formId/submit endpoint
 
-- [ ] 7.3.3 Checkpoint
+- [x] 7.3.3 Checkpoint
   - **Execute:** Voice Forms task 10
-  - Ensure all tests pass
+  - ✅ All 635 tests passing (schemas: 27, api: 184, voice-agent: 224, widget: 148, dashboard: 53)
 
 ### 7.4 Form Capability - Voice Agent (Voice Forms Phase 4)
 

@@ -34,6 +34,7 @@ model Project {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   documents     Document[]
   conversations Conversation[]
+  formSchemas   FormSchema[]
 
   @@index([userId])
   @@index([widgetToken])
@@ -94,4 +95,33 @@ model ConversationTurn {
 
   @@index([conversationId])
   @@map("conversation_turns")
+}
+
+model FormSchema {
+  id          String            @id @default(cuid())
+  projectId   String
+  name        String
+  fields      Json              // [{name, type, label, required, options?}]
+  webhookUrl  String?           @db.Text
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submissions FormSubmission[]
+
+  @@index([projectId])
+  @@map("form_schemas")
+}
+
+model FormSubmission {
+  id           String     @id @default(cuid())
+  formSchemaId String
+  sessionId    String
+  data         Json       // {name: "John", email: "john@x.com"}
+  webhookSent  Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  formSchema   FormSchema @relation(fields: [formSchemaId], references: [id], onDelete: Cascade)
+
+  @@index([formSchemaId])
+  @@index([sessionId])
+  @@map("form_submissions")
 }
