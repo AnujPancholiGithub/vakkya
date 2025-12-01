@@ -52,108 +52,115 @@
 
 ## Phase 2: Widget Form State Manager
 
-- [ ] 6. Create form state manager module
-  - [ ] 6.1 Create form-state-manager.js
+- [x] 6. Create form state manager module
+  - [x] 6.1 Create form-state-manager.js
     - Implement FormStateManager interface from design
     - State: currentForm, currentFieldIndex, answers, pendingConfirmation, mode
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-  - [ ] 6.2 Implement state persistence to localStorage
+  - [x] 6.2 Implement state persistence to localStorage
     - saveToStorage, restoreFromStorage, clearStorage
     - 24-hour expiration for saved state
     - _Requirements: 7.1, 7.2_
-  - [ ] 6.3 Write property test for state persistence
+  - [x] 6.3 Write property test for state persistence
     - **Property 14: Connection Recovery State Preservation**
     - **Validates: Requirements 7.1**
 
-- [ ] 7. Implement confirmation flow in state manager
-  - [ ] 7.1 Add confirmation state handling
+- [x] 7. Implement confirmation flow in state manager
+  - [x] 7.1 Add confirmation state handling
     - setPendingConfirmation, confirmAnswer, rejectAnswer
     - Track attempt count per field
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  - [ ] 7.2 Implement keyboard bypass logic
+  - [x] 7.2 Implement keyboard bypass logic
     - Skip confirmation for keyboard inputs
     - _Requirements: 4.5_
-  - [ ] 7.3 Implement extraction fallback trigger
+  - [x] 7.3 Implement extraction fallback trigger
     - After 3 failed attempts, set fallbackToKeyboard flag
     - _Requirements: 4.6_
-  - [ ] 7.4 Write property test for confirmation state machine
+  - [x] 7.4 Write property test for confirmation state machine
     - **Property 7: Confirmation State Machine**
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
-  - [ ] 7.5 Write property test for keyboard bypass
+  - [x] 7.5 Write property test for keyboard bypass
     - **Property 8: Keyboard Bypass Confirmation**
     - **Validates: Requirements 4.5**
-  - [ ] 7.6 Write property test for extraction fallback
+  - [x] 7.6 Write property test for extraction fallback
     - **Property 9: Extraction Fallback After Failures**
     - **Validates: Requirements 4.6**
 
-- [ ] 8. Implement input priority resolution
-  - [ ] 8.1 Add timestamp tracking to inputs
+- [x] 8. Implement input priority resolution
+  - [x] 8.1 Add timestamp tracking to inputs
     - Track when voice and keyboard inputs arrive
     - Use most recent complete input
     - _Requirements: 5.5_
-  - [ ] 8.2 Write property test for input priority
+  - [x] 8.2 Write property test for input priority
     - **Property 10: Input Priority Resolution**
     - **Validates: Requirements 5.5**
 
-- [ ] 9. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 9. Checkpoint - Ensure all tests pass
+  - ✅ All 529 tests passing (schemas: 40, api: 215, widget: 221, dashboard: 53)
 
 ---
 
 ## Phase 3: Data Channel Protocol
 
-- [ ] 10. Define and implement data channel protocol
-  - [ ] 10.1 Create data-channel-protocol.js in widget
+- [x] 10. Define and implement data channel protocol
+  - [x] 10.1 Create data-channel-protocol.js in widget
     - Define message types (WidgetToAgentMessage, AgentToWidgetMessage)
     - Serialize/deserialize functions
     - _Requirements: 3.5, 10.1, 10.2, 10.3_
-  - [ ] 10.2 Add publishData method to livekit-manager.js
+  - [x] 10.2 Add publishData method to livekit-manager.js
     - Send typed messages to agent via data channel
     - _Requirements: 10.3_
-  - [ ] 10.3 Add message handler for agent messages
+  - [x] 10.3 Add message handler for agent messages
     - Handle form_activate, field_focus, value_extracted, etc.
     - _Requirements: 10.1, 10.2_
-  - [ ] 10.4 Write property test for widget-agent sync
+  - [x] 10.4 Write property test for widget-agent sync
     - **Property 21: Widget-Agent State Sync**
     - **Validates: Requirements 10.1, 10.2, 10.3**
 
-- [ ] 11. Implement form activation sync
-  - [ ] 11.1 Handle form_activate message in widget
+- [x] 11. Implement form activation sync
+  - [x] 11.1 Handle form_activate message in widget
     - Receive schema from agent, activate form UI
     - _Requirements: 2.4, 3.5_
-  - [ ] 11.2 Write property test for form activation sync
+  - [x] 11.2 Write property test for form activation sync
     - **Property 6: Form Activation Widget Sync**
     - **Validates: Requirements 2.4, 3.5**
 
-- [ ] 12. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 12. Checkpoint - Ensure all tests pass
+  - ✅ All 579 tests passing (schemas: 40, api: 215, widget: 271, dashboard: 53)
 
 ---
 
 ## Phase 4: Widget Lazy Loading & Form UI Updates
 
-- [ ] 13. Implement lazy form loading
-  - [ ] 13.1 Remove form fetch from widget init
+- [x] 13. Implement lazy form loading
+  - [x] 13.1 Remove form fetch from widget init
     - Only fetch forms when voice session starts
     - _Requirements: 1.1_
-  - [ ] 13.2 Add parallel form fetch on button click
+    - ✅ Forms only fetched in connect(), not on manager creation
+  - [x] 13.2 Add parallel form fetch on button click
     - Fetch forms alongside LiveKit connection
     - _Requirements: 1.2_
-  - [ ] 13.3 Implement form schema caching
+    - ✅ Promise.all fetches forms in parallel with LiveKit SDK loading
+  - [x] 13.3 Implement form schema caching
     - Cache schemas for session duration
     - _Requirements: 1.4_
-  - [ ] 13.4 Implement graceful degradation on fetch failure
+    - ✅ formSchemaCache Map with 30-minute expiration
+  - [x] 13.4 Implement graceful degradation on fetch failure
     - Continue in RAG mode if forms fail to load
     - _Requirements: 1.3_
-  - [ ] 13.5 Write property test for lazy loading
+    - ✅ Returns empty array on failure, logs warning, continues session
+  - [x] 13.5 Write property test for lazy loading
     - **Property 1: Lazy Loading Guarantee**
     - **Validates: Requirements 1.1**
-  - [ ] 13.6 Write property test for caching
+    - ✅ 3 tests verifying no fetch on init
+  - [x] 13.6 Write property test for caching
     - **Property 2: Form Schema Caching**
     - **Validates: Requirements 1.4**
-  - [ ] 13.7 Write property test for graceful degradation
+    - ✅ 4 tests verifying cache behavior
+  - [x] 13.7 Write property test for graceful degradation
     - **Property 3: Graceful Degradation on Fetch Failure**
     - **Validates: Requirements 1.3**
+    - ✅ 6 tests verifying graceful degradation
 
 - [ ] 14. Update form UI for confirmation flow
   - [ ] 14.1 Add confirmation UI state to form-ui.js

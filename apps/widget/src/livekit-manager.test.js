@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createLiveKitManager, validateToken } from './livekit-manager.js';
+import { createLiveKitManager, validateToken, fetchAllForms, clearFormCache, getCachedForms } from './livekit-manager.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -98,6 +98,15 @@ describe('createLiveKitManager', () => {
     expect(manager.getState).toBeInstanceOf(Function);
     expect(manager.onRemoteAudio).toBeInstanceOf(Function);
     expect(manager.onStateChange).toBeInstanceOf(Function);
+    expect(manager.onAgentMessage).toBeInstanceOf(Function);
+    // Data channel methods
+    expect(manager.publishMessage).toBeInstanceOf(Function);
+    expect(manager.sendKeyboardInput).toBeInstanceOf(Function);
+    expect(manager.sendFieldConfirmed).toBeInstanceOf(Function);
+    expect(manager.sendFieldRejected).toBeInstanceOf(Function);
+    expect(manager.sendFormAbandoned).toBeInstanceOf(Function);
+    expect(manager.sendSubmissionApproved).toBeInstanceOf(Function);
+    expect(manager.sendEditRequested).toBeInstanceOf(Function);
   });
 
   it('should start in idle state', () => {
@@ -314,5 +323,315 @@ describe('Page Context Collection', () => {
 
     expect(data.length).toBeLessThan(10000); // Reasonable size limit
     expect(data.length).toBeGreaterThan(2000); // Contains the long URL
+  });
+});
+
+/**
+ * Data Channel Protocol Tests
+ * Property 21: Widget-Agent State Sync
+ * Validates: Requirements 10.1, 10.2, 10.3
+ */
+describe('Data Channel Methods', () => {
+  let manager;
+
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    manager = createLiveKitManager('token', 'https://api.test.com');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return false when publishing without connection', () => {
+    const result = manager.sendKeyboardInput('email', 'test@example.com');
+    expect(result).toBe(false);
+  });
+
+  it('should return false for all send methods when not connected', () => {
+    expect(manager.sendKeyboardInput('email', 'test')).toBe(false);
+    expect(manager.sendFieldConfirmed('email')).toBe(false);
+    expect(manager.sendFieldRejected('email')).toBe(false);
+    expect(manager.sendFormAbandoned()).toBe(false);
+    expect(manager.sendSubmissionApproved()).toBe(false);
+    expect(manager.sendEditRequested('email')).toBe(false);
+  });
+
+  it('should set onAgentMessage callback without throwing', () => {
+    const callback = vi.fn();
+    expect(() => manager.onAgentMessage(callback)).not.toThrow();
+  });
+});
+
+/**
+ * Property 1: Lazy Loading Guarantee
+ * Validates: Requirements 1.1
+ * 
+ * WHEN the widget initializes THEN the Conversational_Forms_System SHALL NOT
+ * fetch form schemas until a voice session begins.
+ */
+describe('Property 1: Lazy Loading Guarantee', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    clearFormCache();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should NOT fetch forms when manager is created', () => {
+    createLiveKitManager('token', 'https://api.test.com');
+    
+    // No fetch calls should be made on creation
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('should NOT fetch forms until connect() is called', () => {
+    const manager = createLiveKitManager('token', 'https://api.test.com');
+    
+    // Access methods but don't connect
+    manager.getState();
+    manager.isConnected();
+    manager.getAvailableForms();
+    
+    // Still no fetch calls
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('should report forms not loaded before connect', () => {
+    const manager = createLiveKitManager('token', 'https://api.test.com');
+    
+    expect(manager.areFormsLoaded()).toBe(false);
+    expect(manager.getAvailableForms()).toEqual([]);
+  });
+});
+
+/**
+ * Property 2: Form Schema Caching
+ * Validates: Requirements 1.4
+ * 
+ * WHEN forms are fetched successfully THEN the Conversational_Forms_System
+ * SHALL cache the schemas for the session duration.
+ */
+describe('Property 2: Form Schema Caching', () => {
+  const mockForms = [
+    { id: 'form_1', name: 'Contact Form', fields: [], triggerPhrases: ['contact us'] },
+    { id: 'form_2', name: 'Support Form', fields: [], triggerPhrases: ['need help'] },
+  ];
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    clearFormCache();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should cache forms after successful fetch', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ forms: mockForms }),
+    });
+
+    await fetchAllForms('project_123', 'https://api.test.com');
+
+    const cached = getCachedForms('project_123');
+    expect(cached).toBeDefined();
+    expect(cached.forms).toEqual(mockForms);
+    expect(cached.fetchedAt).toBeGreaterThan(0);
+  });
+
+  it('should return cached forms on subsequent calls', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ forms: mockForms }),
+    });
+
+    // First call - fetches from API
+    const result1 = await fetchAllForms('project_123', 'https://api.test.com');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    // Second call - should use cache
+    const result2 = await fetchAllForms('project_123', 'https://api.test.com');
+    expect(mockFetch).toHaveBeenCalledTimes(1); // No additional fetch
+
+    expect(result1).toEqual(result2);
+  });
+
+  it('should cache forms per project', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ forms: [mockForms[0]] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ forms: [mockForms[1]] }),
+      });
+
+    const forms1 = await fetchAllForms('project_1', 'https://api.test.com');
+    const forms2 = await fetchAllForms('project_2', 'https://api.test.com');
+
+    expect(forms1).toHaveLength(1);
+    expect(forms2).toHaveLength(1);
+    expect(forms1[0].id).toBe('form_1');
+    expect(forms2[0].id).toBe('form_2');
+  });
+
+  it('should clear cache when clearFormCache is called', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ forms: mockForms }),
+    });
+
+    await fetchAllForms('project_123', 'https://api.test.com');
+    expect(getCachedForms('project_123')).toBeDefined();
+
+    clearFormCache();
+    expect(getCachedForms('project_123')).toBeUndefined();
+  });
+});
+
+/**
+ * Property 3: Graceful Degradation on Fetch Failure
+ * Validates: Requirements 1.3
+ * 
+ * WHEN form fetching fails THEN the Conversational_Forms_System SHALL
+ * continue the session in RAG-only mode and log the error.
+ */
+describe('Property 3: Graceful Degradation on Fetch Failure', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    clearFormCache();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return empty array on API error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    });
+
+    const forms = await fetchAllForms('project_123', 'https://api.test.com');
+
+    expect(forms).toEqual([]);
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('should return empty array on network error', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+    const forms = await fetchAllForms('project_123', 'https://api.test.com');
+
+    expect(forms).toEqual([]);
+    expect(console.warn).toHaveBeenCalled();
+  });
+
+  it('should return empty array on invalid JSON response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.reject(new Error('Invalid JSON')),
+    });
+
+    const forms = await fetchAllForms('project_123', 'https://api.test.com');
+
+    expect(forms).toEqual([]);
+  });
+
+  it('should return empty array when response has no forms property', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const forms = await fetchAllForms('project_123', 'https://api.test.com');
+
+    expect(forms).toEqual([]);
+  });
+
+  it('should not cache failed responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    });
+
+    await fetchAllForms('project_123', 'https://api.test.com');
+
+    expect(getCachedForms('project_123')).toBeUndefined();
+  });
+
+  it('should allow retry after failure', async () => {
+    const mockForms = [{ id: 'form_1', name: 'Test', fields: [] }];
+    
+    // First call fails
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+    });
+
+    const result1 = await fetchAllForms('project_123', 'https://api.test.com');
+    expect(result1).toEqual([]);
+
+    // Second call succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ forms: mockForms }),
+    });
+
+    const result2 = await fetchAllForms('project_123', 'https://api.test.com');
+    expect(result2).toEqual(mockForms);
+  });
+});
+
+/**
+ * Multi-Form Manager Methods Tests
+ */
+describe('Multi-Form Manager Methods', () => {
+  let manager;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    clearFormCache();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    manager = createLiveKitManager('token', 'https://api.test.com');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should have getAvailableForms method', () => {
+    expect(manager.getAvailableForms).toBeInstanceOf(Function);
+  });
+
+  it('should have areFormsLoaded method', () => {
+    expect(manager.areFormsLoaded).toBeInstanceOf(Function);
+  });
+
+  it('should have getFormById method', () => {
+    expect(manager.getFormById).toBeInstanceOf(Function);
+  });
+
+  it('should return empty array for getAvailableForms before connect', () => {
+    expect(manager.getAvailableForms()).toEqual([]);
+  });
+
+  it('should return false for areFormsLoaded before connect', () => {
+    expect(manager.areFormsLoaded()).toBe(false);
+  });
+
+  it('should return null for getFormById before connect', () => {
+    expect(manager.getFormById('form_123')).toBeNull();
   });
 });

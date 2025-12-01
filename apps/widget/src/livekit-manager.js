@@ -1,9 +1,22 @@
 /**
  * LiveKit manager - handles room connection and audio streaming
  * Uses dynamic import to lazy-load LiveKit SDK
+ * 
+ * Validates: Requirements 3.5, 10.1, 10.2, 10.3
  */
 
 import { AUDIO_CONSTRAINTS } from './config.js';
+import {
+  serializeMessage,
+  deserializeMessage,
+  createKeyboardInputMessage,
+  createFieldConfirmedMessage,
+  createFieldRejectedMessage,
+  createFormAbandonedMessage,
+  createSubmissionApprovedMessage,
+  createEditRequestedMessage,
+  createPageContextMessage,
+} from './data-channel-protocol.js';
 
 /** @type {typeof import('livekit-client')|null} */
 let LiveKitClient = null;
@@ -103,7 +116,7 @@ async function validateToken(token, apiUrl) {
 }
 
 /**
- * Fetch active form for a project
+ * Fetch active form for a project (legacy single-form endpoint)
  * @param {string} projectId - Project ID
  * @param {string} apiUrl - API server URL
  * @returns {Promise<Object|null>} Form schema or null if no active form
@@ -128,6 +141,73 @@ async function fetchActiveForm(projectId, apiUrl) {
     console.warn('[Vakkya] Error fetching active form:', err);
     return null;
   }
+}
+
+/**
+ * Form schema cache for session duration
+ * Property 2: Form Schema Caching
+ * @type {Map<string, {forms: Object[], fetchedAt: number}>}
+ */
+const formSchemaCache = new Map();
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Fetch all active forms for a project (V2 multi-form endpoint)
+ * Property 1: Lazy Loading Guarantee - only called when voice session starts
+ * Property 2: Form Schema Caching - caches for session duration
+ * Property 3: Graceful Degradation - returns empty array on failure
+ * 
+ * @param {string} projectId - Project ID
+ * @param {string} apiUrl - API server URL
+ * @returns {Promise<Object[]>} Array of form schemas (empty on failure)
+ */
+async function fetchAllForms(projectId, apiUrl) {
+  // Check cache first (Property 2)
+  const cached = formSchemaCache.get(projectId);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_DURATION_MS) {
+    return cached.forms;
+  }
+
+  try {
+    const response = await fetch(`${apiUrl}/internal/projects/${projectId}/forms/all`);
+    
+    if (!response.ok) {
+      console.warn('[Vakkya] Failed to fetch forms:', response.status);
+      // Property 3: Graceful degradation - return empty array, continue in RAG mode
+      return [];
+    }
+    
+    const data = await response.json();
+    const forms = data.forms || [];
+    
+    // Cache the result (Property 2)
+    formSchemaCache.set(projectId, {
+      forms,
+      fetchedAt: Date.now(),
+    });
+    
+    return forms;
+  } catch (err) {
+    console.warn('[Vakkya] Error fetching forms:', err);
+    // Property 3: Graceful degradation - return empty array, continue in RAG mode
+    return [];
+  }
+}
+
+/**
+ * Clear form schema cache (for testing or session reset)
+ */
+function clearFormCache() {
+  formSchemaCache.clear();
+}
+
+/**
+ * Get cached forms for a project (for testing)
+ * @param {string} projectId
+ * @returns {{forms: Object[], fetchedAt: number}|undefined}
+ */
+function getCachedForms(projectId) {
+  return formSchemaCache.get(projectId);
 }
 
 /**
@@ -163,6 +243,18 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   
   /** @type {Object|null} */
   let activeForm = null;
+  
+  /** @type {Object[]} */
+  let availableForms = [];
+  
+  /** @type {string|null} */
+  let projectId = null;
+  
+  /** @type {Function|null} */
+  let onAgentMessageCallback = null;
+  
+  /** @type {boolean} */
+  let formsLoaded = false;
 
   /**
    * Update connection state
@@ -178,6 +270,10 @@ export function createLiveKitManager(widgetToken, apiUrl) {
 
   /**
    * Connect to LiveKit room
+   * Property 1: Lazy Loading - forms fetched only when voice session starts
+   * Property 2: Parallel fetch - forms fetched alongside LiveKit connection
+   * Property 3: Graceful degradation - continues in RAG mode if forms fail
+   * 
    * @param {MediaStream} stream - Microphone stream
    * @returns {Promise<boolean>}
    */
@@ -192,16 +288,28 @@ export function createLiveKitManager(widgetToken, apiUrl) {
       // Step 1: Validate token with API
       setState('validating');
       const tokenData = await validateToken(widgetToken, apiUrl);
+      projectId = tokenData.projectId;
       
-      // Step 1.5: Fetch active form for this project (if any)
-      activeForm = await fetchActiveForm(tokenData.projectId, apiUrl);
-      if (activeForm && onFormAvailableCallback) {
-        onFormAvailableCallback(activeForm);
-      }
-
-      // Step 2: Load LiveKit SDK
+      // Step 2: Start parallel operations (Property 1.2: parallel fetch)
       setState('connecting');
-      const lk = await loadLiveKitSDK();
+      
+      // Fetch forms in parallel with LiveKit SDK loading (Property 1, 2)
+      const [lk, forms] = await Promise.all([
+        loadLiveKitSDK(),
+        fetchAllForms(tokenData.projectId, apiUrl),
+      ]);
+      
+      // Store fetched forms (Property 3: graceful degradation - empty array on failure)
+      availableForms = forms;
+      formsLoaded = true;
+      
+      // For backward compatibility, set activeForm to first form if available
+      if (forms.length > 0) {
+        activeForm = forms[0];
+        if (onFormAvailableCallback) {
+          onFormAvailableCallback(activeForm);
+        }
+      }
 
       // Step 3: Create room
       room = new lk.Room({
@@ -259,6 +367,28 @@ export function createLiveKitManager(widgetToken, apiUrl) {
         console.warn('[Vakkya] Poor connection quality');
       }
     });
+
+    // Handle data channel messages from agent
+    room.on(lk.RoomEvent.DataReceived, (payload, participant) => {
+      // Only process messages from remote participants (agent)
+      if (participant && !participant.isLocal) {
+        handleAgentMessage(payload);
+      }
+    });
+  }
+
+  /**
+   * Handle incoming data channel message from agent
+   * Validates: Requirements 10.1, 10.2
+   * @param {Uint8Array} payload
+   */
+  function handleAgentMessage(payload) {
+    const message = deserializeMessage(payload);
+    if (!message) return;
+
+    if (onAgentMessageCallback) {
+      onAgentMessageCallback(message);
+    }
   }
 
   /**
@@ -292,19 +422,90 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     if (!room || !room.localParticipant) return;
 
     try {
-      const pageContext = {
-        url: window.location.href,
-        title: document.title,
-        timestamp: Date.now(),
-      };
-
-      const encoder = new TextEncoder();
-      const data = encoder.encode(JSON.stringify(pageContext));
-      
+      const message = createPageContextMessage(
+        window.location.href,
+        document.title
+      );
+      const data = serializeMessage(message);
       room.localParticipant.publishData(data, { reliable: true });
     } catch (err) {
       console.warn('[Vakkya] Failed to send page context:', err);
     }
+  }
+
+  /**
+   * Publish a message to the agent via data channel
+   * Validates: Requirements 10.3
+   * @param {Object} message - Message to send
+   * @returns {boolean} True if sent successfully
+   */
+  function publishMessage(message) {
+    if (!room || !room.localParticipant) {
+      console.warn('[Vakkya] Cannot publish message: not connected');
+      return false;
+    }
+
+    try {
+      const data = serializeMessage(message);
+      room.localParticipant.publishData(data, { reliable: true });
+      return true;
+    } catch (err) {
+      console.warn('[Vakkya] Failed to publish message:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Send keyboard input to agent
+   * @param {string} fieldName
+   * @param {unknown} value
+   * @returns {boolean}
+   */
+  function sendKeyboardInput(fieldName, value) {
+    return publishMessage(createKeyboardInputMessage(fieldName, value));
+  }
+
+  /**
+   * Send field confirmation to agent
+   * @param {string} fieldName
+   * @returns {boolean}
+   */
+  function sendFieldConfirmed(fieldName) {
+    return publishMessage(createFieldConfirmedMessage(fieldName));
+  }
+
+  /**
+   * Send field rejection to agent
+   * @param {string} fieldName
+   * @returns {boolean}
+   */
+  function sendFieldRejected(fieldName) {
+    return publishMessage(createFieldRejectedMessage(fieldName));
+  }
+
+  /**
+   * Send form abandonment to agent
+   * @returns {boolean}
+   */
+  function sendFormAbandoned() {
+    return publishMessage(createFormAbandonedMessage());
+  }
+
+  /**
+   * Send submission approval to agent
+   * @returns {boolean}
+   */
+  function sendSubmissionApproved() {
+    return publishMessage(createSubmissionApprovedMessage());
+  }
+
+  /**
+   * Send edit request to agent
+   * @param {string} fieldName
+   * @returns {boolean}
+   */
+  function sendEditRequested(fieldName) {
+    return publishMessage(createEditRequestedMessage(fieldName));
   }
 
   /**
@@ -381,11 +582,46 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   }
 
   /**
-   * Get the active form (if any)
+   * Set callback for agent messages
+   * Validates: Requirements 10.1, 10.2
+   * @param {Function} callback - Called with AgentToWidgetMessage
+   */
+  function onAgentMessage(callback) {
+    onAgentMessageCallback = callback;
+  }
+
+  /**
+   * Get the active form (if any) - legacy single form
    * @returns {Object|null}
    */
   function getActiveForm() {
     return activeForm;
+  }
+
+  /**
+   * Get all available forms for the project
+   * Property 4: Multi-Form Availability
+   * @returns {Object[]}
+   */
+  function getAvailableForms() {
+    return availableForms;
+  }
+
+  /**
+   * Check if forms have been loaded
+   * @returns {boolean}
+   */
+  function areFormsLoaded() {
+    return formsLoaded;
+  }
+
+  /**
+   * Get form by ID from available forms
+   * @param {string} formId
+   * @returns {Object|null}
+   */
+  function getFormById(formId) {
+    return availableForms.find(f => f.id === formId) || null;
   }
 
   return {
@@ -396,9 +632,21 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     onRemoteAudio,
     onStateChange,
     onFormAvailable,
+    onAgentMessage,
     getActiveForm,
+    getAvailableForms,
+    areFormsLoaded,
+    getFormById,
+    // Data channel methods
+    publishMessage,
+    sendKeyboardInput,
+    sendFieldConfirmed,
+    sendFieldRejected,
+    sendFormAbandoned,
+    sendSubmissionApproved,
+    sendEditRequested,
   };
 }
 
 // Export for testing
-export { loadLiveKitSDK, validateToken, fetchActiveForm };
+export { loadLiveKitSDK, validateToken, fetchActiveForm, fetchAllForms, clearFormCache, getCachedForms };

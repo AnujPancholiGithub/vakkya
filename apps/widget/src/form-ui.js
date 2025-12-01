@@ -717,6 +717,130 @@ export function createFormUI(shadow, schema, callbacks) {
     renderForm();
   }
   
+  /**
+   * Focus a specific field by name
+   * @param {string} fieldName
+   */
+  function focusField(fieldName) {
+    const fieldIndex = schema.fields.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    
+    state.currentIndex = fieldIndex;
+    state.error = null;
+    renderForm();
+  }
+
+  /**
+   * Show pending value for confirmation (voice extraction)
+   * @param {string} fieldName
+   * @param {any} value
+   * @param {string} utterance
+   */
+  function showPendingValue(fieldName, value, utterance) {
+    const fieldIndex = schema.fields.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    
+    // Navigate to the field if not already there
+    if (state.currentIndex !== fieldIndex) {
+      state.currentIndex = fieldIndex;
+    }
+    
+    // Store the pending value (will be shown in input)
+    state.answers[fieldName] = value;
+    state.error = null;
+    renderForm();
+    
+    // Highlight the input to show it's pending confirmation
+    const input = element.querySelector('.vakkya-form-input, .vakkya-form-select');
+    if (input) {
+      input.style.borderColor = '#FCD34D'; // Yellow for pending
+    }
+  }
+
+  /**
+   * Confirm a value (from agent confirmation)
+   * @param {string} fieldName
+   * @param {any} value
+   */
+  function confirmValue(fieldName, value) {
+    const fieldIndex = schema.fields.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    
+    state.answers[fieldName] = value;
+    
+    // Advance to next field
+    if (fieldIndex === state.currentIndex) {
+      state.currentIndex++;
+      if (state.currentIndex >= schema.fields.length) {
+        state.completed = true;
+        if (callbacks.onSubmit) {
+          callbacks.onSubmit(state.answers);
+        }
+      }
+    }
+    
+    state.error = null;
+    renderForm();
+  }
+
+  /**
+   * Show form summary before submission
+   * @param {Object} answers
+   */
+  function showSummary(answers) {
+    // Update state with all answers
+    state.answers = { ...state.answers, ...answers };
+    state.currentIndex = schema.fields.length; // Move past all fields
+    
+    // Render summary view
+    element.innerHTML = `
+      <div class="vakkya-form-header">
+        <span class="vakkya-form-title">${escapeHtml(schema.name)} - Review</span>
+        <button class="vakkya-form-close" aria-label="Close form" type="button">${CLOSE_ICON}</button>
+      </div>
+      <div class="vakkya-form-content">
+        <p class="vakkya-form-question">Please review your answers:</p>
+        ${schema.fields.map(field => `
+          <div style="margin-bottom: 12px;">
+            <div style="color: rgba(255,255,255,0.7); font-size: 12px;">${escapeHtml(field.label)}</div>
+            <div style="color: white; font-size: 14px;">${escapeHtml(String(state.answers[field.name] || '-'))}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="vakkya-form-footer">
+        <div></div>
+        <div class="vakkya-form-actions">
+          <button class="vakkya-form-btn vakkya-form-btn-secondary" type="button">Edit</button>
+          <button class="vakkya-form-btn vakkya-form-btn-primary" type="button">Submit</button>
+        </div>
+      </div>
+    `;
+    
+    element.querySelector('.vakkya-form-close').addEventListener('click', () => {
+      if (callbacks.onClose) callbacks.onClose();
+    });
+    
+    element.querySelector('.vakkya-form-btn-secondary').addEventListener('click', () => {
+      state.currentIndex = 0;
+      renderForm();
+    });
+    
+    element.querySelector('.vakkya-form-btn-primary').addEventListener('click', () => {
+      if (callbacks.onSubmit) {
+        callbacks.onSubmit(state.answers);
+      }
+    });
+  }
+
+  /**
+   * Show success message after submission
+   * @param {string} submissionId
+   */
+  function showSuccess(submissionId) {
+    state.completed = true;
+    renderComplete();
+  }
+
   return {
     element,
     setAnswer,
@@ -724,6 +848,11 @@ export function createFormUI(shadow, schema, callbacks) {
     getState,
     goBack,
     showError,
+    focusField,
+    showPendingValue,
+    confirmValue,
+    showSummary,
+    showSuccess,
   };
 }
 

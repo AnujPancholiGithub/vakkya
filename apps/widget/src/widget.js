@@ -79,6 +79,7 @@ export class VakkyaWidget {
       this.livekitManager.onStateChange((state, error) => this.handleConnectionStateChange(state, error));
       this.livekitManager.onRemoteAudio((audioElement) => this.handleRemoteAudio(audioElement));
       this.livekitManager.onFormAvailable((schema) => this.handleFormAvailable(schema));
+      this.livekitManager.onAgentMessage((message) => this.handleAgentMessage(message));
       
       this.initialized = true;
       return true;
@@ -366,35 +367,141 @@ export class VakkyaWidget {
   }
 
   /**
-   * Handle individual form answer
+   * Handle individual form answer (keyboard input)
    * @param {string} fieldName
    * @param {any} value
    */
   handleFormAnswer(fieldName, value) {
-    // Send answer to voice agent via data channel
+    // Send keyboard input to voice agent via data channel
     if (this.livekitManager && this.livekitManager.isConnected()) {
-      this.sendFormData({
-        type: 'form_answer',
-        fieldName,
-        value,
-      });
+      this.livekitManager.sendKeyboardInput(fieldName, value);
     }
   }
 
   /**
-   * Send form data via LiveKit data channel
-   * @param {Object} data
+   * Handle agent messages from data channel
+   * Validates: Requirements 10.1, 10.2 (Property 6, 21)
+   * @param {Object} message - AgentToWidgetMessage
    */
-  sendFormData(data) {
-    if (!this.livekitManager) return;
+  handleAgentMessage(message) {
+    switch (message.type) {
+      case 'form_activate':
+        this.handleFormActivate(message.schema);
+        break;
+      case 'field_focus':
+        this.handleFieldFocus(message.fieldName);
+        break;
+      case 'value_extracted':
+        this.handleValueExtracted(message.fieldName, message.value, message.utterance);
+        break;
+      case 'value_confirmed':
+        this.handleValueConfirmed(message.fieldName, message.value);
+        break;
+      case 'show_summary':
+        this.handleShowSummary(message.answers);
+        break;
+      case 'submission_success':
+        this.handleSubmissionSuccess(message.submissionId);
+        break;
+      case 'submission_failed':
+        this.handleSubmissionFailed(message.error, message.canRetry);
+        break;
+      case 'form_deactivated':
+        this.handleFormDeactivated();
+        break;
+      default:
+        console.warn('[Vakkya] Unknown agent message type:', message.type);
+    }
+  }
+
+  /**
+   * Handle form_activate message from agent
+   * Property 6: Form Activation Widget Sync
+   * @param {Object} schema - Form schema from agent
+   */
+  handleFormActivate(schema) {
+    if (!schema || !schema.fields || schema.fields.length === 0) {
+      console.warn('[Vakkya] Invalid form schema in form_activate');
+      return;
+    }
     
-    try {
-      const encoder = new TextEncoder();
-      const payload = encoder.encode(JSON.stringify(data));
-      // Note: This requires adding publishData method to livekitManager
-      // For now, form data is handled locally
-    } catch (err) {
-      console.warn('[Vakkya] Failed to send form data:', err);
+    console.log('[Vakkya] Form activated by agent:', schema.name);
+    this.showFormUI(schema);
+  }
+
+  /**
+   * Handle field_focus message - navigate to specific field
+   * @param {string} fieldName
+   */
+  handleFieldFocus(fieldName) {
+    if (this.formUI) {
+      this.formUI.focusField(fieldName);
+    }
+  }
+
+  /**
+   * Handle value_extracted message - show pending confirmation
+   * @param {string} fieldName
+   * @param {any} value
+   * @param {string} utterance
+   */
+  handleValueExtracted(fieldName, value, utterance) {
+    if (this.formUI) {
+      this.formUI.showPendingValue(fieldName, value, utterance);
+    }
+  }
+
+  /**
+   * Handle value_confirmed message - confirm the value
+   * @param {string} fieldName
+   * @param {any} value
+   */
+  handleValueConfirmed(fieldName, value) {
+    if (this.formUI) {
+      this.formUI.confirmValue(fieldName, value);
+    }
+  }
+
+  /**
+   * Handle show_summary message - display form summary
+   * @param {Object} answers
+   */
+  handleShowSummary(answers) {
+    if (this.formUI) {
+      this.formUI.showSummary(answers);
+    }
+  }
+
+  /**
+   * Handle submission_success message
+   * @param {string} submissionId
+   */
+  handleSubmissionSuccess(submissionId) {
+    if (this.formUI) {
+      this.formUI.showSuccess(submissionId);
+    }
+  }
+
+  /**
+   * Handle submission_failed message
+   * @param {string} error
+   * @param {boolean} canRetry
+   */
+  handleSubmissionFailed(error, canRetry) {
+    if (this.formUI) {
+      this.formUI.showError(error, canRetry);
+    }
+  }
+
+  /**
+   * Handle form_deactivated message - close form UI
+   */
+  handleFormDeactivated() {
+    if (this.formUI) {
+      this.formUI.element.remove();
+      this.formUI = null;
+      this.formSchema = null;
+      this.state.mode = null;
     }
   }
 

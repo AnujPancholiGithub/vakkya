@@ -226,43 +226,64 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ### 8.2 Widget Form State Manager (V2 Phase 2)
 
-- [ ] 8.2.1 Create form state manager module
+- [x] 8.2.1 Create form state manager module
   - **Execute:** Conversational Forms V2 task 6 (subtasks 6.1-6.3)
   - State persistence, confirmation flow
   - _Requirements: 4.1-4.5, 7.1-7.2_
+  - ✅ form-state-manager.js with FormStateManager interface
+  - ✅ State: currentForm, currentFieldIndex, answers, pendingConfirmation, mode
+  - ✅ localStorage persistence with 24-hour expiration
+  - ✅ 30 property tests (Property 14)
 
-- [ ] 8.2.2 Implement confirmation flow in state manager
+- [x] 8.2.2 Implement confirmation flow in state manager
   - **Execute:** Conversational Forms V2 task 7 (subtasks 7.1-7.6)
   - Keyboard bypass, extraction fallback
   - _Requirements: 4.1-4.6_
+  - ✅ setPendingConfirmation, confirmAnswer, rejectAnswer
+  - ✅ Keyboard inputs auto-confirm (Property 8)
+  - ✅ fallbackToKeyboard after 3 failed attempts (Property 9)
+  - ✅ Property tests for confirmation state machine (Property 7)
 
-- [ ] 8.2.3 Implement input priority resolution
+- [x] 8.2.3 Implement input priority resolution
   - **Execute:** Conversational Forms V2 task 8 (subtasks 8.1-8.2)
   - _Requirements: 5.5_
+  - ✅ Timestamp tracking in FieldAnswer
+  - ✅ Property test for input priority (Property 10)
 
-- [ ] 8.2.4 Checkpoint
+- [x] 8.2.4 Checkpoint
   - **Execute:** Conversational Forms V2 task 9
+  - ✅ All 529 tests passing (schemas: 40, api: 215, widget: 221, dashboard: 53)
 
 ### 8.3 Data Channel Protocol (V2 Phase 3)
 
-- [ ] 8.3.1 Define and implement data channel protocol
+- [x] 8.3.1 Define and implement data channel protocol
   - **Execute:** Conversational Forms V2 task 10 (subtasks 10.1-10.4)
   - Widget ↔ Agent bidirectional sync
   - _Requirements: 3.5, 10.1-10.3_
+  - ✅ data-channel-protocol.js with message types and serialization
+  - ✅ publishMessage and send* methods in livekit-manager.js
+  - ✅ Agent message handler with deserializeMessage
+  - ✅ 47 property tests for data channel protocol (Property 21)
 
-- [ ] 8.3.2 Implement form activation sync
+- [x] 8.3.2 Implement form activation sync
   - **Execute:** Conversational Forms V2 task 11 (subtasks 11.1-11.2)
   - _Requirements: 2.4, 3.5_
+  - ✅ handleAgentMessage in widget.js handles all agent message types
+  - ✅ form_activate triggers showFormUI with schema from agent
+  - ✅ Added focusField, showPendingValue, confirmValue, showSummary, showSuccess to form-ui.js
 
-- [ ] 8.3.3 Checkpoint
+- [x] 8.3.3 Checkpoint
   - **Execute:** Conversational Forms V2 task 12
+  - ✅ All 579 tests passing (schemas: 40, api: 215, widget: 271, dashboard: 53)
 
 ### 8.4 Widget Lazy Loading & Form UI Updates (V2 Phase 4)
 
-- [ ] 8.4.1 Implement lazy form loading
+- [x] 8.4.1 Implement lazy form loading
   - **Execute:** Conversational Forms V2 task 13 (subtasks 13.1-13.7)
   - Parallel fetch, caching, graceful degradation
   - _Requirements: 1.1-1.4_
+  - ✅ fetchAllForms() with caching, parallel fetch in connect(), graceful degradation
+  - ✅ 19 property tests added (Properties 1, 2, 3)
 
 - [ ] 8.4.2 Update form UI for confirmation flow
   - **Execute:** Conversational Forms V2 task 14 (subtasks 14.1-14.3)
