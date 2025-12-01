@@ -6,6 +6,7 @@ import { parseConfig } from './config.js';
 import { createContainer, destroyContainer } from './container.js';
 import { createButton, requestMicrophonePermission, releaseMicrophone } from './button.js';
 import { createVoiceUI } from './voice-ui.js';
+import { createFormUI } from './form-ui.js';
 import { createWaveformRenderer, generateIdleData } from './waveform.js';
 import { createAudioProcessor } from './audio-processor.js';
 import { createLiveKitManager } from './livekit-manager.js';
@@ -15,6 +16,7 @@ import { safeExecute } from './errors.js';
  * @typedef {Object} WidgetState
  * @property {'idle'|'connecting'|'active'|'error'} status
  * @property {string|null} error
+ * @property {'voice'|'form'|null} mode - Current interaction mode
  */
 
 export class VakkyaWidget {
@@ -28,6 +30,7 @@ export class VakkyaWidget {
     this.state = {
       status: 'idle',
       error: null,
+      mode: null,
     };
     
     this.initialized = false;
@@ -36,6 +39,8 @@ export class VakkyaWidget {
     // Components
     this.button = null;
     this.voiceUI = null;
+    this.formUI = null;
+    this.formSchema = null;
     this.waveformRenderer = null;
     this.audioProcessor = null;
     this.livekitManager = null;
@@ -250,6 +255,12 @@ export class VakkyaWidget {
       this.voiceUI = null;
     }
     
+    // Remove form UI
+    if (this.formUI) {
+      this.formUI.element.remove();
+      this.formUI = null;
+    }
+    
     // Show button again
     if (this.button) {
       this.button.style.display = 'flex';
@@ -257,6 +268,7 @@ export class VakkyaWidget {
     
     this.state.status = 'idle';
     this.state.error = null;
+    this.state.mode = null;
   }
 
   /**
@@ -296,8 +308,106 @@ export class VakkyaWidget {
     
     this.button = null;
     this.livekitManager = null;
+    this.formSchema = null;
     this.initialized = false;
-    this.state = { status: 'idle', error: null };
+    this.state = { status: 'idle', error: null, mode: null };
+  }
+
+  /**
+   * Show form UI for conversational forms
+   * @param {Object} schema - Form schema from API
+   */
+  showFormUI(schema) {
+    if (this.formUI) return;
+    
+    this.formSchema = schema;
+    this.state.mode = 'form';
+    
+    // Hide button
+    if (this.button) {
+      this.button.style.display = 'none';
+    }
+    
+    // Hide voice UI if showing
+    if (this.voiceUI) {
+      this.voiceUI.element.style.display = 'none';
+    }
+    
+    // Create form UI
+    this.formUI = createFormUI(this.shadow, schema, {
+      onClose: () => this.handleClose(),
+      onSubmit: (answers) => this.handleFormSubmit(answers),
+      onAnswer: (fieldName, value) => this.handleFormAnswer(fieldName, value),
+    });
+    
+    this.container.appendChild(this.formUI.element);
+  }
+
+  /**
+   * Handle form submission
+   * @param {Object} answers - Collected form answers
+   */
+  async handleFormSubmit(answers) {
+    // Send form data to voice agent via data channel if connected
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.sendFormData({
+        type: 'form_complete',
+        formId: this.formSchema?.id,
+        answers,
+      });
+    }
+  }
+
+  /**
+   * Handle individual form answer
+   * @param {string} fieldName
+   * @param {any} value
+   */
+  handleFormAnswer(fieldName, value) {
+    // Send answer to voice agent via data channel
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.sendFormData({
+        type: 'form_answer',
+        fieldName,
+        value,
+      });
+    }
+  }
+
+  /**
+   * Send form data via LiveKit data channel
+   * @param {Object} data
+   */
+  sendFormData(data) {
+    if (!this.livekitManager) return;
+    
+    try {
+      const encoder = new TextEncoder();
+      const payload = encoder.encode(JSON.stringify(data));
+      // Note: This requires adding publishData method to livekitManager
+      // For now, form data is handled locally
+    } catch (err) {
+      console.warn('[Vakkya] Failed to send form data:', err);
+    }
+  }
+
+  /**
+   * Set form answer from voice input (called by voice agent)
+   * @param {string} fieldName
+   * @param {any} value
+   */
+  setFormAnswer(fieldName, value) {
+    if (this.formUI) {
+      this.formUI.setAnswer(fieldName, value);
+    }
+  }
+
+  /**
+   * Get current form field (for voice agent coordination)
+   * @returns {Object|null}
+   */
+  getCurrentFormField() {
+    return this.formUI ? this.formUI.getCurrentField() : null;
   }
 
   /**

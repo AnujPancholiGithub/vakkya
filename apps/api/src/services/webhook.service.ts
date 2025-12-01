@@ -81,38 +81,41 @@ export class WebhookService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT);
 
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          headers,
-          body: payloadString,
-          signal: controller.signal,
-        });
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers,
+            body: payloadString,
+            signal: controller.signal,
+          });
 
-        clearTimeout(timeoutId);
-        lastStatusCode = response.status;
+          lastStatusCode = response.status;
 
-        if (response.ok) {
-          logger.info({ webhookUrl, attempts: attemptCount }, 'Webhook delivered successfully');
-          return {
-            success: true,
-            statusCode: response.status,
-            attempts: attemptCount,
-          };
-        }
+          if (response.ok) {
+            logger.info({ webhookUrl, attempts: attemptCount }, 'Webhook delivered successfully');
+            return {
+              success: true,
+              statusCode: response.status,
+              attempts: attemptCount,
+            };
+          }
 
-        // Non-retryable status codes (4xx except 429)
-        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          // Non-retryable status codes (4xx except 429)
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            lastError = `HTTP ${response.status}: ${response.statusText}`;
+            logger.warn({ webhookUrl, status: response.status }, 'Webhook rejected (non-retryable)');
+            return {
+              success: false,
+              statusCode: lastStatusCode,
+              attempts: attemptCount,
+              error: lastError,
+            };
+          }
+
           lastError = `HTTP ${response.status}: ${response.statusText}`;
-          logger.warn({ webhookUrl, status: response.status }, 'Webhook rejected (non-retryable)');
-          return {
-            success: false,
-            statusCode: lastStatusCode,
-            attempts: attemptCount,
-            error: lastError,
-          };
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        lastError = `HTTP ${response.status}: ${response.statusText}`;
       } catch (error) {
         if (error instanceof Error) {
           if (error.name === 'AbortError') {
