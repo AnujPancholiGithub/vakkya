@@ -6,14 +6,15 @@
 **Phase 7: Voice Forms** - In Progress
 
 ## Last Completed Task
-**Task 7.1.2:** Implement capability orchestrator in voice agent ✅
-- Created Capability base class with can_handle()/handle() interface
-- Created CapabilityOrchestrator for routing to highest-confidence capability
-- Refactored RAG logic into RAGCapability module
-- Added 20 unit tests for orchestrator and capabilities (212 total tests)
+**Task 7.1.3:** Improve RAG responses ✅
+- Added similarity-based confidence detection (threshold: 0.5)
+- RAGCapability now returns "I'm not entirely sure..." for low-confidence results
+- Improved agent instructions with FAQ-optimized prompts
+- search_knowledge tool now indicates low confidence in results
+- Added 12 new tests (224 total voice-agent tests)
 
 ## Next Task
-**Task 7.1.3:** Improve RAG responses
+**Task 7.1.4:** Checkpoint - Ensure all tests pass
 
 ## Phase Completion Status
 

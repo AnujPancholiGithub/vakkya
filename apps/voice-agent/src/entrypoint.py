@@ -97,28 +97,60 @@ async def search_knowledge(
     Returns:
         Relevant document excerpts that can help answer the user's question,
         or a message indicating no relevant documents were found.
+        Results include relevance scores - lower scores (below 0.5) indicate uncertainty.
     """
     session_context = context.userdata
     if not session_context:
         logger.warning("No session context available for RAG search")
-        return "No relevant documents found."
+        return "No relevant information found."
     
     project_id = session_context.project_id
     
     try:
         rag_service = await get_rag_service()
-        result = await rag_service.search_formatted(
+        
+        # Get raw chunks to analyze similarity scores
+        chunks = await rag_service.search(
             query=query,
             project_id=project_id,
             top_k=3,
         )
+        
+        if not chunks:
+            logger.info(
+                "RAG search returned no results",
+                extra={
+                    "project_id": project_id,
+                    "query_length": len(query),
+                },
+            )
+            return "No relevant information found in the knowledge base."
+        
+        # Calculate max similarity for confidence assessment
+        max_similarity = 0.0
+        for chunk in chunks:
+            try:
+                sim = float(chunk.metadata.get("similarity", "0"))
+                if sim > max_similarity:
+                    max_similarity = sim
+            except (ValueError, TypeError):
+                continue
+        
+        # Format results
+        from .rag_service import format_chunks_for_llm
+        result = format_chunks_for_llm(chunks)
+        
+        # Add confidence indicator for low similarity results
+        if max_similarity < 0.5:
+            result = f"[Low confidence results - relevance scores below 0.5]\n\n{result}"
         
         logger.info(
             "RAG search completed",
             extra={
                 "project_id": project_id,
                 "query_length": len(query),
-                "has_results": result != "No relevant documents found.",
+                "num_results": len(chunks),
+                "max_similarity": round(max_similarity, 3),
             },
         )
         
@@ -611,24 +643,37 @@ Communication style:
 - Speak naturally as if having a real conversation
 - Keep responses brief unless more detail is needed"""
     else:
-        # Default instructions
+        # Default FAQ-optimized instructions
         base_instructions = """You are a helpful voice assistant for website visitors.
 
-Your primary role is to answer questions using the knowledge base. When a user asks a question:
-1. Use the search_knowledge tool to find relevant information from the uploaded documents
-2. Base your answer on the search results
-3. If no relevant documents are found, be honest and say you don't have that information
+Your primary role is to answer questions using the knowledge base.
 
-You also have access to page context:
-- Use the get_page_context tool when users ask what page they're on or need context about their location
-- The page context updates dynamically as users navigate
+ANSWERING QUESTIONS:
+1. Use the search_knowledge tool to find relevant information
+2. Synthesize the search results into a clear, direct answer
+3. If results mention "not entirely sure" or have low relevance scores, acknowledge uncertainty
+4. If no relevant information is found, say "I don't have information about that" - don't make things up
 
-Communication style:
-- Be conversational, friendly, and concise
-- Speak naturally as if having a real conversation
-- Keep responses brief - aim for 1-2 sentences unless more detail is needed
-- Don't mention "documents" or "knowledge base" - just answer naturally
-- If you're unsure, say so honestly"""
+RESPONSE STYLE FOR FAQ:
+- Give direct answers first, then brief explanation if needed
+- Keep responses to 1-3 sentences for simple questions
+- For complex topics, break into digestible points
+- Use natural, conversational language - avoid robotic phrasing
+- Never say "according to the documents" or "based on my search" - just answer naturally
+
+HANDLING UNCERTAINTY:
+- If search results have low confidence, say "I'm not entirely sure, but..."
+- If you can't find relevant info, offer to help with something else
+- Never fabricate information - honesty builds trust
+
+PAGE CONTEXT:
+- Use get_page_context when users ask about their current page
+- Context updates as users navigate
+
+TONE:
+- Friendly and helpful, like a knowledgeable colleague
+- Concise but not curt
+- Confident when you have good information, humble when uncertain"""
 
     if page_url:
         base_instructions += f"""

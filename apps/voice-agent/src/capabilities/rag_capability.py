@@ -5,9 +5,14 @@ and generates answers based on relevant document chunks.
 """
 
 import logging
-from typing import Optional
 
 from .base import Capability, CapabilityContext, CapabilityResponse
+from ..models import DocumentChunk
+from ..rag_service import (
+    LOW_CONFIDENCE_THRESHOLD,
+    format_chunks_for_llm,
+    get_max_similarity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +46,11 @@ class RAGCapability(Capability):
             "Please upload some documents to the project first."
         )
         self._no_results_message = (
-            "I couldn't find relevant information in the uploaded documents. "
-            "Could you try rephrasing your question?"
+            "I don't have information about that in my knowledge base. "
+            "Could you try asking something else, or rephrase your question?"
+        )
+        self._low_confidence_message = (
+            "I'm not entirely sure, but based on what I found, here's what might help:"
         )
     
     @property
@@ -91,6 +99,11 @@ class RAGCapability(Capability):
     async def handle(self, context: CapabilityContext) -> CapabilityResponse:
         """Search documents and generate an answer.
         
+        Uses similarity scores to determine confidence:
+        - High similarity (>=0.5): Return results with high confidence
+        - Low similarity (<0.5): Return results with uncertainty indicator
+        - No results: Return "I don't know" message
+        
         Args:
             context: Request context with user query and project ID
             
@@ -98,16 +111,15 @@ class RAGCapability(Capability):
             CapabilityResponse with answer text and metadata
         """
         try:
-            # Search for relevant documents
-            result = await self._rag_service.search_formatted(
+            # Search for relevant documents (get raw chunks for similarity analysis)
+            chunks = await self._rag_service.search(
                 query=context.user_query,
                 project_id=context.project_id,
                 top_k=3,
             )
             
-            # Check if we found relevant results
-            no_results_indicator = "No relevant documents found"
-            if result == no_results_indicator or not result:
+            # No results found
+            if not chunks:
                 logger.info(
                     "RAG search returned no results",
                     extra={
@@ -119,13 +131,41 @@ class RAGCapability(Capability):
                     text=self._no_results_message,
                     confidence=RAG_CONFIDENCE_THRESHOLD,
                     handled=True,
-                    metadata={"rag_hit": False},
+                    metadata={"rag_hit": False, "max_similarity": 0.0},
+                )
+            
+            # Get max similarity score
+            max_similarity = get_max_similarity(chunks)
+            
+            # Format chunks for response
+            result = format_chunks_for_llm(chunks)
+            
+            # Check if results are low confidence
+            if max_similarity < LOW_CONFIDENCE_THRESHOLD:
+                logger.info(
+                    "RAG search returned low confidence results",
+                    extra={
+                        "project_id": context.project_id,
+                        "max_similarity": max_similarity,
+                        "query_length": len(context.user_query),
+                    },
+                )
+                return CapabilityResponse(
+                    text=self._low_confidence_message + "\n\n" + result,
+                    confidence=max_similarity,
+                    handled=True,
+                    metadata={
+                        "rag_hit": True,
+                        "low_confidence": True,
+                        "max_similarity": max_similarity,
+                    },
                 )
             
             logger.info(
                 "RAG search successful",
                 extra={
                     "project_id": context.project_id,
+                    "max_similarity": max_similarity,
                     "result_length": len(result),
                 },
             )
@@ -134,7 +174,11 @@ class RAGCapability(Capability):
                 text=result,
                 confidence=DEFAULT_RAG_CONFIDENCE,
                 handled=True,
-                metadata={"rag_hit": True},
+                metadata={
+                    "rag_hit": True,
+                    "low_confidence": False,
+                    "max_similarity": max_similarity,
+                },
             )
             
         except Exception as e:

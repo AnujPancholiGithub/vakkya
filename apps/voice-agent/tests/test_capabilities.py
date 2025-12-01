@@ -35,7 +35,17 @@ def context():
 @pytest.fixture
 def mock_rag_service():
     """Create a mock RAG service."""
+    from src.models import DocumentChunk
+    
     service = MagicMock()
+    # Mock search() to return chunks with high similarity
+    service.search = AsyncMock(return_value=[
+        DocumentChunk(
+            content="The return policy is 30 days.",
+            metadata={"id": "chunk-1", "chunk_index": "0", "similarity": "0.95"},
+        )
+    ])
+    # Keep search_formatted for backwards compatibility
     service.search_formatted = AsyncMock(return_value="The return policy is 30 days.")
     return service
 
@@ -250,27 +260,26 @@ class TestRAGCapability:
         
         response = await cap.handle(context)
         
-        assert response.text == "The return policy is 30 days."
+        assert "return policy" in response.text.lower() or "30 days" in response.text
         assert response.handled is True
         assert response.metadata["rag_hit"] is True
     
     @pytest.mark.asyncio
     async def test_handle_no_results(self, mock_rag_service, context):
         """Should return helpful message when no results found."""
-        mock_rag_service.search_formatted = AsyncMock(
-            return_value="No relevant documents found"
-        )
+        # Mock search() to return empty list
+        mock_rag_service.search = AsyncMock(return_value=[])
         cap = RAGCapability(mock_rag_service)
         
         response = await cap.handle(context)
         
-        assert "couldn't find" in response.text.lower() or "rephras" in response.text.lower()
+        assert "don't have" in response.text.lower() or "rephras" in response.text.lower()
         assert response.metadata["rag_hit"] is False
     
     @pytest.mark.asyncio
     async def test_handle_search_error(self, mock_rag_service, context):
         """Should handle RAG search errors gracefully."""
-        mock_rag_service.search_formatted = AsyncMock(
+        mock_rag_service.search = AsyncMock(
             side_effect=Exception("Database error")
         )
         cap = RAGCapability(mock_rag_service)
@@ -306,3 +315,80 @@ class TestOrchestratorWithRAG:
         
         assert response.handled is True
         assert response.metadata.get("handled_by") == "rag"
+
+
+# --- Low Confidence RAG Tests ---
+
+class TestRAGCapabilityLowConfidence:
+    """Tests for RAGCapability low confidence handling."""
+    
+    @pytest.mark.asyncio
+    async def test_low_confidence_results_include_uncertainty_message(self):
+        """Should include uncertainty message for low similarity results."""
+        from src.models import DocumentChunk
+        
+        mock_service = MagicMock()
+        mock_service.search = AsyncMock(return_value=[
+            DocumentChunk(
+                content="Some content",
+                metadata={"id": "1", "chunk_index": "0", "similarity": "0.3"},
+            )
+        ])
+        
+        cap = RAGCapability(mock_service)
+        context = CapabilityContext(
+            user_query="What is the policy?",
+            project_id="test-project",
+        )
+        
+        response = await cap.handle(context)
+        
+        assert "not entirely sure" in response.text.lower()
+        assert response.metadata["low_confidence"] is True
+        assert response.metadata["max_similarity"] == 0.3
+
+    @pytest.mark.asyncio
+    async def test_high_confidence_results_no_uncertainty_message(self):
+        """Should not include uncertainty message for high similarity results."""
+        from src.models import DocumentChunk
+        
+        mock_service = MagicMock()
+        mock_service.search = AsyncMock(return_value=[
+            DocumentChunk(
+                content="The policy is 30 days.",
+                metadata={"id": "1", "chunk_index": "0", "similarity": "0.85"},
+            )
+        ])
+        
+        cap = RAGCapability(mock_service)
+        context = CapabilityContext(
+            user_query="What is the policy?",
+            project_id="test-project",
+        )
+        
+        response = await cap.handle(context)
+        
+        assert "not entirely sure" not in response.text.lower()
+        assert response.metadata["low_confidence"] is False
+        assert response.metadata["max_similarity"] == 0.85
+
+    def test_get_max_similarity_helper(self):
+        """Should correctly calculate max similarity from chunks."""
+        from src.models import DocumentChunk
+        from src.rag_service import get_max_similarity
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={"similarity": "0.5"}),
+            DocumentChunk(content="B", metadata={"similarity": "0.9"}),
+            DocumentChunk(content="C", metadata={"similarity": "0.7"}),
+        ]
+        
+        result = get_max_similarity(chunks)
+        assert result == 0.9
+
+    def test_get_max_similarity_empty_chunks(self):
+        """Should return 0.0 for empty chunks."""
+        from src.rag_service import get_max_similarity
+        
+        result = get_max_similarity([])
+        assert result == 0.0

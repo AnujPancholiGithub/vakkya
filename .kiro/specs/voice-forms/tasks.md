@@ -30,15 +30,17 @@
     - Test fallback behavior
     - _Requirements: Architecture Principle_
 
-- [ ] 3. Improve RAG responses
-  - [ ] 3.1 Add "I don't know" fallback when RAG confidence is low
-    - Check similarity score threshold
-    - Return graceful fallback message
+- [x] 3. Improve RAG responses
+  - [x] 3.1 Add "I don't know" fallback when RAG confidence is low
+    - Check similarity score threshold (0.5)
+    - Return graceful fallback message with uncertainty indicator
     - _Requirements: 2.A_
-  - [ ] 3.2 Improve RAG prompt template for FAQ-style answers
+    - **Status:** Added LOW_SIMILARITY_THRESHOLD, _get_max_similarity(), low confidence detection
+  - [x] 3.2 Improve RAG prompt template for FAQ-style answers
     - Concise, helpful responses
     - Include source context
     - _Requirements: 2.A_
+    - **Status:** Improved agent instructions with FAQ-optimized prompts
 
 - [ ] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

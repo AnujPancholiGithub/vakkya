@@ -66,9 +66,10 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - **Execute:** Voice Forms task 2 (subtasks 2.1-2.4)
   - _Requirements: Architecture Principle_
 
-- [ ] 7.1.3 Improve RAG responses
+- [x] 7.1.3 Improve RAG responses
   - **Execute:** Voice Forms task 3 (subtasks 3.1-3.2)
   - _Requirements: 2.A_
+  - **Completed:** Added similarity-based confidence, "I don't know" fallback, FAQ-optimized prompts
 
 - [ ] 7.1.4 Checkpoint
   - **Execute:** Voice Forms task 4

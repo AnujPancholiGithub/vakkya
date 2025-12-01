@@ -360,7 +360,7 @@ class TestSearchKnowledgeTool:
     async def test_search_knowledge_returns_results(self, reset_rag_service) -> None:
         """Test search_knowledge returns formatted results from RAG service."""
         from src.entrypoint import search_knowledge
-        from src.models import SessionContext
+        from src.models import SessionContext, DocumentChunk
         
         mock_context = MagicMock()
         mock_context.userdata = SessionContext(
@@ -369,15 +369,19 @@ class TestSearchKnowledgeTool:
         )
         
         mock_rag = AsyncMock()
-        mock_rag.search_formatted = AsyncMock(
-            return_value="[Document 1] (relevance: 0.95)\nRelevant content here"
-        )
+        # Mock search() to return chunks with high similarity
+        mock_rag.search = AsyncMock(return_value=[
+            DocumentChunk(
+                content="Relevant content here",
+                metadata={"id": "chunk-1", "chunk_index": "0", "similarity": "0.95"},
+            )
+        ])
         
         with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
             result = await search_knowledge(mock_context, "How do I reset my password?")
         
         assert "Relevant content" in result
-        mock_rag.search_formatted.assert_called_once_with(
+        mock_rag.search.assert_called_once_with(
             query="How do I reset my password?",
             project_id=TEST_PROJECT_ID,
             top_k=3,
@@ -393,7 +397,7 @@ class TestSearchKnowledgeTool:
         
         result = await search_knowledge(mock_context, "test query")
         
-        assert result == "No relevant documents found."
+        assert "no relevant information" in result.lower()
 
     @pytest.mark.asyncio
     async def test_search_knowledge_handles_rag_error(self, reset_rag_service) -> None:
@@ -408,7 +412,7 @@ class TestSearchKnowledgeTool:
         )
         
         mock_rag = AsyncMock()
-        mock_rag.search_formatted = AsyncMock(side_effect=Exception("Database error"))
+        mock_rag.search = AsyncMock(side_effect=Exception("Database error"))
         
         with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
             result = await search_knowledge(mock_context, "test query")
