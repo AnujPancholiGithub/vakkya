@@ -267,6 +267,198 @@ const FORM_UI_STYLES = `
     margin: 0;
   }
   
+  .vakkya-form-pending {
+    background: rgba(251, 191, 36, 0.15);
+    border: 2px solid #FCD34D;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+  }
+  
+  .vakkya-form-pending-label {
+    color: #FCD34D;
+    font-size: 12px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  
+  .vakkya-form-pending-value {
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 8px;
+  }
+  
+  .vakkya-form-pending-utterance {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    font-style: italic;
+    margin: 0 0 12px;
+  }
+  
+  .vakkya-form-confirm-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .vakkya-form-btn-confirm {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+  
+  .vakkya-form-btn-yes {
+    background: #10B981;
+    color: white;
+  }
+  
+  .vakkya-form-btn-yes:hover {
+    background: #059669;
+  }
+  
+  .vakkya-form-btn-no {
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  
+  .vakkya-form-btn-no:hover {
+    background: rgba(239, 68, 68, 0.3);
+  }
+  
+  .vakkya-form-attempt-counter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  
+  .vakkya-form-fallback-hint {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .vakkya-form-fallback-hint svg {
+    width: 16px;
+    height: 16px;
+    fill: #FCD34D;
+    flex-shrink: 0;
+  }
+  
+  .vakkya-form-fallback-text {
+    color: #FCD34D;
+    font-size: 13px;
+    margin: 0;
+  }
+  
+  .vakkya-form-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .vakkya-form-summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+  }
+  
+  .vakkya-form-summary-field {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .vakkya-form-summary-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    margin: 0 0 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .vakkya-form-summary-value {
+    color: white;
+    font-size: 14px;
+    margin: 0;
+    word-break: break-word;
+  }
+  
+  .vakkya-form-summary-edit {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+  }
+  
+  .vakkya-form-summary-edit:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: white;
+    color: white;
+  }
+  
+  .vakkya-form-error-banner {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .vakkya-form-error-title {
+    color: #FCA5A5;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  
+  .vakkya-form-error-message {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    margin: 0;
+  }
+  
+  .vakkya-form-retry-btn {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.2);
+    color: #FCA5A5;
+    transition: all 0.2s ease;
+  }
+  
+  .vakkya-form-retry-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+  }
+  
   @media (max-width: 480px) {
     .vakkya-form-ui {
       width: calc(100vw - 32px);
@@ -284,6 +476,8 @@ const FORM_UI_STYLES = `
 const CLOSE_ICON = `<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
 const MIC_ICON = `<svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
 const CHECK_ICON = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+const KEYBOARD_ICON = `<svg viewBox="0 0 24 24"><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>`;
+const EDIT_ICON = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 
 /**
  * @typedef {Object} FormField
@@ -302,11 +496,24 @@ const CHECK_ICON = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.4
  */
 
 /**
+ * @typedef {Object} PendingConfirmation
+ * @property {string} fieldName
+ * @property {any} value
+ * @property {string} utterance
+ */
+
+/**
  * @typedef {Object} FormState
  * @property {number} currentIndex
  * @property {Object<string, any>} answers
  * @property {boolean} completed
  * @property {string|null} error
+ * @property {PendingConfirmation|null} pendingConfirmation
+ * @property {Object<string, number>} attemptCounts - Track attempts per field
+ * @property {boolean} showSummary
+ * @property {boolean} submissionError
+ * @property {string|null} submissionErrorMessage
+ * @property {boolean} canRetrySubmission
  */
 
 /**
@@ -331,6 +538,12 @@ export function createFormUI(shadow, schema, callbacks) {
     answers: {},
     completed: false,
     error: null,
+    pendingConfirmation: null,
+    attemptCounts: {},
+    showSummary: false,
+    submissionError: false,
+    submissionErrorMessage: null,
+    canRetrySubmission: false,
   };
   
   // Create main container
@@ -353,10 +566,15 @@ export function createFormUI(shadow, schema, callbacks) {
       return;
     }
     
+    if (state.showSummary) {
+      renderSummaryView();
+      return;
+    }
+    
     const field = schema.fields[state.currentIndex];
     if (!field) {
-      state.completed = true;
-      renderComplete();
+      state.showSummary = true;
+      renderSummaryView();
       return;
     }
     
@@ -397,11 +615,37 @@ export function createFormUI(shadow, schema, callbacks) {
       inputContainer.appendChild(errorText);
     }
     
-    // Voice hint
-    const voiceHint = document.createElement('div');
-    voiceHint.className = 'vakkya-form-voice-hint';
-    voiceHint.innerHTML = `${MIC_ICON} <span>Or speak your answer</span>`;
-    inputContainer.appendChild(voiceHint);
+    // Pending confirmation UI (Requirement 4.1)
+    if (state.pendingConfirmation && state.pendingConfirmation.fieldName === field.name) {
+      const pendingUI = createPendingConfirmationUI(state.pendingConfirmation);
+      inputContainer.appendChild(pendingUI);
+    } else {
+      // Voice hint (only show when not confirming)
+      const voiceHint = document.createElement('div');
+      voiceHint.className = 'vakkya-form-voice-hint';
+      voiceHint.innerHTML = `${MIC_ICON} <span>Or speak your answer</span>`;
+      inputContainer.appendChild(voiceHint);
+    }
+    
+    // Attempt counter (Requirement 4.6)
+    const attempts = state.attemptCounts[field.name] || 0;
+    if (attempts > 0 && attempts < 3) {
+      const attemptCounter = document.createElement('div');
+      attemptCounter.className = 'vakkya-form-attempt-counter';
+      attemptCounter.textContent = `Attempt ${attempts + 1} of 3`;
+      inputContainer.appendChild(attemptCounter);
+    }
+    
+    // Keyboard fallback hint after 3 failed attempts (Requirement 4.6)
+    if (attempts >= 3) {
+      const fallbackHint = document.createElement('div');
+      fallbackHint.className = 'vakkya-form-fallback-hint';
+      fallbackHint.innerHTML = `
+        ${KEYBOARD_ICON}
+        <p class="vakkya-form-fallback-text">Having trouble? Try typing your answer instead.</p>
+      `;
+      inputContainer.appendChild(fallbackHint);
+    }
     
     // Optional hint
     if (!field.required) {
@@ -468,6 +712,238 @@ export function createFormUI(shadow, schema, callbacks) {
         handleNext(input);
       }
     });
+  }
+  
+  /**
+   * Create pending confirmation UI with confirm/reject buttons
+   * Requirement 4.1: Show extracted value with confirm/reject
+   * @param {PendingConfirmation} pending
+   * @returns {HTMLElement}
+   */
+  function createPendingConfirmationUI(pending) {
+    const container = document.createElement('div');
+    container.className = 'vakkya-form-pending';
+    
+    const label = document.createElement('p');
+    label.className = 'vakkya-form-pending-label';
+    label.textContent = 'I heard:';
+    
+    const value = document.createElement('p');
+    value.className = 'vakkya-form-pending-value';
+    value.textContent = String(pending.value);
+    
+    const utterance = document.createElement('p');
+    utterance.className = 'vakkya-form-pending-utterance';
+    utterance.textContent = `"${pending.utterance}"`;
+    
+    const actions = document.createElement('div');
+    actions.className = 'vakkya-form-confirm-actions';
+    
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'vakkya-form-btn-confirm vakkya-form-btn-yes';
+    yesBtn.textContent = 'Yes, correct';
+    yesBtn.type = 'button';
+    yesBtn.addEventListener('click', () => {
+      handleConfirmPending(true);
+    });
+    
+    const noBtn = document.createElement('button');
+    noBtn.className = 'vakkya-form-btn-confirm vakkya-form-btn-no';
+    noBtn.textContent = 'No, try again';
+    noBtn.type = 'button';
+    noBtn.addEventListener('click', () => {
+      handleConfirmPending(false);
+    });
+    
+    actions.appendChild(yesBtn);
+    actions.appendChild(noBtn);
+    
+    container.appendChild(label);
+    container.appendChild(value);
+    container.appendChild(utterance);
+    container.appendChild(actions);
+    
+    return container;
+  }
+  
+  /**
+   * Handle confirmation of pending value
+   * @param {boolean} confirmed
+   */
+  function handleConfirmPending(confirmed) {
+    if (!state.pendingConfirmation) return;
+    
+    const { fieldName, value } = state.pendingConfirmation;
+    
+    if (confirmed) {
+      // Store the confirmed value
+      state.answers[fieldName] = value;
+      state.pendingConfirmation = null;
+      state.attemptCounts[fieldName] = 0;
+      
+      // Notify callback
+      if (callbacks.onAnswer) {
+        callbacks.onAnswer(fieldName, value);
+      }
+      
+      // Notify widget of confirmation (for data channel)
+      if (callbacks.onConfirm) {
+        callbacks.onConfirm(fieldName);
+      }
+      
+      // Advance to next field
+      state.currentIndex++;
+      if (state.currentIndex >= schema.fields.length) {
+        state.showSummary = true;
+      }
+    } else {
+      // Increment attempt count
+      state.attemptCounts[fieldName] = (state.attemptCounts[fieldName] || 0) + 1;
+      state.pendingConfirmation = null;
+      
+      // Notify widget of rejection (for data channel)
+      if (callbacks.onReject) {
+        callbacks.onReject(fieldName);
+      }
+    }
+    
+    renderForm();
+  }
+  
+  /**
+   * Render summary view with all answers (Requirement 6.1, 6.4)
+   */
+  function renderSummaryView() {
+    element.innerHTML = '';
+    
+    // Header
+    const header = document.createElement('div');
+    header.className = 'vakkya-form-header';
+    header.innerHTML = `
+      <span class="vakkya-form-title">${escapeHtml(schema.name)} - Review</span>
+      <button class="vakkya-form-close" aria-label="Close form" type="button">${CLOSE_ICON}</button>
+    `;
+    header.querySelector('.vakkya-form-close').addEventListener('click', () => {
+      if (callbacks.onClose) callbacks.onClose();
+    });
+    
+    // Content
+    const content = document.createElement('div');
+    content.className = 'vakkya-form-content';
+    
+    // Submission error banner
+    if (state.submissionError) {
+      const errorBanner = document.createElement('div');
+      errorBanner.className = 'vakkya-form-error-banner';
+      errorBanner.innerHTML = `
+        <p class="vakkya-form-error-title">Submission failed</p>
+        <p class="vakkya-form-error-message">${escapeHtml(state.submissionErrorMessage || 'Please try again')}</p>
+      `;
+      if (state.canRetrySubmission) {
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'vakkya-form-retry-btn';
+        retryBtn.textContent = 'Retry';
+        retryBtn.type = 'button';
+        retryBtn.addEventListener('click', () => {
+          state.submissionError = false;
+          if (callbacks.onSubmit) {
+            callbacks.onSubmit(state.answers);
+          }
+        });
+        errorBanner.appendChild(retryBtn);
+      }
+      content.appendChild(errorBanner);
+    }
+    
+    // Question
+    const question = document.createElement('p');
+    question.className = 'vakkya-form-question';
+    question.textContent = 'Please review your answers:';
+    content.appendChild(question);
+    
+    // Summary list with edit buttons (Requirement 6.4)
+    const summaryList = document.createElement('div');
+    summaryList.className = 'vakkya-form-summary-list';
+    
+    schema.fields.forEach((field) => {
+      const item = document.createElement('div');
+      item.className = 'vakkya-form-summary-item';
+      
+      const fieldInfo = document.createElement('div');
+      fieldInfo.className = 'vakkya-form-summary-field';
+      
+      const label = document.createElement('p');
+      label.className = 'vakkya-form-summary-label';
+      label.textContent = field.label.replace(/\?$/, '');
+      
+      const value = document.createElement('p');
+      value.className = 'vakkya-form-summary-value';
+      value.textContent = state.answers[field.name] !== undefined 
+        ? String(state.answers[field.name]) 
+        : (field.required ? '—' : 'Skipped');
+      
+      fieldInfo.appendChild(label);
+      fieldInfo.appendChild(value);
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'vakkya-form-summary-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.type = 'button';
+      editBtn.addEventListener('click', () => {
+        editFieldFromSummary(field.name);
+      });
+      
+      item.appendChild(fieldInfo);
+      item.appendChild(editBtn);
+      summaryList.appendChild(item);
+    });
+    
+    content.appendChild(summaryList);
+    
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'vakkya-form-footer';
+    
+    const spacer = document.createElement('div');
+    
+    const actions = document.createElement('div');
+    actions.className = 'vakkya-form-actions';
+    
+    const submitBtn = document.createElement('button');
+    submitBtn.className = 'vakkya-form-btn vakkya-form-btn-primary';
+    submitBtn.textContent = 'Submit';
+    submitBtn.type = 'button';
+    submitBtn.addEventListener('click', () => {
+      if (callbacks.onSubmit) {
+        callbacks.onSubmit(state.answers);
+      }
+    });
+    
+    actions.appendChild(submitBtn);
+    footer.appendChild(spacer);
+    footer.appendChild(actions);
+    
+    element.appendChild(header);
+    element.appendChild(content);
+    element.appendChild(footer);
+  }
+  
+  /**
+   * Edit a specific field from summary view (Requirement 6.4)
+   * @param {string} fieldName
+   */
+  function editFieldFromSummary(fieldName) {
+    const fieldIndex = schema.fields.findIndex(f => f.name === fieldName);
+    if (fieldIndex === -1) return;
+    
+    // Clear only this field's answer
+    delete state.answers[fieldName];
+    state.currentIndex = fieldIndex;
+    state.showSummary = false;
+    state.error = null;
+    state.pendingConfirmation = null;
+    
+    renderForm();
   }
   
   /**
@@ -557,6 +1033,7 @@ export function createFormUI(shadow, schema, callbacks) {
   
   /**
    * Handle next button click
+   * Requirement 4.5: Keyboard inputs skip confirmation
    * @param {HTMLElement} input
    */
   function handleNext(input) {
@@ -577,6 +1054,10 @@ export function createFormUI(shadow, schema, callbacks) {
       state.answers[field.name] = value;
     }
     
+    // Clear pending confirmation (keyboard bypasses confirmation)
+    state.pendingConfirmation = null;
+    state.attemptCounts[field.name] = 0;
+    
     // Notify callback
     if (callbacks.onAnswer) {
       callbacks.onAnswer(field.name, value);
@@ -586,12 +1067,9 @@ export function createFormUI(shadow, schema, callbacks) {
     state.error = null;
     state.currentIndex++;
     
-    // Check if complete
+    // Check if complete - show summary instead of auto-submitting (Requirement 6.1)
     if (state.currentIndex >= schema.fields.length) {
-      state.completed = true;
-      if (callbacks.onSubmit) {
-        callbacks.onSubmit(state.answers);
-      }
+      state.showSummary = true;
     }
     
     renderForm();
@@ -732,6 +1210,7 @@ export function createFormUI(shadow, schema, callbacks) {
 
   /**
    * Show pending value for confirmation (voice extraction)
+   * Requirement 4.1: Show extracted value with confirm/reject buttons
    * @param {string} fieldName
    * @param {any} value
    * @param {string} utterance
@@ -745,20 +1224,20 @@ export function createFormUI(shadow, schema, callbacks) {
       state.currentIndex = fieldIndex;
     }
     
-    // Store the pending value (will be shown in input)
-    state.answers[fieldName] = value;
+    // Set pending confirmation state (triggers confirmation UI)
+    state.pendingConfirmation = {
+      fieldName,
+      value,
+      utterance,
+    };
+    state.showSummary = false;
     state.error = null;
-    renderForm();
     
-    // Highlight the input to show it's pending confirmation
-    const input = element.querySelector('.vakkya-form-input, .vakkya-form-select');
-    if (input) {
-      input.style.borderColor = '#FCD34D'; // Yellow for pending
-    }
+    renderForm();
   }
 
   /**
-   * Confirm a value (from agent confirmation)
+   * Confirm a value (from agent confirmation via data channel)
    * @param {string} fieldName
    * @param {any} value
    */
@@ -767,15 +1246,14 @@ export function createFormUI(shadow, schema, callbacks) {
     if (fieldIndex === -1) return;
     
     state.answers[fieldName] = value;
+    state.pendingConfirmation = null;
+    state.attemptCounts[fieldName] = 0;
     
     // Advance to next field
     if (fieldIndex === state.currentIndex) {
       state.currentIndex++;
       if (state.currentIndex >= schema.fields.length) {
-        state.completed = true;
-        if (callbacks.onSubmit) {
-          callbacks.onSubmit(state.answers);
-        }
+        state.showSummary = true;
       }
     }
     
@@ -784,52 +1262,19 @@ export function createFormUI(shadow, schema, callbacks) {
   }
 
   /**
-   * Show form summary before submission
+   * Show form summary before submission (called from agent via data channel)
+   * Requirement 6.1: Summary view with all collected answers
    * @param {Object} answers
    */
   function showSummary(answers) {
     // Update state with all answers
     state.answers = { ...state.answers, ...answers };
-    state.currentIndex = schema.fields.length; // Move past all fields
+    state.currentIndex = schema.fields.length;
+    state.showSummary = true;
+    state.pendingConfirmation = null;
+    state.submissionError = false;
     
-    // Render summary view
-    element.innerHTML = `
-      <div class="vakkya-form-header">
-        <span class="vakkya-form-title">${escapeHtml(schema.name)} - Review</span>
-        <button class="vakkya-form-close" aria-label="Close form" type="button">${CLOSE_ICON}</button>
-      </div>
-      <div class="vakkya-form-content">
-        <p class="vakkya-form-question">Please review your answers:</p>
-        ${schema.fields.map(field => `
-          <div style="margin-bottom: 12px;">
-            <div style="color: rgba(255,255,255,0.7); font-size: 12px;">${escapeHtml(field.label)}</div>
-            <div style="color: white; font-size: 14px;">${escapeHtml(String(state.answers[field.name] || '-'))}</div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="vakkya-form-footer">
-        <div></div>
-        <div class="vakkya-form-actions">
-          <button class="vakkya-form-btn vakkya-form-btn-secondary" type="button">Edit</button>
-          <button class="vakkya-form-btn vakkya-form-btn-primary" type="button">Submit</button>
-        </div>
-      </div>
-    `;
-    
-    element.querySelector('.vakkya-form-close').addEventListener('click', () => {
-      if (callbacks.onClose) callbacks.onClose();
-    });
-    
-    element.querySelector('.vakkya-form-btn-secondary').addEventListener('click', () => {
-      state.currentIndex = 0;
-      renderForm();
-    });
-    
-    element.querySelector('.vakkya-form-btn-primary').addEventListener('click', () => {
-      if (callbacks.onSubmit) {
-        callbacks.onSubmit(state.answers);
-      }
-    });
+    renderForm();
   }
 
   /**
@@ -838,7 +1283,48 @@ export function createFormUI(shadow, schema, callbacks) {
    */
   function showSuccess(submissionId) {
     state.completed = true;
-    renderComplete();
+    state.showSummary = false;
+    state.submissionError = false;
+    renderForm();
+  }
+
+  /**
+   * Show submission error with optional retry
+   * @param {string} message
+   * @param {boolean} canRetry
+   */
+  function showSubmissionError(message, canRetry) {
+    state.submissionError = true;
+    state.submissionErrorMessage = message;
+    state.canRetrySubmission = canRetry;
+    state.showSummary = true;
+    renderForm();
+  }
+
+  /**
+   * Increment attempt count for a field (called when voice extraction fails)
+   * @param {string} fieldName
+   */
+  function incrementAttempts(fieldName) {
+    state.attemptCounts[fieldName] = (state.attemptCounts[fieldName] || 0) + 1;
+    renderForm();
+  }
+
+  /**
+   * Get attempt count for current field
+   * @returns {number}
+   */
+  function getCurrentAttempts() {
+    const field = schema.fields[state.currentIndex];
+    return field ? (state.attemptCounts[field.name] || 0) : 0;
+  }
+
+  /**
+   * Check if keyboard fallback should be shown
+   * @returns {boolean}
+   */
+  function shouldShowKeyboardFallback() {
+    return getCurrentAttempts() >= 3;
   }
 
   return {
@@ -853,6 +1339,11 @@ export function createFormUI(shadow, schema, callbacks) {
     confirmValue,
     showSummary,
     showSuccess,
+    showSubmissionError,
+    incrementAttempts,
+    getCurrentAttempts,
+    shouldShowKeyboardFallback,
+    editFieldFromSummary,
   };
 }
 

@@ -247,9 +247,6 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /** @type {Object[]} */
   let availableForms = [];
   
-  /** @type {string|null} */
-  let projectId = null;
-  
   /** @type {Function|null} */
   let onAgentMessageCallback = null;
   
@@ -288,7 +285,6 @@ export function createLiveKitManager(widgetToken, apiUrl) {
       // Step 1: Validate token with API
       setState('validating');
       const tokenData = await validateToken(widgetToken, apiUrl);
-      projectId = tokenData.projectId;
       
       // Step 2: Start parallel operations (Property 1.2: parallel fetch)
       setState('connecting');

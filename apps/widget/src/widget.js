@@ -358,7 +358,7 @@ export class VakkyaWidget {
   async handleFormSubmit(answers) {
     // Send form data to voice agent via data channel if connected
     if (this.livekitManager && this.livekitManager.isConnected()) {
-      this.sendFormData({
+      this.livekitManager.publishMessage({
         type: 'form_complete',
         formId: this.formSchema?.id,
         answers,

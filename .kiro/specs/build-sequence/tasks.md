@@ -285,37 +285,56 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - ✅ fetchAllForms() with caching, parallel fetch in connect(), graceful degradation
   - ✅ 19 property tests added (Properties 1, 2, 3)
 
-- [ ] 8.4.2 Update form UI for confirmation flow
+- [x] 8.4.2 Update form UI for confirmation flow
   - **Execute:** Conversational Forms V2 task 14 (subtasks 14.1-14.3)
   - Confirmation UI, summary view
   - _Requirements: 4.1, 4.6, 6.1, 6.4_
+  - ✅ Pending confirmation UI with confirm/reject buttons
+  - ✅ Attempt counter and keyboard fallback hint after 3 failures
+  - ✅ Summary view with per-field edit buttons
+  - ✅ 15 new unit tests added (305 total widget tests)
 
-- [ ] 8.4.3 Implement local submission queue
+- [x] 8.4.3 Implement local submission queue
   - **Execute:** Conversational Forms V2 task 15 (subtasks 15.1-15.2)
   - _Requirements: 7.3_
+  - ✅ submission-queue.js with enqueue, retry, persistence
+  - ✅ 21 property tests for local queue (Property 16)
 
-- [ ] 8.4.4 Checkpoint
+- [x] 8.4.4 Checkpoint
   - **Execute:** Conversational Forms V2 task 16
+  - ✅ All 634 tests passing (schemas: 40, api: 215, widget: 326, dashboard: 53)
 
 ### 8.5 Voice Agent FormCapabilityV2 (V2 Phase 5)
 
-- [ ] 8.5.1 Create FormCapabilityV2 class
+- [x] 8.5.1 Create FormCapabilityV2 class
   - **Execute:** Conversational Forms V2 task 17 (subtasks 17.1-17.3)
   - State machine, trigger phrase matching
   - _Requirements: 2.2, 4.1-4.4, 6.1_
+  - ✅ form_capability_v2.py with FormStateEnum (7 states) and FormContext
+  - ✅ Trigger phrase matching with 0.95 confidence
+  - ✅ 33 property tests (Properties 5, 7, 9, 11, 12, 17)
 
-- [ ] 8.5.2 Implement confirmation flow in agent
+- [x] 8.5.2 Implement confirmation flow in agent
   - **Execute:** Conversational Forms V2 task 18 (subtasks 18.1-18.4)
   - Re-ask on rejection, validation re-ask
   - _Requirements: 4.1-4.4, 7.4_
+  - ✅ _generate_confirmation_prompt() for natural confirmation
+  - ✅ _handle_confirming() handles yes/no/correction responses
+  - ✅ _handle_collecting() re-asks on failed extraction
+  - ✅ Property 17 (Validation Re-ask) tested
 
-- [ ] 8.5.3 Implement summary and submission flow
+- [x] 8.5.3 Implement summary and submission flow
   - **Execute:** Conversational Forms V2 task 19 (subtasks 19.1-19.6)
   - Edit without restart, retry logic
   - _Requirements: 6.1, 6.4, 6.6_
+  - ✅ _generate_summary() creates human-readable summary
+  - ✅ _handle_edit_request() allows editing one field without restart
+  - ✅ _handle_submitting() with retry on failure
+  - ✅ Properties 11, 12, 13 tested
 
-- [ ] 8.5.4 Checkpoint
+- [x] 8.5.4 Checkpoint
   - **Execute:** Conversational Forms V2 task 20
+  - ✅ All 925 tests passing (schemas: 40, api: 215, voice-agent: 291, widget: 326, dashboard: 53)
 
 ### 8.6 Mode Transitions & Recovery (V2 Phase 6)
 

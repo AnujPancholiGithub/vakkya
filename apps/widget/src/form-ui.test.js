@@ -332,30 +332,41 @@ describe('createFormUI', () => {
       
       element.querySelector('.vakkya-form-btn-primary').click();
       
-      // Should show completion screen
-      const complete = element.querySelector('.vakkya-form-complete');
-      expect(complete).toBeTruthy();
+      // Should show summary screen (Requirement 6.1)
+      const summaryTitle = element.querySelector('.vakkya-form-title');
+      expect(summaryTitle.textContent).toContain('Review');
     });
   });
 
   describe('completion', () => {
-    it('should show completion screen after last question', () => {
+    it('should show summary screen after last question (Requirement 6.1)', () => {
       const schema = {
         id: 'test',
         name: 'Test',
         fields: [{ name: 'name', type: 'string', label: 'Name', required: true }],
       };
-      const { element } = createFormUI(shadow, schema, callbacks);
+      const { element, showSuccess } = createFormUI(shadow, schema, callbacks);
       
       element.querySelector('.vakkya-form-input').value = 'John';
       element.querySelector('.vakkya-form-btn-primary').click();
+      
+      // Should show summary, not completion
+      const summaryTitle = element.querySelector('.vakkya-form-title');
+      expect(summaryTitle.textContent).toContain('Review');
+      
+      // Submit from summary calls onSubmit
+      element.querySelector('.vakkya-form-btn-primary').click();
+      expect(callbacks.onSubmit).toHaveBeenCalled();
+      
+      // showSuccess is called after successful submission to show completion
+      showSuccess('sub_123');
       
       const complete = element.querySelector('.vakkya-form-complete');
       expect(complete).toBeTruthy();
       expect(element.querySelector('.vakkya-form-complete-title').textContent).toBe('Thank you!');
     });
 
-    it('should call onSubmit with all answers', () => {
+    it('should call onSubmit when clicking submit in summary', () => {
       const schema = {
         id: 'test',
         name: 'Test',
@@ -370,6 +381,9 @@ describe('createFormUI', () => {
       element.querySelector('.vakkya-form-btn-primary').click();
       
       element.querySelector('.vakkya-form-input').value = 'john@test.com';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      // Now in summary view, click submit
       element.querySelector('.vakkya-form-btn-primary').click();
       
       expect(callbacks.onSubmit).toHaveBeenCalledWith({
@@ -517,6 +531,270 @@ describe('createFormUI', () => {
       const title = element.querySelector('.vakkya-form-title');
       expect(title.textContent).toBe('<script>alert("xss")</script>');
       expect(title.innerHTML).not.toContain('<script>');
+    });
+  });
+
+  /**
+   * Confirmation Flow UI Tests
+   * Validates: Requirements 4.1, 4.6, 6.1, 6.4
+   */
+  describe('Confirmation Flow UI (Requirements 4.1, 4.6)', () => {
+    it('should show pending confirmation UI with confirm/reject buttons (Requirement 4.1)', () => {
+      const { element, showPendingValue } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showPendingValue('name', 'John Doe', 'my name is john doe');
+      
+      const pendingUI = element.querySelector('.vakkya-form-pending');
+      expect(pendingUI).toBeTruthy();
+      
+      const pendingValue = element.querySelector('.vakkya-form-pending-value');
+      expect(pendingValue.textContent).toBe('John Doe');
+      
+      const pendingUtterance = element.querySelector('.vakkya-form-pending-utterance');
+      expect(pendingUtterance.textContent).toContain('my name is john doe');
+      
+      const yesBtn = element.querySelector('.vakkya-form-btn-yes');
+      const noBtn = element.querySelector('.vakkya-form-btn-no');
+      expect(yesBtn).toBeTruthy();
+      expect(noBtn).toBeTruthy();
+    });
+
+    it('should confirm value and advance when clicking Yes', () => {
+      const { element, showPendingValue, getState } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showPendingValue('name', 'John Doe', 'my name is john doe');
+      
+      const yesBtn = element.querySelector('.vakkya-form-btn-yes');
+      yesBtn.click();
+      
+      const state = getState();
+      expect(state.answers.name).toBe('John Doe');
+      expect(state.currentIndex).toBe(1); // Advanced to next field
+      expect(state.pendingConfirmation).toBeNull();
+    });
+
+    it('should reject value and stay on field when clicking No', () => {
+      const { element, showPendingValue, getState } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showPendingValue('name', 'John Doe', 'my name is john doe');
+      
+      const noBtn = element.querySelector('.vakkya-form-btn-no');
+      noBtn.click();
+      
+      const state = getState();
+      expect(state.answers.name).toBeUndefined();
+      expect(state.currentIndex).toBe(0); // Still on first field
+      expect(state.pendingConfirmation).toBeNull();
+    });
+
+    it('should increment attempt count on rejection', () => {
+      const { element, showPendingValue, getCurrentAttempts } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      // First rejection
+      showPendingValue('name', 'John', 'john');
+      element.querySelector('.vakkya-form-btn-no').click();
+      expect(getCurrentAttempts()).toBe(1);
+      
+      // Second rejection
+      showPendingValue('name', 'Jon', 'jon');
+      element.querySelector('.vakkya-form-btn-no').click();
+      expect(getCurrentAttempts()).toBe(2);
+    });
+
+    it('should show keyboard fallback hint after 3 failed attempts (Requirement 4.6)', () => {
+      const { element, showPendingValue, shouldShowKeyboardFallback } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      // Three rejections
+      for (let i = 0; i < 3; i++) {
+        showPendingValue('name', `attempt${i}`, `attempt ${i}`);
+        element.querySelector('.vakkya-form-btn-no').click();
+      }
+      
+      expect(shouldShowKeyboardFallback()).toBe(true);
+      
+      const fallbackHint = element.querySelector('.vakkya-form-fallback-hint');
+      expect(fallbackHint).toBeTruthy();
+      expect(fallbackHint.textContent).toContain('typing');
+    });
+
+    it('should not show fallback hint before 3 attempts', () => {
+      const { element, showPendingValue, shouldShowKeyboardFallback } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      // Two rejections
+      for (let i = 0; i < 2; i++) {
+        showPendingValue('name', `attempt${i}`, `attempt ${i}`);
+        element.querySelector('.vakkya-form-btn-no').click();
+      }
+      
+      expect(shouldShowKeyboardFallback()).toBe(false);
+      
+      const fallbackHint = element.querySelector('.vakkya-form-fallback-hint');
+      expect(fallbackHint).toBeNull();
+    });
+
+    it('should show attempt counter during collection', () => {
+      const { element, showPendingValue } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      // First rejection
+      showPendingValue('name', 'John', 'john');
+      element.querySelector('.vakkya-form-btn-no').click();
+      
+      const attemptCounter = element.querySelector('.vakkya-form-attempt-counter');
+      expect(attemptCounter).toBeTruthy();
+      expect(attemptCounter.textContent).toContain('Attempt 2');
+    });
+
+    it('should reset attempt count when keyboard input is used', () => {
+      const { element, showPendingValue, getCurrentAttempts } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      // Two rejections
+      for (let i = 0; i < 2; i++) {
+        showPendingValue('name', `attempt${i}`, `attempt ${i}`);
+        element.querySelector('.vakkya-form-btn-no').click();
+      }
+      expect(getCurrentAttempts()).toBe(2);
+      
+      // Use keyboard input
+      element.querySelector('.vakkya-form-input').value = 'John';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      // Attempt count should be reset for next field
+      expect(getCurrentAttempts()).toBe(0);
+    });
+  });
+
+  /**
+   * Summary View Tests
+   * Validates: Requirements 6.1, 6.4
+   */
+  describe('Summary View (Requirements 6.1, 6.4)', () => {
+    it('should show summary view after all fields are collected (Requirement 6.1)', () => {
+      const schema = {
+        id: 'test',
+        name: 'Test Form',
+        fields: [
+          { name: 'name', type: 'string', label: 'Name', required: true },
+          { name: 'email', type: 'email', label: 'Email', required: true },
+        ],
+      };
+      const { element } = createFormUI(shadow, schema, callbacks);
+      
+      // Fill all fields
+      element.querySelector('.vakkya-form-input').value = 'John';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      element.querySelector('.vakkya-form-input').value = 'john@test.com';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      // Should be in summary view
+      const title = element.querySelector('.vakkya-form-title');
+      expect(title.textContent).toContain('Review');
+      
+      // Should show all answers
+      const summaryItems = element.querySelectorAll('.vakkya-form-summary-item');
+      expect(summaryItems.length).toBe(2);
+    });
+
+    it('should display edit buttons for each field in summary (Requirement 6.4)', () => {
+      const schema = {
+        id: 'test',
+        name: 'Test',
+        fields: [
+          { name: 'name', type: 'string', label: 'Name', required: true },
+          { name: 'email', type: 'email', label: 'Email', required: true },
+        ],
+      };
+      const { element } = createFormUI(shadow, schema, callbacks);
+      
+      // Fill all fields
+      element.querySelector('.vakkya-form-input').value = 'John';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      element.querySelector('.vakkya-form-input').value = 'john@test.com';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      const editButtons = element.querySelectorAll('.vakkya-form-summary-edit');
+      expect(editButtons.length).toBe(2);
+    });
+
+    it('should allow editing specific field without restarting (Requirement 6.4)', () => {
+      const schema = {
+        id: 'test',
+        name: 'Test',
+        fields: [
+          { name: 'name', type: 'string', label: 'Name', required: true },
+          { name: 'email', type: 'email', label: 'Email', required: true },
+        ],
+      };
+      const { element, getState } = createFormUI(shadow, schema, callbacks);
+      
+      // Fill all fields
+      element.querySelector('.vakkya-form-input').value = 'John';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      element.querySelector('.vakkya-form-input').value = 'john@test.com';
+      element.querySelector('.vakkya-form-btn-primary').click();
+      
+      // Click edit on email field (second edit button)
+      const editButtons = element.querySelectorAll('.vakkya-form-summary-edit');
+      editButtons[1].click();
+      
+      const state = getState();
+      expect(state.currentIndex).toBe(1); // Email field index
+      expect(state.answers.name).toBe('John'); // Name preserved
+      expect(state.answers.email).toBeUndefined(); // Email cleared
+      expect(state.showSummary).toBe(false);
+    });
+
+    it('should call showSummary from agent message', () => {
+      const { element, showSummary } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showSummary({ name: 'John', email: 'john@test.com', phone: '555-1234' });
+      
+      const title = element.querySelector('.vakkya-form-title');
+      expect(title.textContent).toContain('Review');
+      
+      const summaryItems = element.querySelectorAll('.vakkya-form-summary-item');
+      expect(summaryItems.length).toBe(3);
+    });
+  });
+
+  /**
+   * Submission Error Handling Tests
+   */
+  describe('Submission Error Handling', () => {
+    it('should show error banner with retry button', () => {
+      const { element, showSummary, showSubmissionError } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showSummary({ name: 'John' });
+      showSubmissionError('Network error', true);
+      
+      const errorBanner = element.querySelector('.vakkya-form-error-banner');
+      expect(errorBanner).toBeTruthy();
+      expect(errorBanner.textContent).toContain('Network error');
+      
+      const retryBtn = element.querySelector('.vakkya-form-retry-btn');
+      expect(retryBtn).toBeTruthy();
+    });
+
+    it('should call onSubmit when retry is clicked', () => {
+      const { element, showSummary, showSubmissionError } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showSummary({ name: 'John' });
+      showSubmissionError('Network error', true);
+      
+      const retryBtn = element.querySelector('.vakkya-form-retry-btn');
+      retryBtn.click();
+      
+      expect(callbacks.onSubmit).toHaveBeenCalled();
+    });
+
+    it('should not show retry button when canRetry is false', () => {
+      const { element, showSummary, showSubmissionError } = createFormUI(shadow, sampleSchema, callbacks);
+      
+      showSummary({ name: 'John' });
+      showSubmissionError('Validation failed', false);
+      
+      const retryBtn = element.querySelector('.vakkya-form-retry-btn');
+      expect(retryBtn).toBeNull();
     });
   });
 });
