@@ -23,6 +23,7 @@ from .models import AgentConfig, PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
 from .validation import ValidationException, validate_and_parse_page_context
+from .capabilities.form_capability import FormCapability
 
 logger = logging.getLogger(__name__)
 
@@ -260,6 +261,33 @@ async def entrypoint(ctx: JobContext) -> None:
         agent_config=agent_config,
     )
     
+    # Fetch active form for this project (if any)
+    active_form = None
+    try:
+        config = get_config()
+        if config.api_server_url:
+            form_capability = FormCapability(api_base_url=config.api_server_url)
+            active_form = await form_capability._fetch_active_form(project_id)
+            if active_form:
+                logger.info(
+                    "Active form loaded for project",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "form_id": active_form.get("id"),
+                        "form_name": active_form.get("name"),
+                    },
+                )
+    except Exception as e:
+        logger.warning(
+            "Failed to fetch active form - continuing without form mode",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "error": str(e),
+            },
+        )
+    
     # Create API conversation for logging (if widget_token is available)
     # Get config for API URL - gracefully handle if not available
     try:
@@ -306,6 +334,7 @@ async def entrypoint(ctx: JobContext) -> None:
         instructions = _build_agent_instructions(
             page_url=page_url,
             agent_config=agent_config,
+            active_form=active_form,
         )
         
         # Create agent with tools for knowledge grounding and page context
@@ -615,6 +644,7 @@ async def _extract_project_id(ctx: JobContext) -> Optional[str]:
 def _build_agent_instructions(
     page_url: Optional[str] = None,
     agent_config: Optional[AgentConfig] = None,
+    active_form: Optional[dict] = None,
 ) -> str:
     """
     Build agent instructions with optional page context and custom configuration.
@@ -622,10 +652,79 @@ def _build_agent_instructions(
     Args:
         page_url: Current page URL the user is viewing (optional)
         agent_config: Custom agent configuration from project settings (optional)
+        active_form: Active form schema for form-filling mode (optional)
         
     Returns:
         Agent instructions string
     """
+    # If there's an active form, use form-filling mode
+    if active_form:
+        form_name = active_form.get("name", "Contact Form")
+        fields = active_form.get("fields", [])
+        
+        # Build field descriptions
+        field_descriptions = []
+        for i, field in enumerate(fields, 1):
+            field_type = field.get("type", "string")
+            label = field.get("label", field.get("name", f"Field {i}"))
+            required = field.get("required", True)
+            options = field.get("options", [])
+            
+            desc = f"{i}. {label} ({field_type})"
+            if not required:
+                desc += " - optional"
+            if options:
+                desc += f" - options: {', '.join(options)}"
+            field_descriptions.append(desc)
+        
+        fields_list = "\n".join(field_descriptions)
+        
+        agent_name = "a helpful assistant"
+        if agent_config and agent_config.agent_name:
+            agent_name = agent_config.agent_name
+        
+        base_instructions = f"""You are {agent_name} helping collect information through a conversational form called "{form_name}".
+
+YOUR PRIMARY TASK: Guide the user through filling out this form by asking questions one at a time.
+
+FORM FIELDS TO COLLECT:
+{fields_list}
+
+HOW TO CONDUCT THE FORM:
+1. Start by greeting the user and explaining you'll help them fill out the {form_name}
+2. Ask for each field ONE AT A TIME in order
+3. After each answer, confirm what you heard and move to the next question
+4. For optional fields, let the user know they can skip
+5. When all fields are collected, summarize the information and confirm
+
+EXTRACTING ANSWERS:
+- For email: Listen for email addresses (e.g., "john at gmail dot com" = john@gmail.com)
+- For phone: Listen for phone numbers in any format
+- For enum/select fields: Match the user's answer to the closest option
+- If you can't understand an answer, politely ask them to repeat
+
+IMPORTANT RULES:
+- Be conversational and friendly, not robotic
+- Keep questions short and clear
+- Confirm each answer before moving on
+- If the user asks unrelated questions, briefly answer using search_knowledge, then guide back to the form
+- Never skip required fields without an answer
+
+EXAMPLE FLOW:
+"Hi! I'll help you fill out our {form_name}. Let's start - what's your name?"
+[User: "I'm John"]
+"Great, John! And what's your email address?"
+[User: "john at example dot com"]
+"Got it - john@example.com. And your phone number?"
+..."""
+
+        if page_url:
+            base_instructions += f"""
+
+Current context: The user is viewing: {page_url}"""
+        
+        return base_instructions
+    
     # Use custom system prompt if provided, otherwise use default
     if agent_config and agent_config.system_prompt:
         # Custom prompt - wrap with essential capabilities

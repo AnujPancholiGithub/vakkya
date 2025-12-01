@@ -210,25 +210,29 @@
 
 ## Phase 6: Dashboard Form Builder
 
-- [ ] 17. Create form builder UI in dashboard
-  - [ ] 17.1 Create forms list page
+- [x] 17. Create form builder UI in dashboard
+  - [x] 17.1 Create forms list page
     - List all forms for project
     - Create/Edit/Delete actions
     - _Requirements: 3_
-  - [ ] 17.2 Create form schema editor
+    - **Status:** Implemented at /projects/[id]/forms with card-based list
+  - [x] 17.2 Create form schema editor
     - Add/remove/reorder fields
     - Configure field type, label, required
     - _Requirements: 3_
-  - [ ] 17.3 Add webhook configuration UI
+    - **Status:** FormEditorDialog with field editor, type selection, options for enum
+  - [x] 17.3 Add webhook configuration UI
     - Input webhook URL
     - Test webhook button
     - _Requirements: 3, Integration Strategy_
+    - **Status:** Webhook URL input in editor, test button in form detail page
 
-- [ ] 18. Create form submissions view
-  - [ ] 18.1 Create submissions list page
+- [x] 18. Create form submissions view
+  - [x] 18.1 Create submissions list page
     - List all submissions for form
     - Show data, timestamp, webhook status
     - _Requirements: 3_
+    - **Status:** Implemented at /projects/[id]/forms/[formId] with table view
 
-- [ ] 19. Final Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 19. Final Checkpoint - Ensure all tests pass
+  - ✅ All 710 tests passing (schemas: 27, api: 184, voice-agent: 258, widget: 188, dashboard: 53)

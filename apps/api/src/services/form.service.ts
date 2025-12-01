@@ -178,6 +178,27 @@ export class FormService {
       fields: formSchema.fields as FormField[],
     };
   }
+
+  /**
+   * Get active form for a project (for internal use, no auth check)
+   * Returns the most recently created form for the project
+   * Used by voice agent to determine if form mode should be active
+   */
+  async getActiveFormForProject(projectId: string) {
+    const formSchema = await prisma.formSchema.findFirst({
+      where: { projectId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!formSchema) {
+      return null;
+    }
+
+    return {
+      ...formSchema,
+      fields: formSchema.fields as FormField[],
+    };
+  }
 }
 
 export const formService = new FormService();

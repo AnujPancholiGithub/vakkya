@@ -11,6 +11,7 @@ import {
   Code,
   ChevronRight,
   Loader2,
+  ClipboardList,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ export default function DashboardLayout({
   const projectNavItems = [
     { href: '', label: 'Overview', icon: Code },
     { href: '/documents', label: 'Documents', icon: FileText },
+    { href: '/forms', label: 'Forms', icon: ClipboardList },
     { href: '/conversations', label: 'Conversations', icon: MessageSquare },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]

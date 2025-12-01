@@ -158,16 +158,171 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ### 7.6 Dashboard Form Builder (Voice Forms Phase 6)
 
-- [ ] 7.6.1 Create form builder UI in dashboard
+- [x] 7.6.1 Create form builder UI in dashboard
   - **Execute:** Voice Forms task 17 (subtasks 17.1-17.3)
   - _Requirements: 3_
+  - ✅ Forms list page at /projects/[id]/forms
+  - ✅ FormEditorDialog with field editor (all types: string, email, phone, number, enum, text)
+  - ✅ Webhook URL configuration with test button
 
-- [ ] 7.6.2 Create form submissions view
+- [x] 7.6.2 Create form submissions view
   - **Execute:** Voice Forms task 18 (subtask 18.1)
   - _Requirements: 3_
+  - ✅ Form detail page at /projects/[id]/forms/[formId]
+  - ✅ Submissions table with data preview, timestamp, webhook status
 
-- [ ] 7.6.3 Final Checkpoint
+- [x] 7.6.3 Final Checkpoint
   - **Execute:** Voice Forms task 19
-  - Ensure all tests pass
-  - Voice Forms feature complete
+  - ✅ All 710 tests passing (schemas: 27, api: 184, voice-agent: 258, widget: 188, dashboard: 53)
+  - ✅ Voice Forms feature complete
 
+
+
+---
+
+## Phase 8: Conversational Forms V2 (Enhanced Dynamic Forms)
+
+**Overview:** Transform rigid form-filling into dynamic, agent-driven conversational inquiries with multi-form support, confirmation loops, and graceful error recovery.
+
+**Detailed tasks:** `.kiro/specs/conversational-forms-v2/tasks.md`
+
+### 8.1 Database Schema & API Foundation (V2 Phase 1)
+
+- [ ] 8.1.1 Extend database schema for V2 forms
+  - **Execute:** Conversational Forms V2 task 1 (subtasks 1.1-1.5)
+  - Add description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive
+  - Add FormEvent table for analytics
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 11.1-11.4_
+
+- [ ] 8.1.2 Implement trigger phrase conflict detection
+  - **Execute:** Conversational Forms V2 task 2 (subtasks 2.1-2.2)
+  - _Requirements: 9.5_
+
+- [ ] 8.1.3 Implement form event logging service
+  - **Execute:** Conversational Forms V2 task 3 (subtasks 3.1-3.2)
+  - _Requirements: 11.1-11.4_
+
+- [ ] 8.1.4 Update form API endpoints for V2
+  - **Execute:** Conversational Forms V2 task 4 (subtasks 4.1-4.3)
+  - _Requirements: 2.1, 9.1-9.4_
+
+- [ ] 8.1.5 Checkpoint
+  - **Execute:** Conversational Forms V2 task 5
+
+### 8.2 Widget Form State Manager (V2 Phase 2)
+
+- [ ] 8.2.1 Create form state manager module
+  - **Execute:** Conversational Forms V2 task 6 (subtasks 6.1-6.3)
+  - State persistence, confirmation flow
+  - _Requirements: 4.1-4.5, 7.1-7.2_
+
+- [ ] 8.2.2 Implement confirmation flow in state manager
+  - **Execute:** Conversational Forms V2 task 7 (subtasks 7.1-7.6)
+  - Keyboard bypass, extraction fallback
+  - _Requirements: 4.1-4.6_
+
+- [ ] 8.2.3 Implement input priority resolution
+  - **Execute:** Conversational Forms V2 task 8 (subtasks 8.1-8.2)
+  - _Requirements: 5.5_
+
+- [ ] 8.2.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 9
+
+### 8.3 Data Channel Protocol (V2 Phase 3)
+
+- [ ] 8.3.1 Define and implement data channel protocol
+  - **Execute:** Conversational Forms V2 task 10 (subtasks 10.1-10.4)
+  - Widget ↔ Agent bidirectional sync
+  - _Requirements: 3.5, 10.1-10.3_
+
+- [ ] 8.3.2 Implement form activation sync
+  - **Execute:** Conversational Forms V2 task 11 (subtasks 11.1-11.2)
+  - _Requirements: 2.4, 3.5_
+
+- [ ] 8.3.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 12
+
+### 8.4 Widget Lazy Loading & Form UI Updates (V2 Phase 4)
+
+- [ ] 8.4.1 Implement lazy form loading
+  - **Execute:** Conversational Forms V2 task 13 (subtasks 13.1-13.7)
+  - Parallel fetch, caching, graceful degradation
+  - _Requirements: 1.1-1.4_
+
+- [ ] 8.4.2 Update form UI for confirmation flow
+  - **Execute:** Conversational Forms V2 task 14 (subtasks 14.1-14.3)
+  - Confirmation UI, summary view
+  - _Requirements: 4.1, 4.6, 6.1, 6.4_
+
+- [ ] 8.4.3 Implement local submission queue
+  - **Execute:** Conversational Forms V2 task 15 (subtasks 15.1-15.2)
+  - _Requirements: 7.3_
+
+- [ ] 8.4.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 16
+
+### 8.5 Voice Agent FormCapabilityV2 (V2 Phase 5)
+
+- [ ] 8.5.1 Create FormCapabilityV2 class
+  - **Execute:** Conversational Forms V2 task 17 (subtasks 17.1-17.3)
+  - State machine, trigger phrase matching
+  - _Requirements: 2.2, 4.1-4.4, 6.1_
+
+- [ ] 8.5.2 Implement confirmation flow in agent
+  - **Execute:** Conversational Forms V2 task 18 (subtasks 18.1-18.4)
+  - Re-ask on rejection, validation re-ask
+  - _Requirements: 4.1-4.4, 7.4_
+
+- [ ] 8.5.3 Implement summary and submission flow
+  - **Execute:** Conversational Forms V2 task 19 (subtasks 19.1-19.6)
+  - Edit without restart, retry logic
+  - _Requirements: 6.1, 6.4, 6.6_
+
+- [ ] 8.5.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 20
+
+### 8.6 Mode Transitions & Recovery (V2 Phase 6)
+
+- [ ] 8.6.1 Implement mode transitions in agent
+  - **Execute:** Conversational Forms V2 task 21 (subtasks 21.1-21.4)
+  - Pause/resume, abandonment, post-completion
+  - _Requirements: 3.4, 8.1-8.5_
+
+- [ ] 8.6.2 Implement connection recovery
+  - **Execute:** Conversational Forms V2 task 22 (subtasks 22.1-22.3)
+  - State restoration on reconnect
+  - _Requirements: 7.1, 7.2, 7.6_
+
+- [ ] 8.6.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 23
+
+### 8.7 Dashboard Updates (V2 Phase 7)
+
+- [ ] 8.7.1 Update form editor for V2 fields
+  - **Execute:** Conversational Forms V2 task 24 (subtasks 24.1-24.5)
+  - Trigger phrases, description, messages, webhook secret
+  - _Requirements: 9.1-9.4_
+
+- [ ] 8.7.2 Add form events to conversation view
+  - **Execute:** Conversational Forms V2 task 25 (subtasks 25.1-25.2)
+  - _Requirements: 11.5_
+
+- [ ] 8.7.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 26
+
+### 8.8 Multi-Form Support & Agent Integration (V2 Phase 8)
+
+- [ ] 8.8.1 Implement multi-form availability
+  - **Execute:** Conversational Forms V2 task 27 (subtasks 27.1-27.3)
+  - All forms available to agent, selection logic
+  - _Requirements: 2.1, 2.3, 2.5_
+
+- [ ] 8.8.2 Integrate FormCapabilityV2 with orchestrator
+  - **Execute:** Conversational Forms V2 task 28 (subtasks 28.1-28.3)
+  - Data channel message handling
+  - _Requirements: 10.1-10.3_
+
+- [ ] 8.8.3 Final Checkpoint
+  - **Execute:** Conversational Forms V2 task 29
+  - All 22 correctness properties validated
+  - Full integration test: multi-form, confirmation, recovery

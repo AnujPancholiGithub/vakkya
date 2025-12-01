@@ -212,3 +212,115 @@ export function useConversation(projectId: string, conversationId: string) {
     enabled: !!projectId && !!conversationId,
   })
 }
+
+// Form types
+export interface FormField {
+  name: string
+  type: 'string' | 'email' | 'phone' | 'number' | 'enum' | 'text'
+  label: string
+  required: boolean
+  options?: string[]
+}
+
+export interface FormSchema {
+  id: string
+  projectId: string
+  name: string
+  fields: FormField[]
+  webhookUrl: string | null
+  createdAt: string
+  updatedAt: string
+  submissionCount?: number
+}
+
+export interface FormSubmission {
+  id: string
+  formSchemaId: string
+  sessionId: string
+  data: Record<string, unknown>
+  webhookSent: boolean
+  createdAt: string
+}
+
+interface FormsResponse {
+  forms: FormSchema[]
+}
+
+interface FormResponse {
+  form: FormSchema
+}
+
+interface SubmissionsResponse {
+  submissions: FormSubmission[]
+}
+
+// Form hooks
+export function useForms(projectId: string) {
+  return useQuery({
+    queryKey: ['forms', projectId],
+    queryFn: async () => {
+      const res = await api.get<FormsResponse>(`/projects/${projectId}/forms`)
+      return res.forms
+    },
+    enabled: !!projectId,
+  })
+}
+
+export function useForm(projectId: string, formId: string) {
+  return useQuery({
+    queryKey: ['forms', projectId, formId],
+    queryFn: async () => {
+      const res = await api.get<FormResponse>(`/projects/${projectId}/forms/${formId}`)
+      return res.form
+    },
+    enabled: !!projectId && !!formId,
+  })
+}
+
+export function useCreateForm(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: { name: string; fields: FormField[]; webhookUrl?: string }) => {
+      const res = await api.post<FormResponse>(`/projects/${projectId}/forms`, data)
+      return res.form
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms', projectId] })
+    },
+  })
+}
+
+export function useUpdateForm(projectId: string, formId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: { name?: string; fields?: FormField[]; webhookUrl?: string }) => {
+      const res = await api.put<FormResponse>(`/projects/${projectId}/forms/${formId}`, data)
+      return res.form
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms', projectId] })
+      queryClient.invalidateQueries({ queryKey: ['forms', projectId, formId] })
+    },
+  })
+}
+
+export function useDeleteForm(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (formId: string) => api.delete(`/projects/${projectId}/forms/${formId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forms', projectId] })
+    },
+  })
+}
+
+export function useFormSubmissions(projectId: string, formId: string) {
+  return useQuery({
+    queryKey: ['submissions', projectId, formId],
+    queryFn: async () => {
+      const res = await api.get<SubmissionsResponse>(`/projects/${projectId}/forms/${formId}/submissions`)
+      return res.submissions
+    },
+    enabled: !!projectId && !!formId,
+  })
+}

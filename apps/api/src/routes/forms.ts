@@ -354,6 +354,61 @@ export async function formRoutes(app: FastifyInstance, env: Env) {
     ),
   });
 
+  // GET /internal/projects/:projectId/active-form - Get active form for project (from voice agent)
+  // No auth required - called by voice agent to check if form mode should be active
+  const InternalProjectIdSchema = z.object({
+    projectId: z.string().cuid(),
+  });
+
+  app.get('/internal/projects/:projectId/active-form', async (request, reply) => {
+    try {
+      const params = InternalProjectIdSchema.parse(request.params);
+
+      const form = await formService.getActiveFormForProject(params.projectId);
+
+      if (!form) {
+        reply.code(404).send({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No active form for this project',
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      reply.send({
+        form: {
+          id: form.id,
+          projectId: form.projectId,
+          name: form.name,
+          fields: form.fields,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        reply.code(400).send({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid parameters',
+            details: error.errors,
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      request.log.error(error, 'Get active form error');
+      reply.code(500).send({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get active form',
+          requestId: request.id,
+        },
+      });
+    }
+  });
+
   app.post('/internal/forms/:formId/submit', async (request, reply) => {
     try {
       const params = InternalFormIdSchema.parse(request.params);

@@ -103,6 +103,34 @@ async function validateToken(token, apiUrl) {
 }
 
 /**
+ * Fetch active form for a project
+ * @param {string} projectId - Project ID
+ * @param {string} apiUrl - API server URL
+ * @returns {Promise<Object|null>} Form schema or null if no active form
+ */
+async function fetchActiveForm(projectId, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/internal/projects/${projectId}/active-form`);
+    
+    if (response.status === 404) {
+      // No active form for this project
+      return null;
+    }
+    
+    if (!response.ok) {
+      console.warn('[Vakkya] Failed to fetch active form:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return data.form || null;
+  } catch (err) {
+    console.warn('[Vakkya] Error fetching active form:', err);
+    return null;
+  }
+}
+
+/**
  * Create a LiveKit manager instance
  * @param {string} widgetToken - Widget token for authentication
  * @param {string} apiUrl - API server URL
@@ -127,8 +155,14 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /** @type {Function|null} */
   let onStateChangeCallback = null;
   
+  /** @type {Function|null} */
+  let onFormAvailableCallback = null;
+  
   /** @type {import('livekit-client').RemoteAudioTrack|null} */
   let remoteAudioTrack = null;
+  
+  /** @type {Object|null} */
+  let activeForm = null;
 
   /**
    * Update connection state
@@ -158,7 +192,12 @@ export function createLiveKitManager(widgetToken, apiUrl) {
       // Step 1: Validate token with API
       setState('validating');
       const tokenData = await validateToken(widgetToken, apiUrl);
-      // projectId available in tokenData if needed for future features
+      
+      // Step 1.5: Fetch active form for this project (if any)
+      activeForm = await fetchActiveForm(tokenData.projectId, apiUrl);
+      if (activeForm && onFormAvailableCallback) {
+        onFormAvailableCallback(activeForm);
+      }
 
       // Step 2: Load LiveKit SDK
       setState('connecting');
@@ -333,6 +372,22 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     onStateChangeCallback = callback;
   }
 
+  /**
+   * Set callback for when a form is available
+   * @param {Function} callback - Called with form schema when available
+   */
+  function onFormAvailable(callback) {
+    onFormAvailableCallback = callback;
+  }
+
+  /**
+   * Get the active form (if any)
+   * @returns {Object|null}
+   */
+  function getActiveForm() {
+    return activeForm;
+  }
+
   return {
     connect,
     disconnect,
@@ -340,8 +395,10 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     getState,
     onRemoteAudio,
     onStateChange,
+    onFormAvailable,
+    getActiveForm,
   };
 }
 
 // Export for testing
-export { loadLiveKitSDK, validateToken };
+export { loadLiveKitSDK, validateToken, fetchActiveForm };

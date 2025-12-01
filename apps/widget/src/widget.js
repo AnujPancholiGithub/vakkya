@@ -78,6 +78,7 @@ export class VakkyaWidget {
       this.livekitManager = createLiveKitManager(this.config.token, this.config.apiUrl);
       this.livekitManager.onStateChange((state, error) => this.handleConnectionStateChange(state, error));
       this.livekitManager.onRemoteAudio((audioElement) => this.handleRemoteAudio(audioElement));
+      this.livekitManager.onFormAvailable((schema) => this.handleFormAvailable(schema));
       
       this.initialized = true;
       return true;
@@ -203,6 +204,22 @@ export class VakkyaWidget {
   }
 
   /**
+   * Handle form available callback - show form UI when a form is configured
+   * @param {Object} schema - Form schema from API
+   */
+  handleFormAvailable(schema) {
+    if (!schema || !schema.fields || schema.fields.length === 0) {
+      return;
+    }
+    
+    console.log('[Vakkya] Form available:', schema.name);
+    this.formSchema = schema;
+    
+    // Show form UI alongside voice UI
+    this.showFormUI(schema);
+  }
+
+  /**
    * Handle remote audio from agent
    * @param {HTMLAudioElement} audioElement
    */
@@ -323,17 +340,7 @@ export class VakkyaWidget {
     this.formSchema = schema;
     this.state.mode = 'form';
     
-    // Hide button
-    if (this.button) {
-      this.button.style.display = 'none';
-    }
-    
-    // Hide voice UI if showing
-    if (this.voiceUI) {
-      this.voiceUI.element.style.display = 'none';
-    }
-    
-    // Create form UI
+    // Create form UI (voice UI stays visible for hybrid voice+visual experience)
     this.formUI = createFormUI(this.shadow, schema, {
       onClose: () => this.handleClose(),
       onSubmit: (answers) => this.handleFormSubmit(answers),

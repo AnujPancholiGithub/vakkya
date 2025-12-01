@@ -378,10 +378,43 @@ class FormCapability(Capability):
         """
         try:
             client = await self._get_http_client()
-            # Note: This endpoint will need to be added to API in Phase 6
-            # For now, we'll return None (no forms active)
-            # TODO: Implement GET /api/internal/projects/:projectId/active-form
-            return None
+            response = await client.get(
+                f"{self._api_base_url}/api/internal/projects/{project_id}/active-form"
+            )
+            
+            if response.status_code == 404:
+                # No active form for this project
+                logger.debug(
+                    "No active form for project",
+                    extra={"project_id": project_id},
+                )
+                return None
+            
+            if response.status_code != 200:
+                logger.warning(
+                    "Failed to fetch active form",
+                    extra={
+                        "project_id": project_id,
+                        "status_code": response.status_code,
+                    },
+                )
+                return None
+            
+            data = response.json()
+            form = data.get("form")
+            
+            if form:
+                logger.info(
+                    "Active form fetched",
+                    extra={
+                        "project_id": project_id,
+                        "form_id": form.get("id"),
+                        "form_name": form.get("name"),
+                        "field_count": len(form.get("fields", [])),
+                    },
+                )
+            
+            return form
             
         except Exception as e:
             logger.error(
