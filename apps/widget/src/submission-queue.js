@@ -316,6 +316,19 @@ export function createSubmissionQueue(apiUrl) {
     }
   }
 
+  /**
+   * Destroy the queue and clean up resources
+   * Call this when the widget is destroyed to prevent memory leaks
+   */
+  function destroy() {
+    if (retryTimeoutId) {
+      clearTimeout(retryTimeoutId);
+      retryTimeoutId = null;
+    }
+    listeners.length = 0;
+    isProcessing = false;
+  }
+
   return {
     enqueue,
     clear,
@@ -326,6 +339,7 @@ export function createSubmissionQueue(apiUrl) {
     subscribe,
     hasPending,
     flush,
+    destroy,
   };
 }
 

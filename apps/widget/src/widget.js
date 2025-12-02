@@ -221,7 +221,7 @@ export class VakkyaWidget {
     
     // If form UI exists and has a state manager, it will auto-restore
     // If not, check if there's persisted state to restore
-    if (!this.formUI && this.formStateManager) {
+    if (!this.formUI && this.formStateManager && this.livekitManager) {
       const availableForms = this.livekitManager.getAvailableForms();
       if (availableForms.length > 0) {
         // Try to restore from the first available form

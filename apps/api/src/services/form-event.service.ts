@@ -95,16 +95,17 @@ export class FormEventService {
    * Requirement 11.4: Log abandonment point and reason if available
    */
   async logFormAbandoned(input: LogFormAbandonedInput) {
+    const metadata: Record<string, string> = {};
+    if (input.abandonmentPoint) metadata.abandonmentPoint = input.abandonmentPoint;
+    if (input.reason) metadata.reason = input.reason;
+
     return prisma.formEvent.create({
       data: {
         formSchemaId: input.formSchemaId,
         sessionId: input.sessionId,
         conversationId: input.conversationId,
         eventType: 'abandoned' as FormEventType,
-        metadata: {
-          ...(input.abandonmentPoint && { abandonmentPoint: input.abandonmentPoint }),
-          ...(input.reason && { reason: input.reason }),
-        },
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       },
     });
   }

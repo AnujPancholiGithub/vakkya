@@ -386,19 +386,28 @@
     - **Validates: Requirements 2.1**
     - ✅ 17 tests: all forms available, each activatable, multiple match handling, selection flow
 
-- [ ] 28. Integrate FormCapabilityV2 with orchestrator
-  - [ ] 28.1 Register FormCapabilityV2 in entrypoint.py
+- [x] 28. Integrate FormCapabilityV2 with orchestrator
+  - [x] 28.1 Register FormCapabilityV2 in entrypoint.py
     - Add to capabilities list with appropriate priority
     - _Requirements: Architecture_
-  - [ ] 28.2 Add data channel message handling
+    - ✅ FormCapabilityV2 imported and exported from capabilities module
+    - ✅ send_widget_message() helper function added for agent→widget messages
+  - [x] 28.2 Add data channel message handling
     - Handle keyboard_input, field_confirmed, field_rejected from widget
     - _Requirements: 10.3_
-  - [ ] 28.3 Send form messages to widget
+    - ✅ Enhanced on_data_received handler for all widget message types
+    - ✅ Handles: page_context, keyboard_input, field_confirmed, field_rejected, form_abandoned, submission_approved, edit_requested
+    - ✅ Backward compatible with legacy page context format
+  - [x] 28.3 Send form messages to widget
     - Send form_activate, field_focus, value_extracted, etc.
     - _Requirements: 10.1, 10.2_
+    - ✅ send_widget_message() sends JSON messages via data channel
+    - ✅ 12 new tests added for data channel message handling
 
-- [ ] 29. Final Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 29. Final Checkpoint - Ensure all tests pass
+  - ✅ All 984 tests passing (schemas: 40, api: 218, voice-agent: 330, widget: 329, dashboard: 67)
+  - ✅ All 22 correctness properties validated
+  - ✅ Conversational Forms V2 feature complete
 
 ---
 

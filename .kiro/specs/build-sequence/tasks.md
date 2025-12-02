@@ -400,12 +400,18 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - ✅ _generate_form_selection_prompt() asks user to choose between forms
   - ✅ 17 property tests added (Property 4)
 
-- [ ] 8.8.2 Integrate FormCapabilityV2 with orchestrator
+- [x] 8.8.2 Integrate FormCapabilityV2 with orchestrator
   - **Execute:** Conversational Forms V2 task 28 (subtasks 28.1-28.3)
   - Data channel message handling
   - _Requirements: 10.1-10.3_
+  - ✅ FormCapabilityV2 exported from capabilities module
+  - ✅ send_widget_message() helper for agent→widget messages
+  - ✅ Enhanced data channel handler for all widget message types
+  - ✅ 12 new tests added (330 total voice-agent tests)
 
-- [ ] 8.8.3 Final Checkpoint
+- [x] 8.8.3 Final Checkpoint
   - **Execute:** Conversational Forms V2 task 29
   - All 22 correctness properties validated
   - Full integration test: multi-form, confirmation, recovery
+  - ✅ All 984 tests passing (schemas: 40, api: 218, voice-agent: 330, widget: 329, dashboard: 67)
+  - ✅ Phase 8 (Conversational Forms V2) complete

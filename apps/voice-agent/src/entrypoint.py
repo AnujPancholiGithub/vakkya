@@ -24,6 +24,7 @@ from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
 from .validation import ValidationException, validate_and_parse_page_context
 from .capabilities.form_capability import FormCapability
+from .capabilities.form_capability_v2 import FormCapabilityV2, FormContext, FormStateEnum, FORM_STATE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,45 @@ async def get_rag_service() -> RAGService:
         await _rag_service.initialize()
         logger.info("RAG service initialized")
     return _rag_service
+
+
+async def send_widget_message(room: rtc.Room, message: dict) -> bool:
+    """
+    Send a message to the widget via data channel.
+    
+    Message types (Requirements 10.1, 10.2):
+    - form_activate: Activate form UI with schema
+    - field_focus: Focus on a specific field
+    - value_extracted: Show extracted value for confirmation
+    - value_confirmed: Confirm a value
+    - show_summary: Display form summary
+    - submission_success: Form submitted successfully
+    - submission_failed: Form submission failed
+    - form_deactivated: Form closed/completed
+    
+    Args:
+        room: LiveKit room instance
+        message: Message dict with 'type' and payload
+        
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    import json
+    
+    try:
+        data = json.dumps(message).encode("utf-8")
+        await room.local_participant.publish_data(data, reliable=True)
+        logger.debug(
+            "Widget message sent",
+            extra={"type": message.get("type")},
+        )
+        return True
+    except Exception as e:
+        logger.warning(
+            "Failed to send widget message",
+            extra={"type": message.get("type"), "error": str(e)},
+        )
+        return False
 
 
 @function_tool()
@@ -377,51 +417,132 @@ async def entrypoint(ctx: JobContext) -> None:
         )
         raise  # Permanent error - invalid configuration
     
-    # Set up data channel handler for page context
+    # Set up data channel handler for page context and form messages
     # Page context is stored in session_context.userdata and will be accessible
     # in agent tools via RunContext parameter (Task 5)
+    # Form messages are handled for widget-agent sync (Requirements 10.1-10.3)
     @ctx.room.on("data_received")
     def on_data_received(data: rtc.DataPacket) -> None:
         """
         Handle data channel messages from widget.
         
+        Message types (Requirements 10.1-10.3):
+        - page_context: Page URL and title
+        - keyboard_input: User typed a value in the form
+        - field_confirmed: User confirmed a voice-extracted value
+        - field_rejected: User rejected a voice-extracted value
+        - form_abandoned: User abandoned the form
+        - submission_approved: User approved submission from summary
+        - edit_requested: User wants to edit a field from summary
+        
         Errors in data channel processing are logged but don't interrupt
         the voice session (transient errors).
         """
         try:
-            # Validate and parse page context (includes size check, JSON parsing, and Pydantic validation)
-            page_context_input = validate_and_parse_page_context(data.data)
+            import json
             
-            # Store validated page context in session userdata
-            # This will be accessible in agent tools via context.userdata.page_context
-            session_context.page_context = PageContext(url=page_context_input.url)
+            # Parse JSON message
+            try:
+                message = json.loads(data.data.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Try legacy page context format
+                page_context_input = validate_and_parse_page_context(data.data)
+                session_context.page_context = PageContext(url=page_context_input.url)
+                logger.info(
+                    "Page context received (legacy)",
+                    extra={"room": room_name, "project_id": project_id, "page_url": page_context_input.url},
+                )
+                return
             
-            logger.info(
-                "Page context received",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "page_url": page_context_input.url,
-                },
-            )
+            msg_type = message.get("type")
+            
+            if msg_type == "page_context":
+                # Handle page context message
+                session_context.page_context = PageContext(url=message.get("url", ""))
+                logger.info(
+                    "Page context received",
+                    extra={"room": room_name, "project_id": project_id, "page_url": message.get("url")},
+                )
+            
+            elif msg_type == "keyboard_input":
+                # Handle keyboard input from widget (Requirement 10.3)
+                # Store in session context for form capability to process
+                field_name = message.get("fieldName")
+                value = message.get("value")
+                if field_name and value is not None:
+                    if not hasattr(session_context, "pending_keyboard_input"):
+                        session_context.pending_keyboard_input = {}
+                    session_context.pending_keyboard_input[field_name] = value
+                    logger.debug(
+                        "Keyboard input received",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "field_confirmed":
+                # Handle field confirmation from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    if not hasattr(session_context, "confirmed_fields"):
+                        session_context.confirmed_fields = set()
+                    session_context.confirmed_fields.add(field_name)
+                    logger.debug(
+                        "Field confirmed via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "field_rejected":
+                # Handle field rejection from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    if not hasattr(session_context, "rejected_fields"):
+                        session_context.rejected_fields = set()
+                    session_context.rejected_fields.add(field_name)
+                    logger.debug(
+                        "Field rejected via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "form_abandoned":
+                # Handle form abandonment from widget
+                session_context.form_abandoned = True
+                logger.info(
+                    "Form abandoned via widget",
+                    extra={"room": room_name, "project_id": project_id},
+                )
+            
+            elif msg_type == "submission_approved":
+                # Handle submission approval from widget
+                session_context.submission_approved = True
+                logger.info(
+                    "Submission approved via widget",
+                    extra={"room": room_name, "project_id": project_id},
+                )
+            
+            elif msg_type == "edit_requested":
+                # Handle edit request from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    session_context.edit_requested_field = field_name
+                    logger.debug(
+                        "Edit requested via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            else:
+                logger.debug(
+                    "Unknown message type",
+                    extra={"room": room_name, "type": msg_type},
+                )
+                
         except ValidationException as e:
             logger.warning(
-                "Invalid page context data",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "error": str(e),
-                },
+                "Invalid data channel message",
+                extra={"room": room_name, "project_id": project_id, "error": str(e)},
             )
         except Exception as e:
             logger.warning(
                 "Failed to process data channel message",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
+                extra={"room": room_name, "project_id": project_id, "error": str(e), "error_type": type(e).__name__},
             )
     
     # Set up conversation logging if API conversation was created

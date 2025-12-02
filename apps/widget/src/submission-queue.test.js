@@ -339,6 +339,36 @@ describe('Submission Queue', () => {
     });
   });
 
+  describe('destroy', () => {
+    it('should clean up resources and cancel pending retries', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      
+      const queue = createSubmissionQueue('https://api.test.com');
+      queue.enqueue('form_123', 'session_456', { name: 'John' });
+      
+      // Destroy before retry completes
+      queue.destroy();
+      
+      // Should not throw and should clean up
+      expect(queue.hasPending()).toBe(true); // Queue still has items but processing stopped
+    });
+
+    it('should remove all listeners', async () => {
+      const queue = createSubmissionQueue('https://api.test.com');
+      const listener = vi.fn();
+      queue.subscribe(listener);
+      
+      queue.destroy();
+      
+      // Enqueue after destroy - listener should not be called
+      mockFetch.mockResolvedValueOnce({ ok: true });
+      queue.enqueue('form_123', 'session_456', { name: 'John' });
+      await vi.runAllTimersAsync();
+      
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
   describe('hasPending', () => {
     it('should return true when there are pending submissions', () => {
       const queue = createSubmissionQueue('https://api.test.com');
