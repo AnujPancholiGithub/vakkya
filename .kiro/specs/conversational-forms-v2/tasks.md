@@ -271,81 +271,120 @@
 
 ## Phase 6: Mode Transitions & Recovery
 
-- [ ] 21. Implement mode transitions in agent
-  - [ ] 21.1 Add form pause/resume for RAG detours
+- [x] 21. Implement mode transitions in agent
+  - [x] 21.1 Add form pause/resume for RAG detours
     - Pause form when user asks unrelated question
     - Resume from last field when returning
     - _Requirements: 3.4, 8.2, 8.5_
-  - [ ] 21.2 Add form abandonment handling
+    - ✅ Added PAUSED state to FormStateEnum
+    - ✅ pause() and resume() methods in FormContext
+    - ✅ _is_rag_question() detects unrelated questions
+    - ✅ _pause_for_rag() pauses form and returns low confidence for RAG
+    - ✅ _handle_paused() handles resume commands
+  - [x] 21.2 Add form abandonment handling
     - Confirm abandonment, transition to RAG mode
     - _Requirements: 8.3_
-  - [ ] 21.3 Add post-completion transition
+    - ✅ _request_abandonment_confirmation() asks for confirmation
+    - ✅ _handle_abandonment_response() processes yes/no
+    - ✅ Preserves collected answers count in confirmation message
+  - [x] 21.3 Add post-completion transition
     - After submission, transition to RAG mode
     - _Requirements: 8.1_
-  - [ ] 21.4 Write property test for mode transitions
+    - ✅ Already implemented in _handle_completed()
+  - [x] 21.4 Write property test for mode transitions
     - **Property 18: Mode Transition Context Preservation**
     - **Validates: Requirements 8.4**
+    - ✅ 11 tests: pause/resume state preservation, RAG question detection, resume commands, abandonment confirmation
 
-- [ ] 22. Implement connection recovery
-  - [ ] 22.1 Add reconnection handling in widget
+- [x] 22. Implement connection recovery
+  - [x] 22.1 Add reconnection handling in widget
     - Detect disconnect, preserve state, attempt reconnect
     - _Requirements: 7.1, 7.6_
-  - [ ] 22.2 Add state restoration on reconnect
+    - ✅ Automatic reconnection with 3 retries (1s, 3s, 5s delays)
+    - ✅ Token data caching for reconnection
+    - ✅ Reconnecting UI state via 'connecting' status
+    - ✅ Cancel reconnection on explicit disconnect
+  - [x] 22.2 Add state restoration on reconnect
     - Restore form state from localStorage
     - Resume from last confirmed field
     - _Requirements: 7.2_
-  - [ ] 22.3 Write property test for reconnection resume
+    - ✅ Form state manager integrated with widget
+    - ✅ restoreFromStorage() called on reconnection
+    - ✅ Form UI recreated with restored state
+    - ✅ handleReconnection() method in widget
+  - [x] 22.3 Write property test for reconnection resume
     - **Property 15: Reconnection Resume**
     - **Validates: Requirements 7.2**
+    - ✅ 3 tests for reconnection capability and state preservation
 
-- [ ] 23. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 23. Checkpoint - Ensure all tests pass
+  - ✅ All 939 tests passing (schemas: 40, api: 215, voice-agent: 302, widget: 329, dashboard: 53)
+  - ✅ Phase 6 (Mode Transitions & Recovery) complete
 
 ---
 
 ## Phase 7: Dashboard Updates
 
-- [ ] 24. Update form editor for V2 fields
-  - [ ] 24.1 Add trigger phrases input to FormEditorDialog
+- [x] 24. Update form editor for V2 fields
+  - [x] 24.1 Add trigger phrases input to FormEditorDialog
     - Multi-value input for trigger phrases
     - _Requirements: 9.1_
-  - [ ] 24.2 Add description textarea
+    - ✅ Trigger phrases input with add button and Enter key support
+    - ✅ Removable phrase tags with X button
+  - [x] 24.2 Add description textarea
     - Help text for agent understanding
     - _Requirements: 9.2_
-  - [ ] 24.3 Add greeting/completion message inputs
+    - ✅ Description textarea with 500 char limit
+  - [x] 24.3 Add greeting/completion message inputs
     - Custom messages for form start/end
     - _Requirements: 9.3, 9.4_
-  - [ ] 24.4 Add webhook secret input
+    - ✅ Greeting and completion message textareas with 500 char limits
+  - [x] 24.4 Add webhook secret input
     - Optional secret for HMAC signing
     - _Requirements: 3 (from V1)_
-  - [ ] 24.5 Write unit tests for form editor updates
+    - ✅ Password input for webhook secret
+  - [x] 24.5 Write unit tests for form editor updates
+    - ✅ 14 unit tests covering all V2 fields
 
-- [ ] 25. Add form events to conversation view
-  - [ ] 25.1 Update conversation detail page
+- [x] 25. Add form events to conversation view
+  - [x] 25.1 Update conversation detail page
     - Display form events inline with conversation turns
     - Show form activation, field collection, submission
     - _Requirements: 11.5_
-  - [ ] 25.2 Write unit tests for conversation view updates
+    - ✅ GET /conversations/:id/form-events API endpoint
+    - ✅ useFormEvents query hook
+    - ✅ Timeline merges turns and form events chronologically
+    - ✅ FormEventBadge component with icons for each event type
+  - [x] 25.2 Write unit tests for conversation view updates
+    - ✅ 3 tests for form-events endpoint (success, auth required, 404)
 
-- [ ] 26. Checkpoint - Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] 26. Checkpoint - Ensure all tests pass
+  - ✅ All 956 tests passing (schemas: 40, api: 218, voice-agent: 302, widget: 329, dashboard: 67)
+  - ✅ Phase 7 (Dashboard Updates) complete
 
 ---
 
 ## Phase 8: Multi-Form Support & Agent Integration
 
-- [ ] 27. Implement multi-form availability
-  - [ ] 27.1 Update agent to receive all forms
+- [x] 27. Implement multi-form availability
+  - [x] 27.1 Update agent to receive all forms
     - Fetch all active forms on session start
     - Make available as selectable tools
     - _Requirements: 2.1_
-  - [ ] 27.2 Add form selection logic
+    - ✅ _get_available_forms() fetches all active forms for project
+    - ✅ All forms available via AVAILABLE_FORMS_KEY in context metadata
+  - [x] 27.2 Add form selection logic
     - Agent can choose form based on intent
     - Agent can ask user to choose if ambiguous
     - _Requirements: 2.3, 2.5_
-  - [ ] 27.3 Write property test for multi-form availability
+    - ✅ _find_all_matching_forms() detects multiple trigger phrase matches
+    - ✅ _handle_form_selection() handles user form choice
+    - ✅ _generate_form_selection_prompt() asks user to choose between forms
+    - ✅ _generate_available_forms_prompt() suggests options when no clear intent
+  - [x] 27.3 Write property test for multi-form availability
     - **Property 4: Multi-Form Availability**
     - **Validates: Requirements 2.1**
+    - ✅ 17 tests: all forms available, each activatable, multiple match handling, selection flow
 
 - [ ] 28. Integrate FormCapabilityV2 with orchestrator
   - [ ] 28.1 Register FormCapabilityV2 in entrypoint.py

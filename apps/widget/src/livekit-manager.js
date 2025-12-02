@@ -235,6 +235,15 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /** @type {Function|null} */
   let onStateChangeCallback = null;
   
+  /** @type {boolean} */
+  let isReconnecting = false;
+  
+  /** @type {number|null} */
+  let reconnectTimeoutId = null;
+  
+  /** @type {Object|null} */
+  let cachedTokenData = null;
+  
   /** @type {Function|null} */
   let onFormAvailableCallback = null;
   
@@ -285,6 +294,9 @@ export function createLiveKitManager(widgetToken, apiUrl) {
       // Step 1: Validate token with API
       setState('validating');
       const tokenData = await validateToken(widgetToken, apiUrl);
+      
+      // Cache token data for reconnection
+      cachedTokenData = tokenData;
       
       // Step 2: Start parallel operations (Property 1.2: parallel fetch)
       setState('connecting');
@@ -354,7 +366,15 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     // Handle disconnection
     room.on(lk.RoomEvent.Disconnected, (reason) => {
       console.log('[Vakkya] Disconnected:', reason);
-      setState('disconnected');
+      
+      // Don't attempt reconnection if user explicitly disconnected or no cached token
+      if (state === 'disconnected' || !micStream || !cachedTokenData) {
+        setState('disconnected');
+        return;
+      }
+      
+      // Attempt automatic reconnection using cached token data
+      attemptReconnection(cachedTokenData, lk);
     });
 
     // Handle connection quality changes
@@ -505,9 +525,83 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   }
 
   /**
+   * Attempt automatic reconnection after unexpected disconnect
+   * Requirement 7.1: Preserve data and attempt reconnection
+   * @param {Object} tokenData - Cached token data from initial connection
+   * @param {typeof import('livekit-client')} lk - LiveKit SDK
+   */
+  async function attemptReconnection(tokenData, lk) {
+    if (isReconnecting) return;
+    
+    isReconnecting = true;
+    setState('connecting'); // Show reconnecting state
+    
+    const maxAttempts = 3;
+    const delays = [1000, 3000, 5000]; // 1s, 3s, 5s
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        console.log(`[Vakkya] Reconnection attempt ${attempt + 1}/${maxAttempts}`);
+        
+        // Wait before retry
+        if (attempt > 0) {
+          await new Promise(resolve => {
+            reconnectTimeoutId = setTimeout(resolve, delays[attempt - 1]);
+          });
+        }
+        
+        // Create new room instance
+        room = new lk.Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        
+        // Set up event handlers
+        setupRoomEventHandlers(lk);
+        
+        // Reconnect to room
+        await room.connect(tokenData.livekitUrl, tokenData.livekitToken);
+        
+        // Republish local audio track
+        if (localAudioTrack) {
+          await room.localParticipant.publishTrack(localAudioTrack);
+        }
+        
+        // Success!
+        isReconnecting = false;
+        setState('connected');
+        console.log('[Vakkya] Reconnection successful');
+        
+        // Notify widget to restore form state if needed
+        if (onStateChangeCallback) {
+          onStateChangeCallback('reconnected');
+        }
+        
+        return;
+      } catch (err) {
+        console.warn(`[Vakkya] Reconnection attempt ${attempt + 1} failed:`, err);
+        
+        if (attempt === maxAttempts - 1) {
+          // All attempts failed
+          isReconnecting = false;
+          setState('error', 'Reconnection failed');
+          console.error('[Vakkya] All reconnection attempts failed');
+        }
+      }
+    }
+  }
+
+  /**
    * Disconnect from room and clean up
    */
   async function disconnect() {
+    // Cancel any pending reconnection
+    if (reconnectTimeoutId) {
+      clearTimeout(reconnectTimeoutId);
+      reconnectTimeoutId = null;
+    }
+    isReconnecting = false;
+    
     // Detach and clean up remote audio track
     if (remoteAudioTrack) {
       remoteAudioTrack.detach();

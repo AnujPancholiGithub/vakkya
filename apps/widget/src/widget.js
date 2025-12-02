@@ -10,6 +10,7 @@ import { createFormUI } from './form-ui.js';
 import { createWaveformRenderer, generateIdleData } from './waveform.js';
 import { createAudioProcessor } from './audio-processor.js';
 import { createLiveKitManager } from './livekit-manager.js';
+import { createFormStateManager } from './form-state-manager.js';
 import { safeExecute } from './errors.js';
 
 /**
@@ -80,6 +81,9 @@ export class VakkyaWidget {
       this.livekitManager.onRemoteAudio((audioElement) => this.handleRemoteAudio(audioElement));
       this.livekitManager.onFormAvailable((schema) => this.handleFormAvailable(schema));
       this.livekitManager.onAgentMessage((message) => this.handleAgentMessage(message));
+      
+      // Create form state manager for persistence (Requirement 7.1)
+      this.formStateManager = createFormStateManager();
       
       this.initialized = true;
       return true;
@@ -187,6 +191,7 @@ export class VakkyaWidget {
 
   /**
    * Handle connection state changes
+   * Requirement 7.2: Resume from last confirmed field on reconnection
    * @param {string} state
    * @param {string} [error]
    */
@@ -196,11 +201,41 @@ export class VakkyaWidget {
         this.voiceUI.setStatus('connecting');
       } else if (state === 'connected') {
         this.voiceUI.setStatus('listening');
+      } else if (state === 'reconnected') {
+        // Requirement 7.2: Restore form state after reconnection
+        this.handleReconnection();
       } else if (state === 'error') {
         this.voiceUI.showError(error || 'Connection failed');
         this.state.status = 'error';
         this.state.error = error;
       }
+    }
+  }
+
+  /**
+   * Handle successful reconnection
+   * Requirement 7.2: Resume from last confirmed field
+   */
+  handleReconnection() {
+    console.log('[Vakkya] Reconnected, checking for form state to restore');
+    
+    // If form UI exists and has a state manager, it will auto-restore
+    // If not, check if there's persisted state to restore
+    if (!this.formUI && this.formStateManager) {
+      const availableForms = this.livekitManager.getAvailableForms();
+      if (availableForms.length > 0) {
+        // Try to restore from the first available form
+        const restored = this.formStateManager.restoreFromStorage(availableForms[0]);
+        if (restored) {
+          console.log('[Vakkya] Restored form state after reconnection');
+          // Recreate form UI with restored state
+          this.showFormUI(availableForms[0]);
+        }
+      }
+    }
+    
+    if (this.voiceUI) {
+      this.voiceUI.setStatus('listening');
     }
   }
 
@@ -333,6 +368,7 @@ export class VakkyaWidget {
 
   /**
    * Show form UI for conversational forms
+   * Requirement 7.1: Preserve form state during disconnection
    * @param {Object} schema - Form schema from API
    */
   showFormUI(schema) {
@@ -340,6 +376,15 @@ export class VakkyaWidget {
     
     this.formSchema = schema;
     this.state.mode = 'form';
+    
+    // Try to restore existing state for this form (Requirement 7.2)
+    const restored = this.formStateManager.restoreFromStorage(schema);
+    if (restored) {
+      console.log('[Vakkya] Restored form state from storage');
+    } else {
+      // Activate new form
+      this.formStateManager.activateForm(schema);
+    }
     
     // Create form UI (voice UI stays visible for hybrid voice+visual experience)
     this.formUI = createFormUI(this.shadow, schema, {

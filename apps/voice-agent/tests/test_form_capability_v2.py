@@ -19,6 +19,7 @@ from src.capabilities.form_capability_v2 import (
     FORM_STATE_KEY,
     AVAILABLE_FORMS_KEY,
 )
+from src.capabilities.base import CapabilityResponse
 from src.capabilities.base import CapabilityContext
 
 
@@ -529,7 +530,7 @@ class TestNavigationCommands:
     
     @pytest.mark.asyncio
     async def test_cancel_command(self, form_capability, sample_form_schema):
-        """Test 'cancel' command abandons form."""
+        """Test 'cancel' command requests confirmation then abandons form."""
         form_context = FormContext(schema=sample_form_schema)
         form_context.state = FormStateEnum.COLLECTING
         
@@ -540,6 +541,13 @@ class TestNavigationCommands:
             metadata={FORM_STATE_KEY: form_context},
         )
         
+        # First call requests confirmation
+        response = await form_capability.handle(context)
+        assert form_context.awaiting_abandonment_confirm is True
+        assert "sure" in response.text.lower()
+        
+        # Second call with "yes" abandons
+        context.user_query = "yes"
         response = await form_capability.handle(context)
         
         assert FORM_STATE_KEY not in context.metadata
@@ -597,3 +605,567 @@ class TestFieldExtraction:
         field = {"name": "phone", "type": "phone", "label": "Phone", "required": False}
         value = await form_capability._extract_field_value("skip", field)
         assert value == ""
+
+
+class TestProperty18ModeTransitionContextPreservation:
+    """Property 18: Mode Transition Context Preservation
+    
+    For any transition between form mode and RAG mode,
+    conversation context and form state shall be preserved.
+    
+    Validates: Requirements 3.4, 8.2, 8.4, 8.5
+    """
+    
+    @pytest.mark.asyncio
+    async def test_pause_preserves_state(self, form_capability, sample_form_schema):
+        """Test pausing form preserves all state (Requirement 8.2)."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.current_field_index = 1
+        form_context.set_answer("name", "John")
+        form_context.attempt_count = 2
+        
+        # Pause the form
+        form_context.pause()
+        
+        assert form_context.state == FormStateEnum.PAUSED
+        assert form_context.state_before_pause == FormStateEnum.COLLECTING
+        assert form_context.current_field_index == 1  # Preserved
+        assert form_context.answers["name"].value == "John"  # Preserved
+        assert form_context.attempt_count == 2  # Preserved
+        assert form_context.paused_for_rag is True
+    
+    @pytest.mark.asyncio
+    async def test_resume_restores_state(self, form_capability, sample_form_schema):
+        """Test resuming form restores to previous state (Requirement 8.5)."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.current_field_index = 1
+        form_context.set_answer("name", "John")
+        
+        # Pause and resume
+        form_context.pause()
+        form_context.resume()
+        
+        assert form_context.state == FormStateEnum.COLLECTING
+        assert form_context.state_before_pause is None
+        assert form_context.current_field_index == 1  # Same field
+        assert form_context.answers["name"].value == "John"  # Preserved
+        assert form_context.paused_for_rag is False
+    
+    @pytest.mark.asyncio
+    async def test_rag_question_pauses_form(self, form_capability, sample_form_schema):
+        """Test unrelated question pauses form for RAG (Requirement 3.4)."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.current_field_index = 0
+        
+        context = CapabilityContext(
+            user_query="What are your business hours?",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert form_context.state == FormStateEnum.PAUSED
+        assert response.handled is False  # Let RAG handle
+        assert response.confidence == 0.0
+        assert response.metadata.get("form_paused") is True
+    
+    @pytest.mark.asyncio
+    async def test_resume_command_continues_form(self, form_capability, sample_form_schema):
+        """Test 'continue' command resumes paused form (Requirement 8.5)."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.PAUSED
+        form_context.state_before_pause = FormStateEnum.COLLECTING
+        form_context.current_field_index = 1
+        form_context.paused_for_rag = True
+        form_context.set_answer("name", "John")
+        
+        context = CapabilityContext(
+            user_query="continue the form",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert form_context.state == FormStateEnum.COLLECTING
+        assert form_context.current_field_index == 1  # Same field
+        assert form_context.answers["name"].value == "John"  # Preserved
+        assert response.metadata.get("form_resumed") is True
+        assert "email" in response.text.lower()  # Asking for email field
+    
+    @pytest.mark.asyncio
+    async def test_paused_form_low_confidence_for_rag(self, form_capability, sample_form_schema):
+        """Test paused form returns low confidence for RAG questions."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.PAUSED
+        form_context.state_before_pause = FormStateEnum.COLLECTING
+        form_context.paused_for_rag = True
+        
+        context = CapabilityContext(
+            user_query="What products do you sell?",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        confidence = await form_capability.can_handle(context)
+        
+        # Low confidence allows RAG to handle
+        assert confidence == 0.3
+    
+    @pytest.mark.asyncio
+    async def test_paused_form_high_confidence_for_resume(self, form_capability, sample_form_schema):
+        """Test paused form returns high confidence for resume commands."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.PAUSED
+        form_context.state_before_pause = FormStateEnum.COLLECTING
+        
+        context = CapabilityContext(
+            user_query="continue",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        confidence = await form_capability.can_handle(context)
+        
+        assert confidence == 1.0
+    
+    @pytest.mark.asyncio
+    async def test_confirming_state_can_pause(self, form_capability, sample_form_schema):
+        """Test CONFIRMING state can also pause for RAG."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.CONFIRMING
+        form_context.pending_value = "John"
+        form_context.current_field_index = 0
+        
+        context = CapabilityContext(
+            user_query="How much does shipping cost?",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert form_context.state == FormStateEnum.PAUSED
+        assert form_context.state_before_pause == FormStateEnum.CONFIRMING
+        assert form_context.pending_value == "John"  # Preserved
+
+
+class TestAbandonmentConfirmation:
+    """Tests for abandonment confirmation flow.
+    
+    Requirement 8.3: Confirm abandonment, transition to RAG mode.
+    """
+    
+    @pytest.mark.asyncio
+    async def test_cancel_requests_confirmation(self, form_capability, sample_form_schema):
+        """Test cancel command requests confirmation."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.set_answer("name", "John")
+        
+        context = CapabilityContext(
+            user_query="cancel",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert form_context.awaiting_abandonment_confirm is True
+        assert "sure" in response.text.lower()
+        assert FORM_STATE_KEY in context.metadata  # Not abandoned yet
+    
+    @pytest.mark.asyncio
+    async def test_confirm_abandonment_clears_form(self, form_capability, sample_form_schema):
+        """Test confirming abandonment clears form state."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.awaiting_abandonment_confirm = True
+        form_context.set_answer("name", "John")
+        
+        context = CapabilityContext(
+            user_query="yes",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert FORM_STATE_KEY not in context.metadata
+        assert response.metadata.get("form_abandoned") is True
+    
+    @pytest.mark.asyncio
+    async def test_decline_abandonment_continues(self, form_capability, sample_form_schema):
+        """Test declining abandonment continues form."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COLLECTING
+        form_context.awaiting_abandonment_confirm = True
+        form_context.current_field_index = 0
+        
+        context = CapabilityContext(
+            user_query="no",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert form_context.awaiting_abandonment_confirm is False
+        assert FORM_STATE_KEY in context.metadata
+        assert response.metadata.get("abandonment_cancelled") is True
+        assert "name" in response.text.lower()  # Continues with current field
+
+
+class TestPostCompletionTransition:
+    """Tests for post-completion transition to RAG mode.
+    
+    Requirement 8.1: After form completion, transition to RAG mode.
+    """
+    
+    @pytest.mark.asyncio
+    async def test_completed_state_clears_form(self, form_capability, sample_form_schema):
+        """Test COMPLETED state clears form and transitions to RAG."""
+        form_context = FormContext(schema=sample_form_schema)
+        form_context.state = FormStateEnum.COMPLETED
+        
+        context = CapabilityContext(
+            user_query="anything",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={FORM_STATE_KEY: form_context},
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert FORM_STATE_KEY not in context.metadata
+        assert "anything else" in response.text.lower()
+
+
+class TestProperty4MultiFormAvailability:
+    """Property 4: Multi-Form Availability
+    
+    For any project with N forms, all N forms shall be available
+    to the agent as selectable tools.
+    
+    Validates: Requirements 2.1, 2.3, 2.5
+    """
+    
+    @pytest.fixture
+    def multi_form_list(self):
+        """Create list of multiple forms with different trigger phrases."""
+        return [
+            {
+                "id": "form-contact",
+                "name": "Contact Form",
+                "triggerPhrases": ["contact us", "get in touch"],
+                "fields": [{"name": "email", "type": "email", "label": "Email", "required": True}],
+            },
+            {
+                "id": "form-support",
+                "name": "Support Form",
+                "triggerPhrases": ["need help", "support request"],
+                "fields": [{"name": "issue", "type": "text", "label": "Issue", "required": True}],
+            },
+            {
+                "id": "form-feedback",
+                "name": "Feedback Form",
+                "triggerPhrases": ["give feedback", "leave feedback"],
+                "fields": [{"name": "feedback", "type": "text", "label": "Feedback", "required": True}],
+            },
+        ]
+    
+    @pytest.mark.asyncio
+    async def test_all_forms_available_to_agent(self, form_capability, multi_form_list):
+        """Test all N forms are available to agent (Requirement 2.1)."""
+        context = CapabilityContext(
+            user_query="I want to contact us",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={},
+        )
+        
+        with patch.object(form_capability, '_get_available_forms', return_value=multi_form_list):
+            confidence = await form_capability.can_handle(context)
+        
+        # Should match contact form
+        assert confidence == 0.95
+        assert context.metadata.get("matched_form", {}).get("id") == "form-contact"
+    
+    @pytest.mark.asyncio
+    async def test_each_form_activatable_by_trigger(self, form_capability, multi_form_list):
+        """Test each form can be activated by its trigger phrase (Requirement 2.1)."""
+        test_cases = [
+            ("contact us please", "form-contact"),
+            ("I need help with something", "form-support"),
+            ("I want to give feedback", "form-feedback"),
+        ]
+        
+        for query, expected_form_id in test_cases:
+            context = CapabilityContext(
+                user_query=query,
+                project_id="proj-123",
+                session_id="session-456",
+                metadata={},
+            )
+            
+            with patch.object(form_capability, '_get_available_forms', return_value=multi_form_list):
+                confidence = await form_capability.can_handle(context)
+            
+            assert confidence == 0.95, f"Failed for query: {query}"
+            assert context.metadata.get("matched_form", {}).get("id") == expected_form_id, \
+                f"Wrong form for query: {query}"
+    
+    @pytest.mark.asyncio
+    async def test_multiple_forms_match_asks_user(self, form_capability):
+        """Test when multiple forms match, agent asks user to choose (Requirement 2.5)."""
+        # Forms with overlapping trigger phrases
+        overlapping_forms = [
+            {
+                "id": "form-1",
+                "name": "Sales Contact",
+                "triggerPhrases": ["contact sales", "talk to sales"],
+                "fields": [{"name": "email", "type": "email", "label": "Email", "required": True}],
+            },
+            {
+                "id": "form-2",
+                "name": "Support Contact",
+                "triggerPhrases": ["contact support", "talk to support"],
+                "fields": [{"name": "issue", "type": "text", "label": "Issue", "required": True}],
+            },
+        ]
+        
+        # Query that matches both "contact" forms
+        context = CapabilityContext(
+            user_query="I want to contact sales and also contact support",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={},
+        )
+        
+        with patch.object(form_capability, '_get_available_forms', return_value=overlapping_forms):
+            confidence = await form_capability.can_handle(context)
+        
+        # Should detect multiple matches
+        assert confidence == 0.9
+        assert context.metadata.get("awaiting_form_selection") is True
+        assert len(context.metadata.get("matching_forms", [])) == 2
+    
+    @pytest.mark.asyncio
+    async def test_form_selection_prompt_generated(self, form_capability):
+        """Test selection prompt is generated for multiple matches (Requirement 2.5)."""
+        matching_forms = [
+            {"id": "form-1", "name": "Sales Form", "fields": []},
+            {"id": "form-2", "name": "Support Form", "fields": []},
+        ]
+        
+        context = CapabilityContext(
+            user_query="I need help",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={
+                "awaiting_form_selection": True,
+                "matching_forms": matching_forms,
+            },
+        )
+        
+        response = await form_capability.handle(context)
+        
+        assert "Sales Form" in response.text or "Support Form" in response.text
+        assert "which" in response.text.lower()
+    
+    @pytest.mark.asyncio
+    async def test_user_selects_form_by_name(self, form_capability):
+        """Test user can select form by saying its name (Requirement 2.5)."""
+        matching_forms = [
+            {
+                "id": "form-sales",
+                "name": "Sales Form",
+                "greetingMessage": "Let me help you with sales!",
+                "fields": [{"name": "email", "type": "email", "label": "Email", "required": True}],
+            },
+            {
+                "id": "form-support",
+                "name": "Support Form",
+                "fields": [{"name": "issue", "type": "text", "label": "Issue", "required": True}],
+            },
+        ]
+        
+        context = CapabilityContext(
+            user_query="I want the Sales Form",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={
+                "awaiting_form_selection": True,
+                "matching_forms": matching_forms,
+                "selection_prompt_sent": True,
+            },
+        )
+        
+        response = await form_capability.handle(context)
+        
+        # Should activate the selected form
+        assert context.metadata.get("awaiting_form_selection") is None
+        assert FORM_STATE_KEY in context.metadata
+        form_context = context.metadata[FORM_STATE_KEY]
+        assert form_context.form_id == "form-sales"
+        assert "sales" in response.text.lower()
+    
+    @pytest.mark.asyncio
+    async def test_unclear_selection_asks_again(self, form_capability):
+        """Test unclear selection prompts user again (Requirement 2.5)."""
+        matching_forms = [
+            {"id": "form-1", "name": "Contact Form", "fields": []},
+            {"id": "form-2", "name": "Feedback Form", "fields": []},
+        ]
+        
+        context = CapabilityContext(
+            user_query="the first one",  # Unclear selection
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={
+                "awaiting_form_selection": True,
+                "matching_forms": matching_forms,
+                "selection_prompt_sent": True,
+            },
+        )
+        
+        response = await form_capability.handle(context)
+        
+        # Should ask again
+        assert context.metadata.get("awaiting_form_selection") is True
+        assert "Contact Form" in response.text or "Feedback Form" in response.text
+    
+    @pytest.mark.asyncio
+    async def test_no_match_returns_zero_confidence(self, form_capability, multi_form_list):
+        """Test no trigger match returns 0.0 confidence (Requirement 2.3)."""
+        context = CapabilityContext(
+            user_query="What's the weather like today?",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={},
+        )
+        
+        with patch.object(form_capability, '_get_available_forms', return_value=multi_form_list):
+            confidence = await form_capability.can_handle(context)
+        
+        assert confidence == 0.0
+        assert "matched_form" not in context.metadata
+    
+    @pytest.mark.asyncio
+    async def test_empty_forms_list_returns_zero(self, form_capability):
+        """Test empty forms list returns 0.0 confidence."""
+        context = CapabilityContext(
+            user_query="contact us",
+            project_id="proj-123",
+            session_id="session-456",
+            metadata={},
+        )
+        
+        with patch.object(form_capability, '_get_available_forms', return_value=[]):
+            confidence = await form_capability.can_handle(context)
+        
+        assert confidence == 0.0
+
+
+class TestFormSelectionHelpers:
+    """Tests for form selection helper methods."""
+    
+    def test_find_all_matching_forms_single(self, form_capability):
+        """Test finding single matching form."""
+        forms = [
+            {"id": "f1", "name": "Form 1", "triggerPhrases": ["contact us"]},
+            {"id": "f2", "name": "Form 2", "triggerPhrases": ["need help"]},
+        ]
+        
+        matches = form_capability._find_all_matching_forms("I want to contact us", forms)
+        
+        assert len(matches) == 1
+        assert matches[0]["id"] == "f1"
+    
+    def test_find_all_matching_forms_multiple(self, form_capability):
+        """Test finding multiple matching forms."""
+        forms = [
+            {"id": "f1", "name": "Form 1", "triggerPhrases": ["contact"]},
+            {"id": "f2", "name": "Form 2", "triggerPhrases": ["contact"]},
+        ]
+        
+        matches = form_capability._find_all_matching_forms("I want to contact someone", forms)
+        
+        assert len(matches) == 2
+    
+    def test_find_all_matching_forms_none(self, form_capability):
+        """Test finding no matching forms."""
+        forms = [
+            {"id": "f1", "name": "Form 1", "triggerPhrases": ["contact us"]},
+        ]
+        
+        matches = form_capability._find_all_matching_forms("hello world", forms)
+        
+        assert len(matches) == 0
+    
+    def test_generate_form_selection_prompt_two_forms(self, form_capability):
+        """Test selection prompt for two forms."""
+        forms = [
+            {"name": "Sales Form"},
+            {"name": "Support Form"},
+        ]
+        
+        prompt = form_capability._generate_form_selection_prompt(forms)
+        
+        assert "Sales Form" in prompt
+        assert "Support Form" in prompt
+        assert "which" in prompt.lower()
+    
+    def test_generate_form_selection_prompt_three_forms(self, form_capability):
+        """Test selection prompt for three forms."""
+        forms = [
+            {"name": "Form A"},
+            {"name": "Form B"},
+            {"name": "Form C"},
+        ]
+        
+        prompt = form_capability._generate_form_selection_prompt(forms)
+        
+        assert "Form A" in prompt
+        assert "Form B" in prompt
+        assert "Form C" in prompt
+    
+    def test_generate_available_forms_prompt_single(self, form_capability):
+        """Test available forms prompt for single form."""
+        forms = [{"name": "Contact Form"}]
+        
+        prompt = form_capability._generate_available_forms_prompt(forms)
+        
+        assert "Contact Form" in prompt
+    
+    def test_generate_available_forms_prompt_multiple(self, form_capability):
+        """Test available forms prompt for multiple forms."""
+        forms = [
+            {"name": "Form A"},
+            {"name": "Form B"},
+            {"name": "Form C"},
+        ]
+        
+        prompt = form_capability._generate_available_forms_prompt(forms)
+        
+        assert "Form A" in prompt
+        assert "Form B" in prompt
+        assert "Form C" in prompt
+    
+    def test_generate_available_forms_prompt_empty(self, form_capability):
+        """Test available forms prompt for empty list."""
+        prompt = form_capability._generate_available_forms_prompt([])
+        
+        assert prompt == ""

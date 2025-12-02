@@ -338,39 +338,67 @@ This is the master execution plan for building Vakkya. Follow these phases in or
 
 ### 8.6 Mode Transitions & Recovery (V2 Phase 6)
 
-- [ ] 8.6.1 Implement mode transitions in agent
+- [x] 8.6.1 Implement mode transitions in agent
   - **Execute:** Conversational Forms V2 task 21 (subtasks 21.1-21.4)
   - Pause/resume, abandonment, post-completion
   - _Requirements: 3.4, 8.1-8.5_
+  - ✅ Added PAUSED state to FormStateEnum
+  - ✅ pause() and resume() methods in FormContext
+  - ✅ _is_rag_question() detects unrelated questions
+  - ✅ _pause_for_rag() pauses form for RAG detour
+  - ✅ _handle_paused() handles resume commands
+  - ✅ Abandonment confirmation flow with _request_abandonment_confirmation()
+  - ✅ 11 property tests added (Property 18)
 
-- [ ] 8.6.2 Implement connection recovery
+- [x] 8.6.2 Implement connection recovery
   - **Execute:** Conversational Forms V2 task 22 (subtasks 22.1-22.3)
   - State restoration on reconnect
   - _Requirements: 7.1, 7.2, 7.6_
+  - ✅ Automatic reconnection with 3 retries (1s, 3s, 5s delays)
+  - ✅ Token data caching for reconnection
+  - ✅ Form state preservation via form-state-manager (already existed)
+  - ✅ Form state restoration on successful reconnection
+  - ✅ Reconnecting UI state handling
+  - ✅ 3 property tests added (Property 15)
 
-- [ ] 8.6.3 Checkpoint
+- [x] 8.6.3 Checkpoint
   - **Execute:** Conversational Forms V2 task 23
+  - ✅ All 939 tests passing (schemas: 40, api: 215, voice-agent: 302, widget: 329, dashboard: 53)
 
 ### 8.7 Dashboard Updates (V2 Phase 7)
 
-- [ ] 8.7.1 Update form editor for V2 fields
+- [x] 8.7.1 Update form editor for V2 fields
   - **Execute:** Conversational Forms V2 task 24 (subtasks 24.1-24.5)
   - Trigger phrases, description, messages, webhook secret
   - _Requirements: 9.1-9.4_
+  - ✅ FormSchema type updated with V2 fields (description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive)
+  - ✅ FormEditorDialog updated with all V2 field inputs
+  - ✅ Trigger phrases multi-value input with add/remove
+  - ✅ 14 unit tests added
 
-- [ ] 8.7.2 Add form events to conversation view
+- [x] 8.7.2 Add form events to conversation view
   - **Execute:** Conversational Forms V2 task 25 (subtasks 25.1-25.2)
   - _Requirements: 11.5_
+  - ✅ GET /conversations/:id/form-events endpoint added
+  - ✅ useFormEvents query hook added
+  - ✅ Conversation detail page displays form events inline with turns
+  - ✅ FormEventBadge component with event type icons and colors
+  - ✅ 3 unit tests added for form-events endpoint
 
-- [ ] 8.7.3 Checkpoint
+- [x] 8.7.3 Checkpoint
   - **Execute:** Conversational Forms V2 task 26
+  - ✅ All 956 tests passing (schemas: 40, api: 218, voice-agent: 302, widget: 329, dashboard: 67)
 
 ### 8.8 Multi-Form Support & Agent Integration (V2 Phase 8)
 
-- [ ] 8.8.1 Implement multi-form availability
+- [x] 8.8.1 Implement multi-form availability
   - **Execute:** Conversational Forms V2 task 27 (subtasks 27.1-27.3)
   - All forms available to agent, selection logic
   - _Requirements: 2.1, 2.3, 2.5_
+  - ✅ _find_all_matching_forms() detects multiple trigger phrase matches
+  - ✅ _handle_form_selection() handles user form choice
+  - ✅ _generate_form_selection_prompt() asks user to choose between forms
+  - ✅ 17 property tests added (Property 4)
 
 - [ ] 8.8.2 Integrate FormCapabilityV2 with orchestrator
   - **Execute:** Conversational Forms V2 task 28 (subtasks 28.1-28.3)

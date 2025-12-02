@@ -26,11 +26,15 @@ class FormStateEnum(Enum):
     
     State transitions:
     INACTIVE → ACTIVE → COLLECTING → CONFIRMING → SUMMARY → SUBMITTING → COMPLETED
+    
+    Pause/Resume flow (Requirement 8.2, 8.5):
+    COLLECTING/CONFIRMING → PAUSED (on RAG detour) → COLLECTING (on resume)
     """
     INACTIVE = "inactive"
     ACTIVE = "active"           # Form activated, greeting
     COLLECTING = "collecting"   # Asking for field value
     CONFIRMING = "confirming"   # Awaiting confirmation of extracted value
+    PAUSED = "paused"           # Paused for RAG detour (Requirement 8.2)
     SUMMARY = "summary"         # Presenting summary before submission
     SUBMITTING = "submitting"   # Submitting to API
     COMPLETED = "completed"     # Done, transitioning out
@@ -58,6 +62,8 @@ class FormContext:
         state: Current state machine state
         attempt_count: Attempts for current field
         paused_for_rag: Whether form is paused for RAG detour
+        state_before_pause: State before pausing (for resume)
+        awaiting_abandonment_confirm: Whether waiting for abandonment confirmation
     """
     schema: dict[str, Any]
     current_field_index: int = 0
@@ -67,6 +73,8 @@ class FormContext:
     state: FormStateEnum = FormStateEnum.INACTIVE
     attempt_count: int = 0
     paused_for_rag: bool = False
+    state_before_pause: Optional[FormStateEnum] = None
+    awaiting_abandonment_confirm: bool = False
     
     @property
     def form_id(self) -> str:
@@ -132,6 +140,30 @@ class FormContext:
             if f.get("required", True) and f["name"] not in self.answers:
                 return False
         return True
+    
+    def pause(self) -> None:
+        """Pause form for RAG detour (Requirement 8.2).
+        
+        Preserves current state so form can resume from same point.
+        """
+        if self.state in (FormStateEnum.COLLECTING, FormStateEnum.CONFIRMING):
+            self.state_before_pause = self.state
+            self.state = FormStateEnum.PAUSED
+            self.paused_for_rag = True
+    
+    def resume(self) -> None:
+        """Resume form from paused state (Requirement 8.5).
+        
+        Returns to the state before pause.
+        """
+        if self.state == FormStateEnum.PAUSED and self.state_before_pause:
+            self.state = self.state_before_pause
+            self.state_before_pause = None
+            self.paused_for_rag = False
+    
+    def is_paused(self) -> bool:
+        """Check if form is currently paused."""
+        return self.state == FormStateEnum.PAUSED
 
 
 class FormCapabilityV2(Capability):
@@ -175,9 +207,12 @@ class FormCapabilityV2(Capability):
     async def can_handle(self, context: CapabilityContext) -> float:
         """Determine if form capability should handle this request.
         
+        Property 4: Multi-Form Availability
         Property 5: Trigger Phrase Activation
+        
         For any user input matching a form's trigger phrases,
-        that specific form shall be activated.
+        that specific form shall be activated. When multiple forms match,
+        the agent asks the user to choose.
         
         Args:
             context: Request context
@@ -185,24 +220,52 @@ class FormCapabilityV2(Capability):
         Returns:
             Confidence score (0.0-1.0)
         """
-        # If form is already active, always handle
+        # If form is already active, always handle (except PAUSED)
         if FORM_STATE_KEY in context.metadata:
             form_context: FormContext = context.metadata[FORM_STATE_KEY]
+            # PAUSED state returns lower confidence to allow RAG to handle
+            if form_context.state == FormStateEnum.PAUSED:
+                # Check if user wants to resume
+                query_lower = context.user_query.lower().strip()
+                resume_phrases = ["continue", "resume", "back to form", "finish form"]
+                if any(phrase in query_lower for phrase in resume_phrases):
+                    return 1.0
+                # Otherwise let RAG handle, but we'll still process in _handle_paused
+                return 0.3  # Low but non-zero to handle resume detection
             if form_context.state not in (FormStateEnum.INACTIVE, FormStateEnum.COMPLETED):
                 return 1.0
+        
+        # Check if we're awaiting form selection (Requirement 2.5)
+        if context.metadata.get("awaiting_form_selection"):
+            return 0.9  # High confidence to handle selection
         
         # Check for trigger phrase match
         available_forms = await self._get_available_forms(context)
         if not available_forms:
             return 0.0
         
+        # Property 4: All forms available to agent
+        # Requirement 2.5: Check for multiple matching forms
+        matching_forms = self._find_all_matching_forms(context.user_query, available_forms)
+        
+        if len(matching_forms) > 1:
+            # Multiple forms match - need to ask user to choose
+            context.metadata["matching_forms"] = matching_forms
+            context.metadata["awaiting_form_selection"] = True
+            return 0.9
+        
+        if len(matching_forms) == 1:
+            # Single match - activate that form
+            context.metadata["matched_form"] = matching_forms[0]
+            return 0.95
+        
+        # No trigger match - use standard single-form matching as fallback
         matched_form, confidence = self._match_trigger_phrase(
             context.user_query,
             available_forms
         )
         
         if matched_form:
-            # Store matched form for handle() to use
             context.metadata["matched_form"] = matched_form
             return confidence
         
@@ -211,7 +274,9 @@ class FormCapabilityV2(Capability):
     async def handle(self, context: CapabilityContext) -> CapabilityResponse:
         """Handle form conversation based on current state.
         
+        Property 4: Multi-Form Availability
         Property 7: Confirmation State Machine
+        
         For any voice-extracted value, the system shall transition through:
         COLLECTING → CONFIRMING → (COLLECTING if rejected, next field if confirmed)
         
@@ -222,6 +287,10 @@ class FormCapabilityV2(Capability):
             CapabilityResponse with agent speech
         """
         try:
+            # Handle form selection when multiple forms match (Requirement 2.5)
+            if context.metadata.get("awaiting_form_selection"):
+                return self._handle_form_selection(context)
+            
             # Get or create form context
             form_context = self._get_or_create_form_context(context)
             
@@ -246,6 +315,9 @@ class FormCapabilityV2(Capability):
             
             elif state == FormStateEnum.CONFIRMING:
                 return self._handle_confirming(form_context, context)
+            
+            elif state == FormStateEnum.PAUSED:
+                return self._handle_paused(form_context, context)
             
             elif state == FormStateEnum.SUMMARY:
                 return self._handle_summary(form_context, context)
@@ -328,16 +400,26 @@ class FormCapabilityV2(Capability):
         """Handle COLLECTING state - extract value and request confirmation.
         
         Property 7: Voice values require confirmation before storage.
+        Requirement 3.4: Answer unrelated questions using RAG.
         """
         query_lower = context.user_query.lower().strip()
+        
+        # Check if awaiting abandonment confirmation first
+        if form_context.awaiting_abandonment_confirm:
+            return self._handle_abandonment_response(form_context, context)
         
         # Check for navigation commands
         if any(word in query_lower for word in ["back", "previous", "go back"]):
             return self._handle_back(form_context)
         
-        # Check for abandonment
+        # Check for abandonment request
         if any(word in query_lower for word in ["cancel", "stop", "quit", "nevermind"]):
-            return self._handle_abandonment(form_context, context)
+            return self._request_abandonment_confirmation(form_context, context)
+        
+        # Check for RAG detour BEFORE extraction (Requirement 3.4, 8.2)
+        # This must come before extraction to avoid treating questions as answers
+        if self._is_rag_question(query_lower, form_context):
+            return self._pause_for_rag(form_context, context)
         
         current_field = form_context.current_field
         if current_field is None:
@@ -389,6 +471,18 @@ class FormCapabilityV2(Capability):
         """
         query_lower = context.user_query.lower().strip()
         current_field = form_context.current_field
+        
+        # Check for abandonment request
+        if any(word in query_lower for word in ["cancel", "stop", "quit", "nevermind"]):
+            return self._request_abandonment_confirmation(form_context, context)
+        
+        # Check if awaiting abandonment confirmation
+        if form_context.awaiting_abandonment_confirm:
+            return self._handle_abandonment_response(form_context, context)
+        
+        # Check for RAG detour
+        if self._is_rag_question(query_lower, form_context):
+            return self._pause_for_rag(form_context, context)
         
         # Check for confirmation
         if self._is_confirmation(query_lower):
@@ -535,6 +629,140 @@ class FormCapabilityV2(Capability):
             handled=True,
         )
     
+    def _handle_form_selection(
+        self,
+        context: CapabilityContext
+    ) -> CapabilityResponse:
+        """Handle form selection when multiple forms match.
+        
+        Property 4: Multi-Form Availability
+        Requirement 2.5: Agent asks user to choose when multiple forms match.
+        
+        Args:
+            context: Request context with matching_forms in metadata
+            
+        Returns:
+            CapabilityResponse asking user to choose or activating selected form
+        """
+        matching_forms = context.metadata.get("matching_forms", [])
+        
+        if not matching_forms:
+            context.metadata.pop("awaiting_form_selection", None)
+            return CapabilityResponse(
+                text="I'm not sure which form you'd like to fill out. Could you tell me more?",
+                confidence=0.5,
+                handled=True,
+            )
+        
+        # Check if user's response indicates a form choice
+        user_query_lower = context.user_query.lower().strip()
+        
+        # Try to match user's response to a form name
+        selected_form = None
+        for form in matching_forms:
+            form_name = form.get("name", "").lower()
+            if form_name and form_name in user_query_lower:
+                selected_form = form
+                break
+            # Also check for partial matches
+            form_words = form_name.split()
+            if any(word in user_query_lower for word in form_words if len(word) > 3):
+                selected_form = form
+                break
+        
+        if selected_form:
+            # User selected a form - activate it
+            context.metadata.pop("awaiting_form_selection", None)
+            context.metadata.pop("matching_forms", None)
+            context.metadata["matched_form"] = selected_form
+            
+            form_context = FormContext(schema=selected_form)
+            context.metadata[FORM_STATE_KEY] = form_context
+            
+            logger.info(
+                "Form selected by user",
+                extra={
+                    "form_id": selected_form.get("id"),
+                    "form_name": selected_form.get("name"),
+                },
+            )
+            
+            return self._handle_activation(form_context, context)
+        
+        # Check if this is the first time asking (no previous selection prompt)
+        if not context.metadata.get("selection_prompt_sent"):
+            context.metadata["selection_prompt_sent"] = True
+            prompt = self._generate_form_selection_prompt(matching_forms)
+            
+            return CapabilityResponse(
+                text=prompt,
+                confidence=0.9,
+                handled=True,
+                metadata={
+                    "awaiting_form_selection": True,
+                    "available_forms": [f.get("name") for f in matching_forms],
+                },
+            )
+        
+        # User didn't clearly select - ask again with more guidance
+        form_names = [f.get("name", f"Form {i+1}") for i, f in enumerate(matching_forms)]
+        return CapabilityResponse(
+            text=f"I didn't catch which one you'd like. Please say the name: {', '.join(form_names)}.",
+            confidence=0.8,
+            handled=True,
+            metadata={"awaiting_form_selection": True},
+        )
+    
+    def _handle_paused(
+        self,
+        form_context: FormContext,
+        context: CapabilityContext
+    ) -> CapabilityResponse:
+        """Handle PAUSED state - check for resume or continue RAG.
+        
+        Requirement 8.5: Resume from last field when returning.
+        Property 18: Mode Transition Context Preservation.
+        """
+        query_lower = context.user_query.lower().strip()
+        
+        # Check for resume intent
+        resume_phrases = [
+            "continue", "resume", "back to form", "back to the form",
+            "continue form", "continue the form", "let's continue",
+            "go back to form", "finish form", "finish the form"
+        ]
+        if any(phrase in query_lower for phrase in resume_phrases):
+            form_context.resume()
+            current_field = form_context.current_field
+            
+            if current_field:
+                return CapabilityResponse(
+                    text=f"Sure, let's continue with the form. {self._format_question(current_field)}",
+                    confidence=1.0,
+                    handled=True,
+                    metadata={"form_resumed": True, "current_field": current_field["name"]},
+                )
+            else:
+                form_context.state = FormStateEnum.SUMMARY
+                return self._generate_summary(form_context)
+        
+        # Check for abandonment
+        if any(word in query_lower for word in ["cancel", "stop", "quit", "nevermind", "forget it"]):
+            return self._handle_abandonment(form_context, context)
+        
+        # Otherwise, this is a RAG question - return low confidence to let RAG handle
+        # But remind user about the paused form
+        return CapabilityResponse(
+            text="",  # Empty - let RAG capability handle
+            confidence=0.0,
+            handled=False,
+            metadata={
+                "form_paused": True,
+                "form_id": form_context.form_id,
+                "reminder": "You have a form in progress. Say 'continue' when you're ready to resume.",
+            },
+        )
+    
     def _handle_back(self, form_context: FormContext) -> CapabilityResponse:
         """Handle going back to previous field."""
         if form_context.current_field_index > 0:
@@ -561,12 +789,152 @@ class FormCapabilityV2(Capability):
             handled=True,
         )
     
+    def _is_rag_question(self, query_lower: str, form_context: FormContext) -> bool:
+        """Detect if user is asking an unrelated question (RAG detour).
+        
+        Requirement 3.4: Answer unrelated questions using RAG.
+        """
+        # Question indicators - must start with these or end with ?
+        question_starters = [
+            "what ", "what's ", "whats ",
+            "how ", "how's ", "hows ",
+            "why ", "when ", "where ", "who ", "which ",
+            "can you ", "could you ", "would you ",
+            "do you ", "does ", "did ",
+            "is there ", "are there ", "is it ", "are you ",
+            "tell me about ", "explain ",
+        ]
+        
+        # Check if it looks like a question
+        is_question = any(query_lower.startswith(w) for w in question_starters) or query_lower.endswith("?")
+        
+        if not is_question:
+            return False
+        
+        # Short queries ending with ? are likely questions
+        # But very short ones like "John?" might be clarifications
+        if query_lower.endswith("?") and len(query_lower.split()) <= 2:
+            return False
+        
+        # Check for form-related questions (not RAG)
+        form_related = ["form", "field", "question", "answer", "skip", "next", "back", "submit", "this form"]
+        if any(word in query_lower for word in form_related):
+            return False
+        
+        # Check for personal info patterns that are likely answers
+        answer_patterns = [
+            "my name is", "i am ", "i'm ", "it's ", "its ",
+            "my email", "my phone", "my number",
+            "@",  # Email indicator
+        ]
+        if any(pattern in query_lower for pattern in answer_patterns):
+            return False
+        
+        # Check if it's related to the current field by field name only
+        # (not label, as labels often contain common words like "your", "what")
+        current_field = form_context.current_field
+        if current_field:
+            field_name = current_field["name"].lower()
+            # If query mentions the field name specifically, it's probably an answer attempt
+            if field_name in query_lower:
+                return False
+        
+        # If it's a question that doesn't match any answer patterns, it's likely RAG
+        return True
+    
+    def _pause_for_rag(
+        self,
+        form_context: FormContext,
+        context: CapabilityContext
+    ) -> CapabilityResponse:
+        """Pause form and let RAG handle the question.
+        
+        Requirement 8.2: Pause form when user asks unrelated question.
+        Property 18: Mode Transition Context Preservation.
+        """
+        form_context.pause()
+        
+        logger.info(
+            "Form paused for RAG detour",
+            extra={
+                "form_id": form_context.form_id,
+                "field_index": form_context.current_field_index,
+                "query": context.user_query,
+            },
+        )
+        
+        return CapabilityResponse(
+            text="",  # Empty - let RAG capability handle
+            confidence=0.0,
+            handled=False,
+            metadata={
+                "form_paused": True,
+                "form_id": form_context.form_id,
+                "paused_at_field": form_context.current_field["name"] if form_context.current_field else None,
+            },
+        )
+    
+    def _request_abandonment_confirmation(
+        self,
+        form_context: FormContext,
+        context: CapabilityContext
+    ) -> CapabilityResponse:
+        """Request confirmation before abandoning form.
+        
+        Requirement 8.3: Confirm abandonment before transitioning.
+        """
+        form_context.awaiting_abandonment_confirm = True
+        
+        collected_count = len(form_context.answers)
+        if collected_count > 0:
+            return CapabilityResponse(
+                text=f"You've already provided {collected_count} answer{'s' if collected_count > 1 else ''}. "
+                     f"Are you sure you want to cancel the form? Say yes to cancel, or no to continue.",
+                confidence=1.0,
+                handled=True,
+                metadata={"awaiting_abandonment_confirm": True},
+            )
+        
+        return CapabilityResponse(
+            text="Are you sure you want to cancel the form? Say yes to cancel, or no to continue.",
+            confidence=1.0,
+            handled=True,
+            metadata={"awaiting_abandonment_confirm": True},
+        )
+    
+    def _handle_abandonment_response(
+        self,
+        form_context: FormContext,
+        context: CapabilityContext
+    ) -> CapabilityResponse:
+        """Handle response to abandonment confirmation.
+        
+        Requirement 8.3: Confirm abandonment, transition to RAG mode.
+        """
+        query_lower = context.user_query.lower().strip()
+        form_context.awaiting_abandonment_confirm = False
+        
+        if self._is_confirmation(query_lower):
+            return self._handle_abandonment(form_context, context)
+        
+        # User wants to continue
+        current_field = form_context.current_field
+        return CapabilityResponse(
+            text=f"Okay, let's continue. {self._format_question(current_field)}",
+            confidence=1.0,
+            handled=True,
+            metadata={"abandonment_cancelled": True},
+        )
+    
     def _handle_abandonment(
         self,
         form_context: FormContext,
         context: CapabilityContext
     ) -> CapabilityResponse:
-        """Handle form abandonment."""
+        """Handle form abandonment.
+        
+        Requirement 8.3: Transition to RAG mode after abandonment.
+        """
         context.metadata.pop(FORM_STATE_KEY, None)
         return CapabilityResponse(
             text="No problem, I've cancelled the form. Is there anything else I can help you with?",
@@ -752,6 +1120,83 @@ class FormCapabilityV2(Capability):
                     return form, 0.95
         
         return None, 0.0
+    
+    def _find_all_matching_forms(
+        self,
+        user_query: str,
+        forms: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Find all forms that match the user query.
+        
+        Property 4: Multi-Form Availability
+        Requirement 2.5: When multiple forms could match, ask user to choose.
+        
+        Returns:
+            List of matching forms (may be empty, one, or multiple)
+        """
+        query_lower = user_query.lower().strip()
+        matching_forms = []
+        
+        for form in forms:
+            trigger_phrases = form.get("triggerPhrases", [])
+            for phrase in trigger_phrases:
+                if phrase.lower() in query_lower:
+                    matching_forms.append(form)
+                    break  # Only add each form once
+        
+        return matching_forms
+    
+    def _generate_form_selection_prompt(
+        self,
+        forms: list[dict[str, Any]]
+    ) -> str:
+        """Generate a prompt asking user to choose between multiple forms.
+        
+        Requirement 2.5: Agent asks user to choose when multiple forms match.
+        
+        Args:
+            forms: List of matching forms
+            
+        Returns:
+            Natural language prompt for form selection
+        """
+        if len(forms) == 2:
+            return (
+                f"I can help you with either the {forms[0].get('name', 'first form')} "
+                f"or the {forms[1].get('name', 'second form')}. Which would you prefer?"
+            )
+        
+        form_names = [f.get("name", f"Form {i+1}") for i, f in enumerate(forms)]
+        options = ", ".join(form_names[:-1]) + f", or {form_names[-1]}"
+        return f"I can help you with several things: {options}. Which would you like?"
+    
+    def _generate_available_forms_prompt(
+        self,
+        forms: list[dict[str, Any]]
+    ) -> str:
+        """Generate a prompt suggesting available forms when no clear intent.
+        
+        Requirement 2.3: When no clear intent, suggest available options.
+        
+        Args:
+            forms: List of available forms
+            
+        Returns:
+            Natural language prompt suggesting options
+        """
+        if not forms:
+            return ""
+        
+        if len(forms) == 1:
+            form = forms[0]
+            return f"I can help you fill out our {form.get('name', 'form')} if you'd like."
+        
+        form_names = [f.get("name", f"Form {i+1}") for i, f in enumerate(forms)]
+        if len(forms) == 2:
+            return f"I can help you with our {form_names[0]} or {form_names[1]}."
+        
+        options = ", ".join(form_names[:-1]) + f", or {form_names[-1]}"
+        return f"I can help you with: {options}."
     
     async def _get_available_forms(self, context: CapabilityContext) -> list[dict[str, Any]]:
         """Fetch available forms for the project."""

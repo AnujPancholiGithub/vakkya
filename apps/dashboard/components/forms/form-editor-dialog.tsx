@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, GripVertical, Loader2 } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,19 +37,43 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
   const updateForm = useUpdateForm(projectId, form?.id ?? '')
   const isEditing = !!form
 
+  // Basic fields
   const [name, setName] = useState('')
-  const [webhookUrl, setWebhookUrl] = useState('')
+  const [description, setDescription] = useState('')
   const [fields, setFields] = useState<FormField[]>([])
+  
+  // V2 fields
+  const [triggerPhrases, setTriggerPhrases] = useState<string[]>([])
+  const [triggerInput, setTriggerInput] = useState('')
+  const [greetingMessage, setGreetingMessage] = useState('')
+  const [completionMessage, setCompletionMessage] = useState('')
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookSecret, setWebhookSecret] = useState('')
+  const [isActive, setIsActive] = useState(true)
 
   useEffect(() => {
     if (form) {
       setName(form.name)
-      setWebhookUrl(form.webhookUrl || '')
+      setDescription(form.description || '')
       setFields(form.fields)
+      setTriggerPhrases(form.triggerPhrases || [])
+      setTriggerInput('')
+      setGreetingMessage(form.greetingMessage || '')
+      setCompletionMessage(form.completionMessage || '')
+      setWebhookUrl(form.webhookUrl || '')
+      setWebhookSecret(form.webhookSecret || '')
+      setIsActive(form.isActive ?? true)
     } else {
       setName('')
-      setWebhookUrl('')
+      setDescription('')
       setFields([{ name: 'email', type: 'email', label: 'Email', required: true }])
+      setTriggerPhrases([])
+      setTriggerInput('')
+      setGreetingMessage('')
+      setCompletionMessage('')
+      setWebhookUrl('')
+      setWebhookSecret('')
+      setIsActive(true)
     }
   }, [form, open])
 
@@ -68,6 +92,28 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
 
   const updateField = (index: number, updates: Partial<FormField>) => {
     setFields(fields.map((f, i) => i === index ? { ...f, ...updates } : f))
+  }
+
+  const addTriggerPhrase = () => {
+    const phrase = triggerInput.trim()
+    if (!phrase) return
+    if (triggerPhrases.includes(phrase)) {
+      toast.error('Trigger phrase already added')
+      return
+    }
+    setTriggerPhrases([...triggerPhrases, phrase])
+    setTriggerInput('')
+  }
+
+  const removeTriggerPhrase = (index: number) => {
+    setTriggerPhrases(triggerPhrases.filter((_, i) => i !== index))
+  }
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      addTriggerPhrase()
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,8 +139,14 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
     try {
       const data = {
         name: name.trim(),
+        description: description.trim() || undefined,
         fields,
+        triggerPhrases: triggerPhrases.length > 0 ? triggerPhrases : undefined,
+        greetingMessage: greetingMessage.trim() || undefined,
+        completionMessage: completionMessage.trim() || undefined,
         webhookUrl: webhookUrl.trim() || undefined,
+        webhookSecret: webhookSecret.trim() || undefined,
+        isActive,
       }
 
       if (isEditing) {
@@ -105,7 +157,12 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
         toast.success('Form created')
       }
       onOpenChange(false)
-    } catch {
+    } catch (err) {
+      // Check for trigger phrase conflict error
+      if (err instanceof Error && err.message.includes('TRIGGER_PHRASE_CONFLICT')) {
+        toast.error('Trigger phrase already used by another form')
+        return
+      }
       toast.error(isEditing ? 'Failed to update form' : 'Failed to create form')
     }
   }
@@ -136,6 +193,63 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
               />
             </div>
 
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <textarea
+                id="description"
+                className="flex min-h-[80px] w-full rounded-md px-3 py-2 bg-zinc-950 border border-zinc-800 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                placeholder="Help the agent understand when to use this form..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isPending}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                Helps the agent understand when to activate this form
+              </p>
+            </div>
+
+            {/* Trigger Phrases */}
+            <div className="space-y-2">
+              <Label>Trigger Phrases (Optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g., I want to contact you"
+                  value={triggerInput}
+                  onChange={(e) => setTriggerInput(e.target.value)}
+                  onKeyDown={handleTriggerKeyDown}
+                  disabled={isPending}
+                />
+                <Button type="button" variant="outline" onClick={addTriggerPhrase} disabled={isPending || !triggerInput.trim()}>
+                  Add
+                </Button>
+              </div>
+              {triggerPhrases.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {triggerPhrases.map((phrase, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded-md text-sm"
+                    >
+                      {phrase}
+                      <button
+                        type="button"
+                        onClick={() => removeTriggerPhrase(index)}
+                        className="hover:text-destructive"
+                        disabled={isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Natural language phrases that activate this form
+              </p>
+            </div>
+
             {/* Fields */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -159,6 +273,40 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
               </div>
             </div>
 
+            {/* Greeting Message */}
+            <div className="space-y-2">
+              <Label htmlFor="greetingMessage">Greeting Message (Optional)</Label>
+              <textarea
+                id="greetingMessage"
+                className="flex min-h-[60px] w-full rounded-md px-3 py-2 bg-zinc-950 border border-zinc-800 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                placeholder="Hello! I'd be happy to help you get in touch..."
+                value={greetingMessage}
+                onChange={(e) => setGreetingMessage(e.target.value)}
+                disabled={isPending}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom message when the form starts
+              </p>
+            </div>
+
+            {/* Completion Message */}
+            <div className="space-y-2">
+              <Label htmlFor="completionMessage">Completion Message (Optional)</Label>
+              <textarea
+                id="completionMessage"
+                className="flex min-h-[60px] w-full rounded-md px-3 py-2 bg-zinc-950 border border-zinc-800 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                placeholder="Thank you! We'll be in touch soon..."
+                value={completionMessage}
+                onChange={(e) => setCompletionMessage(e.target.value)}
+                disabled={isPending}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">
+                Custom message after successful submission
+              </p>
+            </div>
+
             {/* Webhook URL */}
             <div className="space-y-2">
               <Label htmlFor="webhookUrl">Webhook URL (Optional)</Label>
@@ -173,6 +321,40 @@ export function FormEditorDialog({ projectId, open, onOpenChange, form }: FormEd
               <p className="text-xs text-muted-foreground">
                 Submissions will be sent to this URL via POST request
               </p>
+            </div>
+
+            {/* Webhook Secret */}
+            <div className="space-y-2">
+              <Label htmlFor="webhookSecret">Webhook Secret (Optional)</Label>
+              <Input
+                id="webhookSecret"
+                type="password"
+                placeholder="Secret for HMAC signature verification"
+                value={webhookSecret}
+                onChange={(e) => setWebhookSecret(e.target.value)}
+                disabled={isPending}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used to sign webhook payloads for verification
+              </p>
+            </div>
+
+            {/* Active Toggle */}
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                disabled={isPending}
+                className="rounded border-zinc-700 h-4 w-4"
+              />
+              <div>
+                <Label htmlFor="isActive" className="cursor-pointer">Active</Label>
+                <p className="text-xs text-muted-foreground">
+                  Only active forms are available to the voice agent
+                </p>
+              </div>
             </div>
           </div>
 

@@ -226,11 +226,41 @@ export interface FormSchema {
   id: string
   projectId: string
   name: string
+  description: string | null
   fields: FormField[]
+  triggerPhrases: string[]
+  greetingMessage: string | null
+  completionMessage: string | null
   webhookUrl: string | null
+  webhookSecret: string | null
+  isActive: boolean
   createdAt: string
   updatedAt: string
   submissionCount?: number
+}
+
+export interface CreateFormInput {
+  name: string
+  description?: string
+  fields: FormField[]
+  triggerPhrases?: string[]
+  greetingMessage?: string
+  completionMessage?: string
+  webhookUrl?: string
+  webhookSecret?: string
+  isActive?: boolean
+}
+
+export interface UpdateFormInput {
+  name?: string
+  description?: string
+  fields?: FormField[]
+  triggerPhrases?: string[]
+  greetingMessage?: string
+  completionMessage?: string
+  webhookUrl?: string
+  webhookSecret?: string
+  isActive?: boolean
 }
 
 export interface FormSubmission {
@@ -280,7 +310,7 @@ export function useForm(projectId: string, formId: string) {
 export function useCreateForm(projectId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { name: string; fields: FormField[]; webhookUrl?: string }) => {
+    mutationFn: async (data: CreateFormInput) => {
       const res = await api.post<FormResponse>(`/projects/${projectId}/forms`, data)
       return res.form
     },
@@ -293,7 +323,7 @@ export function useCreateForm(projectId: string) {
 export function useUpdateForm(projectId: string, formId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (data: { name?: string; fields?: FormField[]; webhookUrl?: string }) => {
+    mutationFn: async (data: UpdateFormInput) => {
       const res = await api.put<FormResponse>(`/projects/${projectId}/forms/${formId}`, data)
       return res.form
     },
@@ -322,5 +352,33 @@ export function useFormSubmissions(projectId: string, formId: string) {
       return res.submissions
     },
     enabled: !!projectId && !!formId,
+  })
+}
+
+// Form Event types
+export interface FormEvent {
+  id: string
+  formSchemaId: string
+  eventType: 'activated' | 'field_collected' | 'submitted' | 'abandoned'
+  fieldName: string | null
+  fieldValue: string | null
+  attemptCount: number | null
+  metadata: Record<string, unknown> | null
+  timestamp: string
+}
+
+interface FormEventsResponse {
+  events: FormEvent[]
+}
+
+// Form Events hook
+export function useFormEvents(conversationId: string) {
+  return useQuery({
+    queryKey: ['form-events', conversationId],
+    queryFn: async () => {
+      const res = await api.get<FormEventsResponse>(`/conversations/${conversationId}/form-events`)
+      return res.events
+    },
+    enabled: !!conversationId,
   })
 }

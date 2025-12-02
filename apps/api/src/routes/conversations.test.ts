@@ -275,4 +275,93 @@ describe('Conversation API Routes', () => {
       expect(response.statusCode).toBe(401);
     });
   });
+
+  describe('GET /conversations/:id/form-events', () => {
+    it('should get form events for a conversation (Requirement 11.5)', async () => {
+      // Create conversation
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/conversations',
+        payload: {
+          projectId,
+          sessionId: 'session-form-events',
+          widgetToken,
+        },
+      });
+
+      const { conversation } = JSON.parse(createResponse.body);
+
+      // Create a form schema for the project
+      const formSchema = await prisma.formSchema.create({
+        data: {
+          projectId: projectId!,
+          name: 'Test Form',
+          fields: [{ name: 'email', type: 'email', label: 'Email', required: true }],
+        },
+      });
+
+      // Create form events
+      await prisma.formEvent.createMany({
+        data: [
+          {
+            formSchemaId: formSchema.id,
+            conversationId: conversation.id,
+            sessionId: 'session-form-events',
+            eventType: 'activated',
+          },
+          {
+            formSchemaId: formSchema.id,
+            conversationId: conversation.id,
+            sessionId: 'session-form-events',
+            eventType: 'field_collected',
+            fieldName: 'email',
+            fieldValue: 'test@example.com',
+            attemptCount: 1,
+          },
+        ],
+      });
+
+      // Get form events
+      const response = await app.inject({
+        method: 'GET',
+        url: `/conversations/${conversation.id}/form-events`,
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const data = JSON.parse(response.body);
+      expect(data.events).toBeDefined();
+      expect(data.events.length).toBe(2);
+      expect(data.events[0].eventType).toBe('activated');
+      expect(data.events[1].eventType).toBe('field_collected');
+      expect(data.events[1].fieldName).toBe('email');
+
+      // Cleanup
+      await prisma.formEvent.deleteMany({ where: { formSchemaId: formSchema.id } });
+      await prisma.formSchema.delete({ where: { id: formSchema.id } });
+    });
+
+    it('should require authentication', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/conversations/fake-id/form-events',
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('should return 404 for non-existent conversation', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/conversations/clxxxxxxxxxxxxxxxxxxxxxxxxx/form-events',
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+  });
 });
