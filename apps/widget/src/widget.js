@@ -240,7 +240,9 @@ export class VakkyaWidget {
   }
 
   /**
-   * Handle form available callback - show form UI when a form is configured
+   * Handle form available callback - stores form schema but does NOT display it
+   * Forms should only be displayed via handleFormActivate (agent message via data channel)
+   * Validates: Requirements 1.1, 1.2 (No Automatic Form Display)
    * @param {Object} schema - Form schema from API
    */
   handleFormAvailable(schema) {
@@ -248,11 +250,10 @@ export class VakkyaWidget {
       return;
     }
     
-    console.log('[Vakkya] Form available:', schema.name);
+    // Store form schema internally for later use when agent activates it
+    // Do NOT automatically show form UI - agent controls when to display forms
+    console.log('[Vakkya] Form available (stored, not displayed):', schema.name);
     this.formSchema = schema;
-    
-    // Show form UI alongside voice UI
-    this.showFormUI(schema);
   }
 
   /**

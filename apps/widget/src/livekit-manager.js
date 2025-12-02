@@ -307,16 +307,16 @@ export function createLiveKitManager(widgetToken, apiUrl) {
         fetchAllForms(tokenData.projectId, apiUrl),
       ]);
       
-      // Store fetched forms (Property 3: graceful degradation - empty array on failure)
+      // Store fetched forms internally for agent access (Property 3: graceful degradation - empty array on failure)
+      // Forms are NOT automatically displayed - agent controls when to activate them via data channel
+      // Validates: Requirements 1.1, 1.2 (No Automatic Form Display)
       availableForms = forms;
       formsLoaded = true;
       
       // For backward compatibility, set activeForm to first form if available
+      // Note: This only stores the form internally - it does NOT trigger UI display
       if (forms.length > 0) {
         activeForm = forms[0];
-        if (onFormAvailableCallback) {
-          onFormAvailableCallback(activeForm);
-        }
       }
 
       // Step 3: Create room
