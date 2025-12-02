@@ -7,12 +7,12 @@
 
 /**
  * Message types from Widget to Agent
- * @typedef {'keyboard_input'|'field_confirmed'|'field_rejected'|'form_abandoned'|'submission_approved'|'edit_requested'|'page_context'} WidgetToAgentType
+ * @typedef {'keyboard_input'|'field_confirmed'|'field_rejected'|'form_abandoned'|'submission_approved'|'edit_requested'|'page_context'|'user_transcription'} WidgetToAgentType
  */
 
 /**
  * Message types from Agent to Widget
- * @typedef {'form_activate'|'field_focus'|'value_extracted'|'value_confirmed'|'show_summary'|'submission_success'|'submission_failed'|'form_deactivated'} AgentToWidgetType
+ * @typedef {'form_activate'|'field_focus'|'value_extracted'|'value_confirmed'|'show_summary'|'submission_success'|'submission_failed'|'form_deactivated'|'agent_message'|'agent_speaking_start'|'agent_speaking_end'} AgentToWidgetType
  */
 
 /**
@@ -58,7 +58,14 @@
  */
 
 /**
- * @typedef {KeyboardInputMessage|FieldConfirmedMessage|FieldRejectedMessage|FormAbandonedMessage|SubmissionApprovedMessage|EditRequestedMessage|PageContextMessage} WidgetToAgentMessage
+ * @typedef {Object} UserTranscriptionMessage
+ * @property {'user_transcription'} type
+ * @property {string} content
+ * @property {boolean} isFinal
+ */
+
+/**
+ * @typedef {KeyboardInputMessage|FieldConfirmedMessage|FieldRejectedMessage|FormAbandonedMessage|SubmissionApprovedMessage|EditRequestedMessage|PageContextMessage|UserTranscriptionMessage} WidgetToAgentMessage
  */
 
 /**
@@ -113,7 +120,24 @@
  */
 
 /**
- * @typedef {FormActivateMessage|FieldFocusMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage} AgentToWidgetMessage
+ * @typedef {Object} AgentMessageMessage
+ * @property {'agent_message'} type
+ * @property {string} content
+ * @property {boolean} [isSpeaking]
+ */
+
+/**
+ * @typedef {Object} AgentSpeakingStartMessage
+ * @property {'agent_speaking_start'} type
+ */
+
+/**
+ * @typedef {Object} AgentSpeakingEndMessage
+ * @property {'agent_speaking_end'} type
+ */
+
+/**
+ * @typedef {FormActivateMessage|FieldFocusMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage|AgentMessageMessage|AgentSpeakingStartMessage|AgentSpeakingEndMessage} AgentToWidgetMessage
  */
 
 // Valid message types for validation
@@ -125,6 +149,7 @@ const WIDGET_TO_AGENT_TYPES = [
   'submission_approved',
   'edit_requested',
   'page_context',
+  'user_transcription',
 ];
 
 const AGENT_TO_WIDGET_TYPES = [
@@ -136,6 +161,9 @@ const AGENT_TO_WIDGET_TYPES = [
   'submission_success',
   'submission_failed',
   'form_deactivated',
+  'agent_message',
+  'agent_speaking_start',
+  'agent_speaking_end',
 ];
 
 /**
@@ -258,6 +286,16 @@ export function createEditRequestedMessage(fieldName) {
  */
 export function createPageContextMessage(url, title) {
   return { type: 'page_context', url, title };
+}
+
+/**
+ * Create a user transcription message
+ * @param {string} content
+ * @param {boolean} isFinal
+ * @returns {UserTranscriptionMessage}
+ */
+export function createUserTranscriptionMessage(content, isFinal) {
+  return { type: 'user_transcription', content, isFinal };
 }
 
 // Export constants for testing

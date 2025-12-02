@@ -16,6 +16,7 @@ import {
   createSubmissionApprovedMessage,
   createEditRequestedMessage,
   createPageContextMessage,
+  createUserTranscriptionMessage,
 } from './data-channel-protocol.js';
 
 /** @type {typeof import('livekit-client')|null} */
@@ -259,6 +260,9 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /** @type {Function|null} */
   let onAgentMessageCallback = null;
   
+  /** @type {Function|null} */
+  let onTranscriptionCallback = null;
+  
   /** @type {boolean} */
   let formsLoaded = false;
 
@@ -391,6 +395,13 @@ export function createLiveKitManager(widgetToken, apiUrl) {
         handleAgentMessage(payload);
       }
     });
+
+    // Handle transcription events (Requirements 3.2)
+    room.on(lk.RoomEvent.TranscriptionReceived, (transcriptions, participant) => {
+      transcriptions.forEach((transcription) => {
+        handleTranscription(transcription, participant);
+      });
+    });
   }
 
   /**
@@ -404,6 +415,31 @@ export function createLiveKitManager(widgetToken, apiUrl) {
 
     if (onAgentMessageCallback) {
       onAgentMessageCallback(message);
+    }
+  }
+
+  /**
+   * Handle transcription event from LiveKit
+   * Requirements 3.2: Display user speech as message bubbles
+   * @param {Object} transcription - LiveKit transcription object
+   * @param {Object} participant - Participant who spoke
+   */
+  function handleTranscription(transcription, participant) {
+    // Only handle user transcriptions (local participant)
+    if (!participant || !participant.isLocal) return;
+
+    const content = transcription.text || '';
+    const isFinal = transcription.final || false;
+
+    // Notify widget via callback
+    if (onTranscriptionCallback) {
+      onTranscriptionCallback(content, isFinal);
+    }
+
+    // Send transcription to agent via data channel
+    if (isFinal && content.trim()) {
+      const message = createUserTranscriptionMessage(content, isFinal);
+      publishMessage(message);
     }
   }
 
@@ -681,6 +717,15 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   }
 
   /**
+   * Set callback for user transcriptions
+   * Requirements 3.2: Real-time transcription display
+   * @param {Function} callback - Called with (content: string, isFinal: boolean)
+   */
+  function onTranscription(callback) {
+    onTranscriptionCallback = callback;
+  }
+
+  /**
    * Get the active form (if any) - legacy single form
    * @returns {Object|null}
    */
@@ -723,6 +768,7 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     onStateChange,
     onFormAvailable,
     onAgentMessage,
+    onTranscription,
     getActiveForm,
     getAvailableForms,
     areFormsLoaded,

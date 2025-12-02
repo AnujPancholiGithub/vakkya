@@ -46,6 +46,10 @@ export class VakkyaWidget {
     this.audioProcessor = null;
     this.livekitManager = null;
     this.micStream = null;
+    
+    // Transcription state (Requirements 3.2)
+    this.currentUserTranscriptionId = null;
+    this.transcriptions = [];
   }
 
   /**
@@ -81,6 +85,7 @@ export class VakkyaWidget {
       this.livekitManager.onRemoteAudio((audioElement) => this.handleRemoteAudio(audioElement));
       this.livekitManager.onFormAvailable((schema) => this.handleFormAvailable(schema));
       this.livekitManager.onAgentMessage((message) => this.handleAgentMessage(message));
+      this.livekitManager.onTranscription((content, isFinal) => this.handleUserTranscription(content, isFinal));
       
       // Create form state manager for persistence (Requirement 7.1)
       this.formStateManager = createFormStateManager();
@@ -274,6 +279,46 @@ export class VakkyaWidget {
   }
 
   /**
+   * Handle user transcription from LiveKit
+   * Requirements 3.2: Display user speech as message bubbles, real-time update
+   * @param {string} content - Transcription text
+   * @param {boolean} isFinal - Whether this is the final transcription
+   */
+  handleUserTranscription(content, isFinal) {
+    if (!content || !content.trim()) return;
+
+    // Store transcription for later use (when chat panel is integrated)
+    const transcription = {
+      id: this.currentUserTranscriptionId || `trans_${Date.now()}`,
+      type: 'user',
+      content: content.trim(),
+      timestamp: Date.now(),
+      isFinal,
+    };
+
+    if (!this.currentUserTranscriptionId) {
+      // New transcription - add to list
+      this.currentUserTranscriptionId = transcription.id;
+      this.transcriptions.push(transcription);
+    } else {
+      // Update existing transcription
+      const index = this.transcriptions.findIndex(t => t.id === this.currentUserTranscriptionId);
+      if (index !== -1) {
+        this.transcriptions[index] = transcription;
+      }
+    }
+
+    // If final, reset current transcription ID for next utterance
+    if (isFinal) {
+      this.currentUserTranscriptionId = null;
+    }
+
+    // TODO: When chat panel is integrated (task 17), display transcription in chat
+    // For now, just log it
+    console.log('[Vakkya] User transcription:', content, isFinal ? '(final)' : '(interim)');
+  }
+
+  /**
    * Handle close button click
    */
   async handleClose() {
@@ -455,6 +500,15 @@ export class VakkyaWidget {
       case 'form_deactivated':
         this.handleFormDeactivated();
         break;
+      case 'agent_message':
+        this.handleAgentTextMessage(message.content, message.isSpeaking);
+        break;
+      case 'agent_speaking_start':
+        this.handleAgentSpeakingStart();
+        break;
+      case 'agent_speaking_end':
+        this.handleAgentSpeakingEnd();
+        break;
       default:
         console.warn('[Vakkya] Unknown agent message type:', message.type);
     }
@@ -549,6 +603,75 @@ export class VakkyaWidget {
       this.formSchema = null;
       this.state.mode = null;
     }
+  }
+
+  /**
+   * Handle agent_message from data channel
+   * Requirements 3.3: Display agent text as message bubbles
+   * @param {string} content - Agent message text
+   * @param {boolean} [isSpeaking] - Whether agent is currently speaking this message
+   */
+  handleAgentTextMessage(content, isSpeaking = false) {
+    if (!content || !content.trim()) return;
+
+    // Store agent message for later use (when chat panel is integrated)
+    const message = {
+      id: `agent_${Date.now()}`,
+      type: 'agent',
+      content: content.trim(),
+      timestamp: Date.now(),
+      isSpeaking,
+    };
+
+    this.transcriptions.push(message);
+
+    // TODO: When chat panel is integrated (task 17), display message in chat
+    // For now, just log it
+    console.log('[Vakkya] Agent message:', content, isSpeaking ? '(speaking)' : '');
+  }
+
+  /**
+   * Handle agent_speaking_start from data channel
+   * Requirements 7.2: Show speaking indicator during TTS
+   */
+  handleAgentSpeakingStart() {
+    // Find the most recent agent message and mark it as speaking
+    for (let i = this.transcriptions.length - 1; i >= 0; i--) {
+      if (this.transcriptions[i].type === 'agent') {
+        this.transcriptions[i].isSpeaking = true;
+        break;
+      }
+    }
+
+    // Update voice UI status
+    if (this.voiceUI) {
+      this.voiceUI.setStatus('speaking');
+    }
+
+    // TODO: When chat panel is integrated (task 17), update message bubble with speaking indicator
+    console.log('[Vakkya] Agent speaking started');
+  }
+
+  /**
+   * Handle agent_speaking_end from data channel
+   * Requirements 7.2: Remove speaking indicator when TTS ends
+   */
+  handleAgentSpeakingEnd() {
+    // Find the most recent agent message and mark it as not speaking
+    for (let i = this.transcriptions.length - 1; i >= 0; i--) {
+      if (this.transcriptions[i].type === 'agent') {
+        this.transcriptions[i].isSpeaking = false;
+        break;
+      }
+    }
+
+    // Update voice UI status back to listening
+    if (this.voiceUI && this.state.status === 'active') {
+      this.voiceUI.setStatus('listening');
+    }
+
+    // TODO: When chat panel is integrated (task 17), update message bubble to remove speaking indicator
+    console.log('[Vakkya] Agent speaking ended');
   }
 
   /**

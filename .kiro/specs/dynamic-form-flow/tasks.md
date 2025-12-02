@@ -38,16 +38,16 @@
     - **Property 3: Chat Panel Expansion**
     - **Validates: Requirements 3.1, 3.5**
 
-- [ ] 4. Implement message rendering
-  - [ ] 4.1 Create user message bubble component
+- [x] 4. Implement message rendering
+  - [x] 4.1 Create user message bubble component
     - Distinct styling for user messages
     - Support for "transcribing" state
     - _Requirements: 3.2, 5.4_
-  - [ ] 4.2 Create agent message bubble component
+  - [x] 4.2 Create agent message bubble component
     - Distinct styling for agent messages
     - Support for "speaking" indicator
     - _Requirements: 3.3, 5.4, 7.2_
-  - [ ] 4.3 Implement auto-scroll on new messages
+  - [x] 4.3 Implement auto-scroll on new messages
     - Scroll to bottom when messages added
     - _Requirements: 3.4_
   - [ ]* 4.4 Write property test for user transcription display
@@ -70,16 +70,16 @@
 
 ## Phase 3: Voice Input Integration
 
-- [ ] 6. Create voice input bar component
-  - [ ] 6.1 Integrate waveform renderer into chat panel
+- [x] 6. Create voice input bar component
+  - [x] 6.1 Integrate waveform renderer into chat panel
     - Reuse existing waveform.js
     - Display in voice input bar area
     - _Requirements: 7.1_
-  - [ ] 6.2 Add voice status indicators
+  - [x] 6.2 Add voice status indicators
     - Listening, processing, speaking states
     - Animated indicators for each state
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
-  - [ ] 6.3 Add mic button with status feedback
+  - [x] 6.3 Add mic button with status feedback
     - Visual feedback for mic state
     - Error indicator for mic issues
     - _Requirements: 7.4_
@@ -87,21 +87,21 @@
     - **Property 13: Voice Status Indicators**
     - **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
 
-- [ ] 7. Implement transcription display
-  - [ ] 7.1 Add user transcription handling
+- [x] 7. Implement transcription display
+  - [x] 7.1 Add user transcription handling
     - Display user speech as message bubbles
     - Real-time update during transcription
     - _Requirements: 3.2_
-  - [ ] 7.2 Add agent response display
+  - [x] 7.2 Add agent response display
     - Display agent text as message bubbles
     - Show speaking indicator during TTS
     - _Requirements: 3.3, 7.2_
-  - [ ] 7.3 Update data channel protocol for transcriptions
+  - [x] 7.3 Update data channel protocol for transcriptions
     - Add agent_message, agent_speaking_start/end messages
     - Handle user_transcription messages
     - _Requirements: 3.2, 3.3_
 
-- [ ] 8. Checkpoint - Ensure all tests pass
+- [x] 8. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
@@ -109,19 +109,19 @@
 ## Phase 4: Inline Form Inputs
 
 - [ ] 9. Create inline form input components
-  - [ ] 9.1 Create inline text input component
+  - [x] 9.1 Create inline text input component
     - Renders within chat flow
     - Supports string, email, phone, number types
     - _Requirements: 4.1, 4.2_
-  - [ ] 9.2 Create inline select component
+  - [x] 9.2 Create inline select component
     - For enum field types
     - Dropdown within chat bubble style
     - _Requirements: 4.1_
-  - [ ] 9.3 Create inline textarea component
+  - [x] 9.3 Create inline textarea component
     - For text field type
     - Expandable within chat
     - _Requirements: 4.1_
-  - [ ] 9.4 Add pending confirmation state
+  - [x] 9.4 Add pending confirmation state
     - Show extracted value with confirm/reject
     - Visual distinction for pending state
     - _Requirements: 4.3_
