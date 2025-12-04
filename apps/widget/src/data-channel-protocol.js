@@ -78,6 +78,7 @@
  * @typedef {Object} FieldFocusMessage
  * @property {'field_focus'} type
  * @property {string} fieldName
+ * @property {number} fieldIndex - Index of the field in the form schema (Requirement 4.3)
  */
 
 /**
@@ -93,6 +94,13 @@
  * @property {'value_confirmed'} type
  * @property {string} fieldName
  * @property {unknown} value
+ */
+
+/**
+ * @typedef {Object} FieldCompletedMessage
+ * @property {'field_completed'} type
+ * @property {string} fieldName
+ * @property {unknown} value - The confirmed value for the field
  */
 
 /**
@@ -137,7 +145,14 @@
  */
 
 /**
- * @typedef {FormActivateMessage|FieldFocusMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage|AgentMessageMessage|AgentSpeakingStartMessage|AgentSpeakingEndMessage} AgentToWidgetMessage
+ * @typedef {Object} ValidationErrorMessage
+ * @property {'validation_error'} type
+ * @property {string} fieldName
+ * @property {string} error - Error message to display
+ */
+
+/**
+ * @typedef {FormActivateMessage|FieldFocusMessage|FieldCompletedMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage|AgentMessageMessage|AgentSpeakingStartMessage|AgentSpeakingEndMessage|ValidationErrorMessage} AgentToWidgetMessage
  */
 
 // Valid message types for validation
@@ -155,6 +170,7 @@ const WIDGET_TO_AGENT_TYPES = [
 const AGENT_TO_WIDGET_TYPES = [
   'form_activate',
   'field_focus',
+  'field_completed',
   'value_extracted',
   'value_confirmed',
   'show_summary',
@@ -164,6 +180,7 @@ const AGENT_TO_WIDGET_TYPES = [
   'agent_message',
   'agent_speaking_start',
   'agent_speaking_end',
+  'validation_error',
 ];
 
 /**

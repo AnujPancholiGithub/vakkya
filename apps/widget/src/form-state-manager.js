@@ -134,13 +134,18 @@ export function createFormStateManager(sessionId = null) {
   /**
    * Set answer for a field
    * Property 8: Keyboard inputs skip confirmation
+   * Requirements 1.2, 4.2: On confirm, add answer card to chat, hide current input, show next
    * @param {string} fieldName
    * @param {unknown} value
    * @param {'voice'|'keyboard'} source
+   * @returns {{ field: Object, value: unknown, shouldTransitionToSummary: boolean } | null}
    */
   function setAnswer(fieldName, value, source) {
     const existingAnswer = state.answers[fieldName];
     const attempts = existingAnswer ? existingAnswer.attempts + 1 : 1;
+
+    // Get the field info before advancing
+    const confirmedField = state.currentForm?.fields?.find(f => f.name === fieldName);
 
     state.answers[fieldName] = {
       value,
@@ -154,11 +159,26 @@ export function createFormStateManager(sessionId = null) {
     if (source === 'keyboard') {
       state.pendingConfirmation = null;
       state.fallbackToKeyboard = false;
+      const previousIndex = state.currentFieldIndex;
       advanceToNextField();
+      const shouldTransitionToSummary = state.mode === 'summary';
+      
+      saveToStorage();
+      notifyListeners();
+
+      // Return info for the caller to add answer card and handle transition
+      return {
+        field: confirmedField,
+        value,
+        shouldTransitionToSummary,
+        previousIndex,
+        newIndex: state.currentFieldIndex,
+      };
     }
 
     saveToStorage();
     notifyListeners();
+    return null;
   }
 
   /**
@@ -179,18 +199,24 @@ export function createFormStateManager(sessionId = null) {
 
   /**
    * Confirm the pending answer
+   * Requirements 1.2, 4.2: On confirm, add answer card to chat, hide current input, show next
    * @param {string} fieldName
+   * @returns {{ field: Object, value: unknown, shouldTransitionToSummary: boolean } | null}
    */
   function confirmAnswer(fieldName) {
     if (!state.pendingConfirmation || state.pendingConfirmation.fieldName !== fieldName) {
-      return;
+      return null;
     }
 
     const pending = state.pendingConfirmation;
     const existingAnswer = state.answers[fieldName];
 
+    // Get the field info before advancing
+    const confirmedField = state.currentForm?.fields?.find(f => f.name === fieldName);
+    const confirmedValue = pending.extractedValue;
+
     state.answers[fieldName] = {
-      value: pending.extractedValue,
+      value: confirmedValue,
       confirmed: true,
       source: 'voice',
       attempts: existingAnswer ? existingAnswer.attempts : 1,
@@ -199,9 +225,23 @@ export function createFormStateManager(sessionId = null) {
 
     state.pendingConfirmation = null;
     state.fallbackToKeyboard = false;
+    
+    // Advance to next field and check if we should transition to summary
+    const previousIndex = state.currentFieldIndex;
     advanceToNextField();
+    const shouldTransitionToSummary = state.mode === 'summary';
+    
     saveToStorage();
     notifyListeners();
+
+    // Return info for the caller to add answer card and handle transition
+    return {
+      field: confirmedField,
+      value: confirmedValue,
+      shouldTransitionToSummary,
+      previousIndex,
+      newIndex: state.currentFieldIndex,
+    };
   }
 
   /**
@@ -330,6 +370,77 @@ export function createFormStateManager(sessionId = null) {
       return null;
     }
     return state.currentForm.fields[state.currentFieldIndex];
+  }
+
+  /**
+   * Get the active field (alias for getCurrentField for clarity)
+   * Requirement 4.1: Track which field is currently being collected
+   * @returns {Object|null}
+   */
+  function getActiveField() {
+    return getCurrentField();
+  }
+
+  /**
+   * Get all completed (confirmed) fields with their answers
+   * Requirements 1.3, 3.1: Return completed fields for display as answer cards
+   * @returns {Array<{field: Object, answer: FieldAnswer}>}
+   */
+  function getCompletedFields() {
+    if (!state.currentForm) return [];
+
+    const completed = [];
+    for (const field of state.currentForm.fields) {
+      const answer = state.answers[field.name];
+      if (answer && answer.confirmed) {
+        completed.push({ field, answer });
+      }
+    }
+    return completed;
+  }
+
+  /**
+   * Get form progress for progress indicator
+   * Requirement 6.4: Display "Question X of Y"
+   * @returns {{ current: number, total: number }}
+   */
+  function getProgress() {
+    if (!state.currentForm) {
+      return { current: 0, total: 0 };
+    }
+    return {
+      current: state.currentFieldIndex + 1,
+      total: state.currentForm.fields.length,
+    };
+  }
+
+  /**
+   * Check if a specific field is the active field
+   * @param {string} fieldName
+   * @returns {boolean}
+   */
+  function isFieldActive(fieldName) {
+    const activeField = getActiveField();
+    return activeField !== null && activeField.name === fieldName;
+  }
+
+  /**
+   * Set the active field index (for agent synchronization)
+   * Requirement 4.1, 4.3: Sync field index with agent's field_focus messages
+   * @param {number} index - The field index to set as active
+   */
+  function setActiveFieldIndex(index) {
+    if (!state.currentForm) return;
+    
+    const maxIndex = state.currentForm.fields.length - 1;
+    if (index < 0 || index > maxIndex) {
+      console.warn('[Vakkya] Invalid field index:', index);
+      return;
+    }
+    
+    state.currentFieldIndex = index;
+    saveToStorage();
+    notifyListeners();
   }
 
   /**
@@ -470,6 +581,10 @@ export function createFormStateManager(sessionId = null) {
     getState,
     subscribe,
     getCurrentField,
+    getActiveField,
+    getCompletedFields,
+    getProgress,
+    isFieldActive,
     getCurrentFieldAttempts,
     shouldOfferKeyboardFallback,
     getConfirmedAnswers,
@@ -488,6 +603,7 @@ export function createFormStateManager(sessionId = null) {
     confirmAnswer,
     rejectAnswer,
     editField,
+    setActiveFieldIndex,
 
     // Persistence
     saveToStorage,

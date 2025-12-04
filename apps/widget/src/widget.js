@@ -4,10 +4,10 @@
 
 import { parseConfig } from './config.js';
 import { createContainer, destroyContainer } from './container.js';
+import { applyAccentColor, applyTheme } from './chat-styles.js';
 import { createButton, requestMicrophonePermission, releaseMicrophone } from './button.js';
-import { createVoiceUI } from './voice-ui.js';
-import { createFormUI } from './form-ui.js';
-import { createWaveformRenderer, generateIdleData } from './waveform.js';
+import { createChatPanel } from './chat-panel.js';
+import { generateIdleData } from './waveform.js';
 import { createAudioProcessor } from './audio-processor.js';
 import { createLiveKitManager } from './livekit-manager.js';
 import { createFormStateManager } from './form-state-manager.js';
@@ -39,17 +39,17 @@ export class VakkyaWidget {
     
     // Components
     this.button = null;
-    this.voiceUI = null;
-    this.formUI = null;
+    this.chatPanel = null;
     this.formSchema = null;
-    this.waveformRenderer = null;
     this.audioProcessor = null;
     this.livekitManager = null;
     this.micStream = null;
     
     // Transcription state (Requirements 3.2)
     this.currentUserTranscriptionId = null;
-    this.transcriptions = [];
+    
+    // Chat panel state (for submission flow - Requirements 8.2, 8.3)
+    this.currentSummaryMessageId = null;
   }
 
   /**
@@ -73,6 +73,9 @@ export class VakkyaWidget {
       this.host = host;
       this.shadow = shadow;
       this.container = container;
+      
+      // Apply customization (Requirements 6.1, 6.2, 6.3)
+      this.applyCustomization();
       
       // Create and add button
       this.button = createButton(shadow);
@@ -123,8 +126,8 @@ export class VakkyaWidget {
         return;
       }
 
-      // Show voice UI
-      this.showVoiceUI();
+      // Show chat panel (Requirements 3.1)
+      this.showChatPanel();
       
       // Connect audio processor
       this.audioProcessor = createAudioProcessor();
@@ -149,41 +152,53 @@ export class VakkyaWidget {
   }
 
   /**
-   * Show the voice UI
+   * Show the chat panel (Requirements 3.1)
+   * Replaces voice-ui with chat panel for conversation display
    */
-  showVoiceUI() {
-    if (this.voiceUI) return;
+  showChatPanel() {
+    if (this.chatPanel) return;
     
     // Hide button
     if (this.button) {
       this.button.style.display = 'none';
     }
     
-    // Create voice UI
-    this.voiceUI = createVoiceUI(this.shadow, () => this.handleClose());
-    this.container.appendChild(this.voiceUI.element);
+    // Create chat panel with all event handlers connected
+    this.chatPanel = createChatPanel(this.shadow, {
+      onClose: () => this.handleClose(),
+      onMicClick: () => this.handleMicClick(),
+      onKeyboardInput: (fieldName, value) => this.handleFormAnswer(fieldName, value),
+      onConfirmValue: (fieldName) => this.handleFieldConfirm(fieldName),
+      onRejectValue: (fieldName) => this.handleFieldReject(fieldName),
+      onSummaryApprove: () => this.handleSubmissionApproval(),
+      onSummaryEdit: (fieldName) => this.handleSummaryEdit(fieldName),
+    }, {
+      accentColor: this.config?.accentColor,
+      theme: this.config?.theme,
+    });
     
-    // Create waveform renderer
-    this.waveformRenderer = createWaveformRenderer(this.voiceUI.canvas);
+    this.container.appendChild(this.chatPanel.element);
+    
+    // Expand the chat panel with animation
+    this.chatPanel.expand();
   }
 
   /**
    * Start waveform animation loop
    */
   startWaveformAnimation() {
-    if (!this.waveformRenderer) return;
+    if (!this.chatPanel) return;
     
-    this.waveformRenderer.start();
     this._animating = true;
     
     // Update waveform with audio data
     const updateWaveform = () => {
-      if (!this._animating || !this.waveformRenderer) return;
+      if (!this._animating || !this.chatPanel) return;
       
       if (this.audioProcessor && this.audioProcessor.isConnected()) {
-        this.waveformRenderer.setData(this.audioProcessor.getFrequencyData());
+        this.chatPanel.updateWaveform(this.audioProcessor.getFrequencyData());
       } else {
-        this.waveformRenderer.setData(generateIdleData());
+        this.chatPanel.showIdleWaveform();
       }
       
       if (this._animating && (this.state.status === 'active' || this.state.status === 'connecting')) {
@@ -201,16 +216,16 @@ export class VakkyaWidget {
    * @param {string} [error]
    */
   handleConnectionStateChange(state, error) {
-    if (this.voiceUI) {
+    if (this.chatPanel) {
       if (state === 'validating' || state === 'connecting') {
-        this.voiceUI.setStatus('connecting');
+        this.chatPanel.setVoiceStatus('processing');
       } else if (state === 'connected') {
-        this.voiceUI.setStatus('listening');
+        this.chatPanel.setVoiceStatus('listening');
       } else if (state === 'reconnected') {
         // Requirement 7.2: Restore form state after reconnection
         this.handleReconnection();
       } else if (state === 'error') {
-        this.voiceUI.showError(error || 'Connection failed');
+        this.chatPanel.showError(error || 'Connection failed');
         this.state.status = 'error';
         this.state.error = error;
       }
@@ -224,23 +239,20 @@ export class VakkyaWidget {
   handleReconnection() {
     console.log('[Vakkya] Reconnected, checking for form state to restore');
     
-    // If form UI exists and has a state manager, it will auto-restore
-    // If not, check if there's persisted state to restore
-    if (!this.formUI && this.formStateManager && this.livekitManager) {
+    // Check if there's persisted state to restore
+    if (this.formStateManager && this.livekitManager) {
       const availableForms = this.livekitManager.getAvailableForms();
       if (availableForms.length > 0) {
         // Try to restore from the first available form
         const restored = this.formStateManager.restoreFromStorage(availableForms[0]);
         if (restored) {
           console.log('[Vakkya] Restored form state after reconnection');
-          // Recreate form UI with restored state
-          this.showFormUI(availableForms[0]);
         }
       }
     }
     
-    if (this.voiceUI) {
-      this.voiceUI.setStatus('listening');
+    if (this.chatPanel) {
+      this.chatPanel.setVoiceStatus('listening');
     }
   }
 
@@ -266,14 +278,14 @@ export class VakkyaWidget {
    * @param {HTMLAudioElement} audioElement
    */
   handleRemoteAudio(audioElement) {
-    if (this.voiceUI) {
-      this.voiceUI.setStatus('speaking');
+    if (this.chatPanel) {
+      this.chatPanel.setVoiceStatus('speaking');
     }
     
     // When audio ends, go back to listening
     audioElement.addEventListener('ended', () => {
-      if (this.voiceUI && this.state.status === 'active') {
-        this.voiceUI.setStatus('listening');
+      if (this.chatPanel && this.state.status === 'active') {
+        this.chatPanel.setVoiceStatus('listening');
       }
     });
   }
@@ -287,24 +299,25 @@ export class VakkyaWidget {
   handleUserTranscription(content, isFinal) {
     if (!content || !content.trim()) return;
 
-    // Store transcription for later use (when chat panel is integrated)
-    const transcription = {
-      id: this.currentUserTranscriptionId || `trans_${Date.now()}`,
-      type: 'user',
-      content: content.trim(),
-      timestamp: Date.now(),
-      isFinal,
-    };
-
-    if (!this.currentUserTranscriptionId) {
-      // New transcription - add to list
-      this.currentUserTranscriptionId = transcription.id;
-      this.transcriptions.push(transcription);
-    } else {
-      // Update existing transcription
-      const index = this.transcriptions.findIndex(t => t.id === this.currentUserTranscriptionId);
-      if (index !== -1) {
-        this.transcriptions[index] = transcription;
+    // Display transcription in chat panel (Requirements 3.2)
+    if (this.chatPanel) {
+      if (!this.currentUserTranscriptionId) {
+        // New transcription - add message to chat
+        const message = {
+          id: `user_${Date.now()}`,
+          type: 'user',
+          content: content.trim(),
+          timestamp: Date.now(),
+          isTranscribing: !isFinal,
+        };
+        this.currentUserTranscriptionId = message.id;
+        this.chatPanel.addMessage(message);
+      } else {
+        // Update existing transcription message
+        this.chatPanel.updateMessage(this.currentUserTranscriptionId, {
+          content: content.trim(),
+          isTranscribing: !isFinal,
+        });
       }
     }
 
@@ -313,8 +326,6 @@ export class VakkyaWidget {
       this.currentUserTranscriptionId = null;
     }
 
-    // TODO: When chat panel is integrated (task 17), display transcription in chat
-    // For now, just log it
     console.log('[Vakkya] User transcription:', content, isFinal ? '(final)' : '(interim)');
   }
 
@@ -330,12 +341,6 @@ export class VakkyaWidget {
       await this.livekitManager.disconnect();
     }
     
-    // Stop waveform
-    if (this.waveformRenderer) {
-      this.waveformRenderer.destroy();
-      this.waveformRenderer = null;
-    }
-    
     // Disconnect audio processor
     if (this.audioProcessor) {
       this.audioProcessor.disconnect();
@@ -348,16 +353,11 @@ export class VakkyaWidget {
       this.micStream = null;
     }
     
-    // Remove voice UI
-    if (this.voiceUI) {
-      this.voiceUI.element.remove();
-      this.voiceUI = null;
-    }
-    
-    // Remove form UI
-    if (this.formUI) {
-      this.formUI.element.remove();
-      this.formUI = null;
+    // Remove chat panel
+    if (this.chatPanel) {
+      this.chatPanel.destroy();
+      this.chatPanel.element.remove();
+      this.chatPanel = null;
     }
     
     // Show button again
@@ -368,6 +368,8 @@ export class VakkyaWidget {
     this.state.status = 'idle';
     this.state.error = null;
     this.state.mode = null;
+    this.currentUserTranscriptionId = null;
+    this.currentSummaryMessageId = null;
   }
 
   /**
@@ -384,8 +386,8 @@ export class VakkyaWidget {
       unknown: 'Something went wrong',
     };
     
-    if (this.voiceUI) {
-      this.voiceUI.showError(messages[errorCode] || messages.unknown);
+    if (this.chatPanel) {
+      this.chatPanel.showError(messages[errorCode] || messages.unknown);
     }
     
     this.state.status = 'error';
@@ -406,6 +408,7 @@ export class VakkyaWidget {
     }
     
     this.button = null;
+    this.chatPanel = null;
     this.livekitManager = null;
     this.formSchema = null;
     this.initialized = false;
@@ -413,13 +416,11 @@ export class VakkyaWidget {
   }
 
   /**
-   * Show form UI for conversational forms
-   * Requirement 7.1: Preserve form state during disconnection
+   * Activate form for conversational forms (via chat panel)
+   * Requirement 2.2, 2.3: Form activation via data channel
    * @param {Object} schema - Form schema from API
    */
-  showFormUI(schema) {
-    if (this.formUI) return;
-    
+  activateForm(schema) {
     this.formSchema = schema;
     this.state.mode = 'form';
     
@@ -432,14 +433,8 @@ export class VakkyaWidget {
       this.formStateManager.activateForm(schema);
     }
     
-    // Create form UI (voice UI stays visible for hybrid voice+visual experience)
-    this.formUI = createFormUI(this.shadow, schema, {
-      onClose: () => this.handleClose(),
-      onSubmit: (answers) => this.handleFormSubmit(answers),
-      onAnswer: (fieldName, value) => this.handleFormAnswer(fieldName, value),
-    });
-    
-    this.container.appendChild(this.formUI.element);
+    // Form inputs will be rendered inline in chat panel via handleFieldFocus
+    console.log('[Vakkya] Form activated:', schema.name);
   }
 
   /**
@@ -459,14 +454,205 @@ export class VakkyaWidget {
 
   /**
    * Handle individual form answer (keyboard input)
+   * Requirements 1.2, 4.2: On keyboard input, add answer card and advance to next field
    * @param {string} fieldName
    * @param {any} value
    */
   handleFormAnswer(fieldName, value) {
+    console.log('[Vakkya] handleFormAnswer:', fieldName, value);
+    
+    // Get the field info
+    const field = this.formSchema?.fields?.find(f => f.name === fieldName);
+    if (!field) {
+      console.warn('[Vakkya] handleFormAnswer: field not found in schema:', fieldName);
+      return;
+    }
+    
+    // Set answer in form state manager (keyboard inputs are auto-confirmed)
+    const result = this.formStateManager?.setAnswer(fieldName, value, 'keyboard');
+    console.log('[Vakkya] handleFormAnswer: setAnswer result:', result);
+    
+    if (result && this.chatPanel) {
+      // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
+      this.chatPanel.addAnswerCard(
+        fieldName,
+        field.label || fieldName,
+        result.value
+      );
+      
+      // Hide the current sticky input
+      this.chatPanel.hideStickyInput();
+      
+      // Check if we should transition to summary (Requirement 1.5, 4.4)
+      if (result.shouldTransitionToSummary) {
+        console.log('[Vakkya] handleFormAnswer: transitioning to summary');
+        this.transitionToSummary();
+      } else {
+        // Show the next field in sticky input with animation (Requirement 2.3)
+        console.log('[Vakkya] handleFormAnswer: showing next field');
+        this.showNextFieldWithAnimation();
+      }
+    } else {
+      console.warn('[Vakkya] handleFormAnswer: no result from setAnswer or missing chatPanel');
+    }
+    
     // Send keyboard input to voice agent via data channel
     if (this.livekitManager && this.livekitManager.isConnected()) {
       this.livekitManager.sendKeyboardInput(fieldName, value);
     }
+  }
+
+  /**
+   * Handle mic button click in chat panel
+   * Toggles microphone state
+   */
+  handleMicClick() {
+    // Mic is always active when chat panel is open
+    // This could be extended to toggle mute state if needed
+    console.log('[Vakkya] Mic button clicked');
+  }
+
+  /**
+   * Handle field confirmation from chat panel
+   * Requirements 1.2, 4.2: On confirm, add answer card to chat, hide current input, show next
+   * Requirement 6.2: Clear pending confirmation from sticky container after confirm
+   * @param {string} fieldName
+   */
+  handleFieldConfirm(fieldName) {
+    // Get the field info and value before confirming
+    const formState = this.formStateManager?.getState();
+    const pendingConfirmation = formState?.pendingConfirmation;
+    const field = this.formSchema?.fields?.find(f => f.name === fieldName);
+    
+    // Confirm in form state manager and get transition info
+    const result = this.formStateManager?.confirmAnswer(fieldName);
+    
+    if (result && this.chatPanel && field) {
+      // Clear sticky input pending confirmation (Requirement 6.2)
+      this.chatPanel.clearStickyInputPending(fieldName);
+      
+      // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
+      this.chatPanel.addAnswerCard(
+        fieldName,
+        field.label || fieldName,
+        result.value
+      );
+      
+      // Hide the current sticky input
+      this.chatPanel.hideStickyInput();
+      
+      // Check if we should transition to summary (Requirement 1.5, 4.4)
+      if (result.shouldTransitionToSummary) {
+        this.transitionToSummary();
+      } else {
+        // Show the next field in sticky input with animation (Requirement 2.3)
+        this.showNextFieldWithAnimation();
+      }
+    }
+    
+    // Update chat panel state (legacy inline form input)
+    if (this.chatPanel) {
+      this.chatPanel.confirmFormInput(fieldName);
+    }
+    
+    // Send confirmation to agent via data channel
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.livekitManager.publishMessage({
+        type: 'field_confirmed',
+        fieldName,
+      });
+    }
+    
+    console.log('[Vakkya] Field confirmed:', fieldName);
+  }
+
+  /**
+   * Show the next field in sticky input with animation
+   * Requirement 2.3: Animate transition to new field input
+   */
+  showNextFieldWithAnimation() {
+    if (!this.formStateManager || !this.chatPanel || !this.formSchema) return;
+    
+    const nextField = this.formStateManager.getActiveField();
+    if (!nextField) return;
+    
+    const progress = this.formStateManager.getProgress();
+    const currentValue = this.formStateManager.getState().answers[nextField.name]?.value || '';
+    
+    // Small delay for animation effect (Requirement 2.3)
+    setTimeout(() => {
+      this.chatPanel.showStickyInput(
+        nextField,
+        progress.current - 1, // 0-based index
+        progress.total,
+        currentValue
+      );
+    }, 150);
+  }
+
+  /**
+   * Transition to summary mode when all fields are collected
+   * Requirements 1.5, 4.4: Transition to summary when complete
+   */
+  transitionToSummary() {
+    if (!this.formStateManager || !this.chatPanel || !this.formSchema) return;
+    
+    // Hide sticky input (Requirement 2.4)
+    this.chatPanel.hideStickyInput();
+    
+    // Get all confirmed answers
+    const confirmedAnswers = this.formStateManager.getConfirmedAnswers();
+    
+    // Format answers for summary card
+    const formattedAnswers = {};
+    for (const [fieldName, value] of Object.entries(confirmedAnswers)) {
+      const field = this.formSchema.fields?.find(f => f.name === fieldName);
+      formattedAnswers[fieldName] = {
+        label: field?.label || fieldName,
+        value: value,
+      };
+    }
+    
+    // Add summary card to chat (Requirement 8.1)
+    this.currentSummaryMessageId = this.chatPanel.addSummaryCard(
+      this.formSchema.name || 'Form Summary',
+      formattedAnswers
+    );
+    
+    // Update form state manager
+    this.formStateManager.showSummary();
+    
+    console.log('[Vakkya] Transitioned to summary mode');
+  }
+
+  /**
+   * Handle field rejection from chat panel
+   * Requirement 4.4: Clear and re-ask on reject
+   * Requirement 6.2: Clear pending confirmation from sticky container
+   * @param {string} fieldName
+   */
+  handleFieldReject(fieldName) {
+    // Update chat panel state - clear inline form input pending
+    if (this.chatPanel) {
+      this.chatPanel.rejectFormInput(fieldName);
+      // Clear sticky input pending confirmation (Requirement 6.2)
+      this.chatPanel.clearStickyInputPending(fieldName);
+    }
+    
+    // Update form state manager
+    if (this.formStateManager) {
+      this.formStateManager.rejectAnswer(fieldName);
+    }
+    
+    // Send rejection to agent via data channel
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.livekitManager.publishMessage({
+        type: 'field_rejected',
+        fieldName,
+      });
+    }
+    
+    console.log('[Vakkya] Field rejected:', fieldName);
   }
 
   /**
@@ -480,7 +666,10 @@ export class VakkyaWidget {
         this.handleFormActivate(message.schema);
         break;
       case 'field_focus':
-        this.handleFieldFocus(message.fieldName);
+        this.handleFieldFocus(message.fieldName, message.fieldIndex);
+        break;
+      case 'field_completed':
+        this.handleFieldCompleted(message.fieldName, message.value);
         break;
       case 'value_extracted':
         this.handleValueExtracted(message.fieldName, message.value, message.utterance);
@@ -509,6 +698,9 @@ export class VakkyaWidget {
       case 'agent_speaking_end':
         this.handleAgentSpeakingEnd();
         break;
+      case 'validation_error':
+        this.handleValidationError(message.fieldName, message.error);
+        break;
       default:
         console.warn('[Vakkya] Unknown agent message type:', message.type);
     }
@@ -517,91 +709,350 @@ export class VakkyaWidget {
   /**
    * Handle form_activate message from agent
    * Property 6: Form Activation Widget Sync
+   * Requirements 1.1, 2.1: Display only first field in sticky container
    * @param {Object} schema - Form schema from agent
    */
   handleFormActivate(schema) {
+    console.log('[Vakkya] handleFormActivate called with schema:', JSON.stringify(schema, null, 2));
+    
     if (!schema || !schema.fields || schema.fields.length === 0) {
-      console.warn('[Vakkya] Invalid form schema in form_activate');
+      console.warn('[Vakkya] Invalid form schema in form_activate - schema:', schema, 'fields:', schema?.fields);
       return;
     }
     
-    console.log('[Vakkya] Form activated by agent:', schema.name);
-    this.showFormUI(schema);
+    console.log('[Vakkya] Form activated by agent:', schema.name, 'with', schema.fields.length, 'fields');
+    this.activateForm(schema);
+    
+    if (this.chatPanel && schema.fields) {
+      // Add a system message introducing the form
+      this.chatPanel.addMessage({
+        id: `form_intro_${Date.now()}`,
+        type: 'system',
+        content: `You can type your answers below or speak them.`,
+        timestamp: Date.now(),
+      });
+      
+      // Show only the first field in sticky input (Requirement 1.1, 2.1)
+      const firstField = schema.fields[0];
+      if (firstField) {
+        this.chatPanel.showStickyInput(
+          firstField,
+          0, // First field (0-based index)
+          schema.fields.length,
+          '' // No initial value
+        );
+      }
+      
+      console.log('[Vakkya] First field shown in sticky input:', firstField?.name);
+    } else {
+      console.warn('[Vakkya] Cannot show sticky input - chatPanel:', !!this.chatPanel, 'fields:', !!schema.fields);
+    }
   }
 
   /**
    * Handle field_focus message - navigate to specific field
+   * Requirement 4.1, 4.3: Track current field and sync with agent
    * @param {string} fieldName
+   * @param {number} [fieldIndex] - Index of the field in the form schema
    */
-  handleFieldFocus(fieldName) {
-    if (this.formUI) {
-      this.formUI.focusField(fieldName);
+  handleFieldFocus(fieldName, fieldIndex) {
+    if (!this.chatPanel || !this.formSchema) return;
+    
+    // Find the field in the schema
+    const field = this.formSchema.fields?.find(f => f.name === fieldName);
+    if (!field) {
+      console.warn('[Vakkya] Field not found in schema:', fieldName);
+      return;
     }
+    
+    // Update form state manager with current field index (Requirement 4.1)
+    if (this.formStateManager && typeof fieldIndex === 'number') {
+      this.formStateManager.setActiveFieldIndex(fieldIndex);
+    }
+    
+    // Update sticky input with the focused field (Requirement 2.1)
+    // Note: We ONLY use sticky input now - no inline form inputs in chat (Requirement 1.1, 1.4)
+    const totalFields = this.formSchema.fields?.length || 0;
+    const currentIndex = typeof fieldIndex === 'number' ? fieldIndex : 0;
+    
+    if (this.chatPanel.showStickyInput) {
+      this.chatPanel.showStickyInput(
+        field,
+        currentIndex,
+        totalFields
+      );
+    }
+    
+    console.log('[Vakkya] Field focus updated:', fieldName, 'index:', fieldIndex);
+  }
+
+  /**
+   * Handle field_completed message from agent
+   * Requirements 1.2, 3.1: Add answer card to chat when agent confirms field, advance to next field
+   * @param {string} fieldName - Name of the completed field
+   * @param {unknown} value - The confirmed value for the field
+   */
+  handleFieldCompleted(fieldName, value) {
+    if (!this.chatPanel || !this.formSchema) return;
+    
+    // Find the field in the schema
+    const field = this.formSchema.fields?.find(f => f.name === fieldName);
+    if (!field) {
+      console.warn('[Vakkya] Field not found in schema for field_completed:', fieldName);
+      return;
+    }
+    
+    // Set the answer in form state manager (mark as confirmed from voice)
+    const result = this.formStateManager?.setAnswer(fieldName, value, 'voice');
+    
+    // If voice input, we need to manually confirm it since setAnswer with 'voice' doesn't auto-confirm
+    if (!result) {
+      // The answer was set but needs confirmation - confirm it now
+      this.formStateManager?.setPendingConfirmation(fieldName, value, '');
+      const confirmResult = this.formStateManager?.confirmAnswer(fieldName);
+      
+      if (confirmResult && this.chatPanel) {
+        // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
+        this.chatPanel.addAnswerCard(
+          fieldName,
+          field.label || fieldName,
+          confirmResult.value
+        );
+        
+        // Clear any pending state from sticky input
+        this.chatPanel.clearStickyInputPending(fieldName);
+        
+        // Hide the current sticky input
+        this.chatPanel.hideStickyInput();
+        
+        // Check if we should transition to summary (Requirement 1.5, 4.4)
+        if (confirmResult.shouldTransitionToSummary) {
+          this.transitionToSummary();
+        } else {
+          // Show the next field in sticky input with animation (Requirement 2.3)
+          this.showNextFieldWithAnimation();
+        }
+      }
+    } else {
+      // Keyboard-style auto-confirm happened
+      if (this.chatPanel) {
+        // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
+        this.chatPanel.addAnswerCard(
+          fieldName,
+          field.label || fieldName,
+          result.value
+        );
+        
+        // Hide the current sticky input
+        this.chatPanel.hideStickyInput();
+        
+        // Check if we should transition to summary (Requirement 1.5, 4.4)
+        if (result.shouldTransitionToSummary) {
+          this.transitionToSummary();
+        } else {
+          // Show the next field in sticky input with animation (Requirement 2.3)
+          this.showNextFieldWithAnimation();
+        }
+      }
+    }
+    
+    console.log('[Vakkya] Field completed:', fieldName, 'value:', value);
   }
 
   /**
    * Handle value_extracted message - show pending confirmation
+   * Requirement 4.3: Display extracted value with pending state
+   * Requirement 6.2: Show extracted value with confirm/reject in sticky container
    * @param {string} fieldName
    * @param {any} value
    * @param {string} utterance
    */
   handleValueExtracted(fieldName, value, utterance) {
-    if (this.formUI) {
-      this.formUI.showPendingValue(fieldName, value, utterance);
+    if (this.chatPanel) {
+      // Update legacy inline form input
+      this.chatPanel.setFormInputPending(fieldName, value);
+      
+      // Update sticky input container with pending confirmation (Requirement 6.2)
+      // This shows "I heard: {value}" with Confirm/Reject buttons
+      this.chatPanel.setStickyInputPending(fieldName, value);
+    }
+    
+    // Also update form state manager with pending confirmation
+    if (this.formStateManager) {
+      this.formStateManager.setPendingConfirmation(fieldName, value, utterance || '');
     }
   }
 
   /**
-   * Handle value_confirmed message - confirm the value
+   * Handle value_confirmed message - confirm the value from agent
+   * Requirements 1.2, 4.2: On confirm, add answer card to chat, hide current input, show next
    * @param {string} fieldName
    * @param {any} value
    */
   handleValueConfirmed(fieldName, value) {
-    if (this.formUI) {
-      this.formUI.confirmValue(fieldName, value);
+    // Get the field info
+    const field = this.formSchema?.fields?.find(f => f.name === fieldName);
+    
+    // Confirm in form state manager
+    const result = this.formStateManager?.confirmAnswer(fieldName);
+    
+    if (this.chatPanel && field) {
+      // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
+      this.chatPanel.addAnswerCard(
+        fieldName,
+        field.label || fieldName,
+        result?.value ?? value
+      );
+      
+      // Hide the current sticky input
+      this.chatPanel.hideStickyInput();
+      
+      // Check if we should transition to summary (Requirement 1.5, 4.4)
+      if (result?.shouldTransitionToSummary) {
+        this.transitionToSummary();
+      } else {
+        // Show the next field in sticky input with animation (Requirement 2.3)
+        this.showNextFieldWithAnimation();
+      }
+      
+      // Also update legacy inline form input
+      this.chatPanel.confirmFormInput(fieldName);
     }
   }
 
   /**
    * Handle show_summary message - display form summary
+   * Requirement 8.1: Present summary when all fields collected
    * @param {Object} answers
    */
   handleShowSummary(answers) {
-    if (this.formUI) {
-      this.formUI.showSummary(answers);
+    // Add summary card to chat panel
+    if (this.chatPanel && this.formSchema) {
+      // Convert answers to the format expected by chat panel
+      const formattedAnswers = {};
+      for (const [fieldName, value] of Object.entries(answers)) {
+        const field = this.formSchema.fields?.find(f => f.name === fieldName);
+        formattedAnswers[fieldName] = {
+          label: field?.label || fieldName,
+          value: value,
+        };
+      }
+      
+      this.currentSummaryMessageId = this.chatPanel.addSummaryCard(
+        this.formSchema.name || 'Form Summary',
+        formattedAnswers
+      );
+    }
+    
+    // Update form state manager
+    if (this.formStateManager) {
+      this.formStateManager.showSummary();
     }
   }
 
   /**
    * Handle submission_success message
+   * Requirement 8.3: Show success message in chat
    * @param {string} submissionId
    */
   handleSubmissionSuccess(submissionId) {
-    if (this.formUI) {
-      this.formUI.showSuccess(submissionId);
+    // Update chat panel summary card
+    if (this.chatPanel && this.currentSummaryMessageId) {
+      this.chatPanel.setSummarySuccess(this.currentSummaryMessageId);
+      
+      // Add success message to chat (Requirement 8.3)
+      this.chatPanel.addMessage({
+        id: `success_${Date.now()}`,
+        type: 'system',
+        content: 'Your information has been submitted successfully! Is there anything else I can help you with?',
+        timestamp: Date.now(),
+      });
     }
+    
+    // Mark form as completed in state manager
+    if (this.formStateManager) {
+      this.formStateManager.completeForm();
+    }
+    
+    console.log('[Vakkya] Submission successful:', submissionId);
   }
 
   /**
    * Handle submission_failed message
+   * Requirement 8.3: Display error in chat, allow retry
    * @param {string} error
    * @param {boolean} canRetry
    */
   handleSubmissionFailed(error, canRetry) {
-    if (this.formUI) {
-      this.formUI.showError(error, canRetry);
+    // Update chat panel summary card
+    if (this.chatPanel && this.currentSummaryMessageId) {
+      const errorMessage = error || 'Submission failed. Please try again.';
+      this.chatPanel.setSummaryError(this.currentSummaryMessageId, errorMessage);
+    }
+    
+    console.log('[Vakkya] Submission failed:', error, 'canRetry:', canRetry);
+  }
+
+  /**
+   * Handle submission approval from chat panel
+   * Requirement 8.2: Send submission_approved via data channel, show submitting state
+   */
+  handleSubmissionApproval() {
+    // Show submitting state in chat panel
+    if (this.chatPanel && this.currentSummaryMessageId) {
+      this.chatPanel.setSummarySubmitting(this.currentSummaryMessageId);
+    }
+    
+    // Send submission_approved via data channel
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.livekitManager.sendSubmissionApproved();
+      console.log('[Vakkya] Submission approved, sent to agent');
+    } else {
+      // Handle case where not connected - show error
+      this.handleSubmissionFailed('Not connected to voice agent. Please try again.', true);
     }
   }
 
   /**
-   * Handle form_deactivated message - close form UI
+   * Handle summary edit request from chat panel
+   * @param {string} fieldName - Field to edit
+   */
+  handleSummaryEdit(fieldName) {
+    // Reset summary state for re-editing
+    if (this.chatPanel && this.currentSummaryMessageId) {
+      this.chatPanel.resetSummaryState(this.currentSummaryMessageId);
+    }
+    
+    // Send edit request via data channel
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.livekitManager.sendEditRequested(fieldName);
+    }
+    
+    // Update form state manager
+    if (this.formStateManager) {
+      this.formStateManager.editField(fieldName);
+    }
+    
+    console.log('[Vakkya] Edit requested for field:', fieldName);
+  }
+
+  /**
+   * Handle form_deactivated message - clear form state
    */
   handleFormDeactivated() {
-    if (this.formUI) {
-      this.formUI.element.remove();
-      this.formUI = null;
-      this.formSchema = null;
-      this.state.mode = null;
+    // Clear form schema and mode
+    this.formSchema = null;
+    this.state.mode = null;
+    this.currentSummaryMessageId = null;
+    
+    // Add system message to chat panel
+    if (this.chatPanel) {
+      this.chatPanel.addMessage({
+        id: `system_${Date.now()}`,
+        type: 'system',
+        content: 'Form completed. How else can I help you?',
+        timestamp: Date.now(),
+      });
     }
   }
 
@@ -614,19 +1065,18 @@ export class VakkyaWidget {
   handleAgentTextMessage(content, isSpeaking = false) {
     if (!content || !content.trim()) return;
 
-    // Store agent message for later use (when chat panel is integrated)
-    const message = {
-      id: `agent_${Date.now()}`,
-      type: 'agent',
-      content: content.trim(),
-      timestamp: Date.now(),
-      isSpeaking,
-    };
+    // Display agent message in chat panel (Requirements 3.3)
+    if (this.chatPanel) {
+      const message = {
+        id: `agent_${Date.now()}`,
+        type: 'agent',
+        content: content.trim(),
+        timestamp: Date.now(),
+        isSpeaking,
+      };
+      this.chatPanel.addMessage(message);
+    }
 
-    this.transcriptions.push(message);
-
-    // TODO: When chat panel is integrated (task 17), display message in chat
-    // For now, just log it
     console.log('[Vakkya] Agent message:', content, isSpeaking ? '(speaking)' : '');
   }
 
@@ -635,20 +1085,20 @@ export class VakkyaWidget {
    * Requirements 7.2: Show speaking indicator during TTS
    */
   handleAgentSpeakingStart() {
-    // Find the most recent agent message and mark it as speaking
-    for (let i = this.transcriptions.length - 1; i >= 0; i--) {
-      if (this.transcriptions[i].type === 'agent') {
-        this.transcriptions[i].isSpeaking = true;
-        break;
+    // Update chat panel status
+    if (this.chatPanel) {
+      this.chatPanel.setVoiceStatus('speaking');
+      
+      // Find the most recent agent message and mark it as speaking
+      const state = this.chatPanel.getState();
+      for (let i = state.messages.length - 1; i >= 0; i--) {
+        if (state.messages[i].type === 'agent') {
+          this.chatPanel.updateMessage(state.messages[i].id, { isSpeaking: true });
+          break;
+        }
       }
     }
 
-    // Update voice UI status
-    if (this.voiceUI) {
-      this.voiceUI.setStatus('speaking');
-    }
-
-    // TODO: When chat panel is integrated (task 17), update message bubble with speaking indicator
     console.log('[Vakkya] Agent speaking started');
   }
 
@@ -657,21 +1107,38 @@ export class VakkyaWidget {
    * Requirements 7.2: Remove speaking indicator when TTS ends
    */
   handleAgentSpeakingEnd() {
-    // Find the most recent agent message and mark it as not speaking
-    for (let i = this.transcriptions.length - 1; i >= 0; i--) {
-      if (this.transcriptions[i].type === 'agent') {
-        this.transcriptions[i].isSpeaking = false;
-        break;
+    // Update chat panel status back to listening
+    if (this.chatPanel) {
+      if (this.state.status === 'active') {
+        this.chatPanel.setVoiceStatus('listening');
+      }
+      
+      // Find the most recent agent message and mark it as not speaking
+      const state = this.chatPanel.getState();
+      for (let i = state.messages.length - 1; i >= 0; i--) {
+        if (state.messages[i].type === 'agent') {
+          this.chatPanel.updateMessage(state.messages[i].id, { isSpeaking: false });
+          break;
+        }
       }
     }
 
-    // Update voice UI status back to listening
-    if (this.voiceUI && this.state.status === 'active') {
-      this.voiceUI.setStatus('listening');
-    }
-
-    // TODO: When chat panel is integrated (task 17), update message bubble to remove speaking indicator
     console.log('[Vakkya] Agent speaking ended');
+  }
+
+  /**
+   * Handle validation_error message from agent
+   * Requirement 6.3: Display validation error message below input
+   * @param {string} fieldName - Field that failed validation
+   * @param {string} error - Error message to display
+   */
+  handleValidationError(fieldName, error) {
+    if (!this.chatPanel) return;
+    
+    // Display error in sticky input container (Requirement 6.3)
+    this.chatPanel.setStickyInputError(error);
+    
+    console.log('[Vakkya] Validation error for field:', fieldName, 'error:', error);
   }
 
   /**
@@ -680,8 +1147,8 @@ export class VakkyaWidget {
    * @param {any} value
    */
   setFormAnswer(fieldName, value) {
-    if (this.formUI) {
-      this.formUI.setAnswer(fieldName, value);
+    if (this.chatPanel) {
+      this.chatPanel.updateFormInputValue(fieldName, value);
     }
   }
 
@@ -690,7 +1157,9 @@ export class VakkyaWidget {
    * @returns {Object|null}
    */
   getCurrentFormField() {
-    return this.formUI ? this.formUI.getCurrentField() : null;
+    // With chat panel, we track the current field via formSchema
+    // Return the current field being collected if form is active
+    return this.formSchema ? { schema: this.formSchema } : null;
   }
 
   /**
@@ -707,5 +1176,28 @@ export class VakkyaWidget {
    */
   getConfig() {
     return this.config ? { ...this.config } : null;
+  }
+
+  /**
+   * Apply customization from config to host element
+   * Requirements: 6.1, 6.2, 6.3
+   */
+  applyCustomization() {
+    if (!this.host || !this.config) return;
+
+    // Apply custom accent color (Requirement 6.1, 6.3)
+    if (this.config.accentColor) {
+      applyAccentColor(this.host, this.config.accentColor);
+    }
+
+    // Apply theme (Requirement 6.2)
+    if (this.config.theme) {
+      applyTheme(this.host, this.config.theme);
+    }
+
+    // Apply position
+    if (this.config.position === 'bottom-left') {
+      this.host.setAttribute('data-position', 'bottom-left');
+    }
   }
 }

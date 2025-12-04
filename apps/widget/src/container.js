@@ -21,13 +21,26 @@ const BASE_STYLES = `
     position: fixed;
     bottom: 20px;
     right: 20px;
+    left: auto;
     z-index: 2147483647;
+  }
+  
+  /* Position: bottom-left */
+  :host([data-position="bottom-left"]) .vakkya-widget {
+    right: auto;
+    left: 20px;
   }
   
   @media (max-width: 480px) {
     .vakkya-widget {
       bottom: 16px;
       right: 16px;
+      left: auto;
+    }
+    
+    :host([data-position="bottom-left"]) .vakkya-widget {
+      right: auto;
+      left: 16px;
     }
   }
 `;

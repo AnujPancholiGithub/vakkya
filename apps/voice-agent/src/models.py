@@ -44,6 +44,11 @@ class SessionContext:
     widget_token: Optional[str] = None
     # Custom agent configuration
     agent_config: Optional[AgentConfig] = None
+    # Form support - active form schema and room reference for widget messaging
+    active_form: Optional[dict] = None
+    room: Optional[object] = None  # rtc.Room reference
+    # Capability registry for dynamic tool and instruction management
+    capability_registry: Optional[object] = None  # CapabilityRegistry reference
 
 
 @dataclass

@@ -129,16 +129,16 @@
     - **Property 7: Inline Form Input Rendering**
     - **Validates: Requirements 4.1**
 
-- [ ] 10. Implement form input interactions
-  - [ ] 10.1 Handle keyboard input submission
+- [x] 10. Implement form input interactions
+  - [x] 10.1 Handle keyboard input submission
     - Send keyboard_input via data channel
     - Update local state
     - _Requirements: 4.2_
-  - [ ] 10.2 Handle voice value extraction display
+  - [x] 10.2 Handle voice value extraction display
     - Show extracted value in input
     - Display confirmation UI
     - _Requirements: 4.3_
-  - [ ] 10.3 Handle confirmation/rejection
+  - [x] 10.3 Handle confirmation/rejection
     - Update input state on confirm
     - Clear and re-ask on reject
     - _Requirements: 4.4_
@@ -149,20 +149,20 @@
     - **Property 9: Voice Value Display in Input**
     - **Validates: Requirements 4.3**
 
-- [ ] 11. Checkpoint - Ensure all tests pass
+- [x] 11. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
 
 ## Phase 5: Summary and Submission
 
-- [ ] 12. Create summary card component
-  - [ ] 12.1 Create summary card for chat flow
+- [x] 12. Create summary card component
+  - [x] 12.1 Create summary card for chat flow
     - Display all collected answers
     - Edit button per field
     - Approve/submit button
     - _Requirements: 4.5, 8.1_
-  - [ ] 12.2 Add submission states
+  - [x] 12.2 Add submission states
     - Submitting, success, error states
     - Visual feedback for each
     - _Requirements: 8.2, 8.3_
@@ -170,16 +170,16 @@
     - **Property 10: Summary Card in Chat**
     - **Validates: Requirements 4.5, 8.1**
 
-- [ ] 13. Implement submission flow
-  - [ ] 13.1 Handle submission approval
+- [x] 13. Implement submission flow
+  - [x] 13.1 Handle submission approval
     - Send submission_approved via data channel
     - Show submitting state
     - _Requirements: 8.2_
-  - [ ] 13.2 Display success message in chat
+  - [x] 13.2 Display success message in chat
     - Add success message to chat
     - Show completion state
     - _Requirements: 8.3_
-  - [ ] 13.3 Handle submission errors
+  - [x] 13.3 Handle submission errors
     - Display error in chat
     - Allow retry
     - _Requirements: 8.3_
@@ -190,27 +190,27 @@
     - **Property 15: Success Message in Chat**
     - **Validates: Requirements 8.3**
 
-- [ ] 14. Checkpoint - Ensure all tests pass
+- [x] 14. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
 
 ## Phase 6: Customization Support
 
-- [ ] 15. Implement widget customization
-  - [ ] 15.1 Add data attribute parsing in config.js
+- [x] 15. Implement widget customization
+  - [x] 15.1 Add data attribute parsing in config.js
     - Parse data-accent-color, data-theme, data-position
     - Validate color values
     - _Requirements: 6.1, 6.2_
-  - [ ] 15.2 Apply custom accent color
+  - [x] 15.2 Apply custom accent color
     - Set CSS custom property from config
     - Apply to accent elements
     - _Requirements: 6.1, 6.3_
-  - [ ] 15.3 Implement theme switching
+  - [x] 15.3 Implement theme switching
     - Light/dark theme via data attribute
     - Apply theme class to host element
     - _Requirements: 6.2_
-  - [ ] 15.4 Set default values
+  - [x] 15.4 Set default values
     - Soft blue accent (#3B82F6)
     - Light theme default
     - _Requirements: 6.4_
@@ -218,19 +218,19 @@
     - **Property 12: Customization Application**
     - **Validates: Requirements 6.1, 6.2, 6.3**
 
-- [ ] 16. Checkpoint - Ensure all tests pass
+- [x] 16. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
 
 ## Phase 7: Integration and Cleanup
 
-- [ ] 17. Integrate chat panel with widget
-  - [ ] 17.1 Replace voice-ui with chat panel in widget.js
+- [x] 17. Integrate chat panel with widget
+  - [x] 17.1 Replace voice-ui with chat panel in widget.js
     - Update showVoiceUI to show chat panel
     - Connect all event handlers
     - _Requirements: 3.1_
-  - [ ] 17.2 Update form activation flow
+  - [x] 17.2 Update form activation flow
     - Only show form inputs via handleFormActivate
     - Remove legacy form-ui overlay
     - _Requirements: 2.2, 2.3_
@@ -238,23 +238,23 @@
     - **Property 2: Form Activation via Data Channel**
     - **Validates: Requirements 2.2, 2.3**
 
-- [ ] 18. Update voice agent for chat messages
-  - [ ] 18.1 Add agent_message sending in entrypoint.py
+- [x] 18. Update voice agent for chat messages
+  - [x] 18.1 Add agent_message sending in entrypoint.py
     - Send agent responses as chat messages
     - Include speaking state indicators
     - _Requirements: 3.3_
-  - [ ] 18.2 Ensure greeting before form activation
+  - [x] 18.2 Ensure greeting before form activation
     - Agent greets user on session start
     - Explains form purpose before activation
     - _Requirements: 1.3, 2.1_
 
-- [ ] 19. Final cleanup
-  - [ ] 19.1 Remove deprecated form-ui.js overlay code
+- [x] 19. Final cleanup
+  - [x] 19.1 Remove deprecated form-ui.js overlay code
     - Keep inline form components
     - Remove standalone form overlay
-  - [ ] 19.2 Remove deprecated voice-ui.js
+  - [x] 19.2 Remove deprecated voice-ui.js
     - Functionality moved to chat panel
-  - [ ] 19.3 Update bundle and verify size
+  - [x] 19.3 Update bundle and verify size
     - Ensure under 100KB gzipped
     - Remove unused code
 

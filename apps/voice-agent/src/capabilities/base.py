@@ -2,11 +2,20 @@
 
 Capabilities are pluggable modules that handle specific types of user requests.
 Each capability implements can_handle() to indicate confidence and handle() to process.
+
+Enhanced with dynamic tool and instruction support for the capability-driven architecture.
+Capabilities can now:
+- Register function tools dynamically via get_tools()
+- Provide instruction fragments via get_instruction_fragment()
+- Control their enabled state via is_enabled()
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+if TYPE_CHECKING:
+    from ..models import SessionContext
 
 
 @dataclass
@@ -54,14 +63,20 @@ class Capability(ABC):
     Capabilities are pluggable modules that handle specific types of requests.
     The orchestrator routes requests to the capability with highest confidence.
     
+    Enhanced Interface (v2):
+    - get_tools(): Return function tools this capability provides
+    - get_instruction_fragment(): Return instructions to append to agent
+    - is_enabled(): Check if capability should be active for session
+    
     MVP Capabilities:
     - RAGCapability: Answers questions from uploaded documents
-    - FormCapability: Guides users through conversational forms (future)
+    - FormCapability: Guides users through conversational forms
     
     Future Capabilities:
     - BookingCapability: Calendar scheduling
     - ProductCapability: E-commerce recommendations
     - HandoffCapability: Escalate to human
+    - MCPCapability: Model Context Protocol integrations
     """
     
     @property
@@ -69,6 +84,10 @@ class Capability(ABC):
     def name(self) -> str:
         """Unique identifier for this capability."""
         pass
+    
+    # =========================================================================
+    # Legacy Interface (for orchestrator-based routing)
+    # =========================================================================
     
     @abstractmethod
     async def can_handle(self, context: CapabilityContext) -> float:
@@ -93,3 +112,50 @@ class Capability(ABC):
             CapabilityResponse with text to speak and metadata
         """
         pass
+    
+    # =========================================================================
+    # Enhanced Interface (for capability-driven agent architecture)
+    # =========================================================================
+    
+    def is_enabled(self, session_context: "SessionContext") -> bool:
+        """Check if this capability should be enabled for the session.
+        
+        Override to implement custom enable logic based on session context.
+        For example, FormCapability checks if active_form exists.
+        
+        Args:
+            session_context: The session context with project config and state
+            
+        Returns:
+            True if capability should be active, False otherwise
+        """
+        return True
+    
+    def get_tools(self, session_context: "SessionContext") -> list[Callable[..., Any]]:
+        """Return list of function tools this capability provides.
+        
+        Override to provide capability-specific tools that will be registered
+        with the agent. Tools should be decorated with @function_tool().
+        
+        Args:
+            session_context: The session context for tool configuration
+            
+        Returns:
+            List of function tools (callables decorated with @function_tool)
+        """
+        return []
+    
+    def get_instruction_fragment(self, session_context: "SessionContext") -> str:
+        """Return instruction fragment to append to agent instructions.
+        
+        Override to provide capability-specific instructions that will be
+        appended to the agent's system prompt. This allows capabilities to
+        add their own guidance without replacing the base or custom prompts.
+        
+        Args:
+            session_context: The session context for instruction customization
+            
+        Returns:
+            Instruction string to append (empty string if none)
+        """
+        return ""

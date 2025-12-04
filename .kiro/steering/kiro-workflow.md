@@ -7,7 +7,7 @@ inclusion: always
 
 ## Core Principle: Iterative Enhancement Over File Explosion
 
-**NEVER create new files when asked for improvements.** Always enhance existing code.
+**NEVER create new files when asked for improvements. unless really important and no other best way to doing it** Always enhance existing code.
 
 ## MCP Tools Available
 

@@ -309,12 +309,12 @@ export class FormService {
 
   /**
    * Get active form for a project (for internal use, no auth check)
-   * Returns the most recently created form for the project
+   * Returns the most recently created active form for the project
    * Used by voice agent to determine if form mode should be active
    */
   async getActiveFormForProject(projectId: string) {
     const formSchema = await prisma.formSchema.findFirst({
-      where: { projectId },
+      where: { projectId, isActive: true },
       orderBy: { createdAt: 'desc' },
     });
 

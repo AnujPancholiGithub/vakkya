@@ -421,25 +421,35 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /**
    * Handle transcription event from LiveKit
    * Requirements 3.2: Display user speech as message bubbles
+   * Requirements 3.3: Display agent speech as message bubbles
    * @param {Object} transcription - LiveKit transcription object
    * @param {Object} participant - Participant who spoke
    */
   function handleTranscription(transcription, participant) {
-    // Only handle user transcriptions (local participant)
-    if (!participant || !participant.isLocal) return;
+    if (!participant) return;
 
     const content = transcription.text || '';
     const isFinal = transcription.final || false;
 
-    // Notify widget via callback
-    if (onTranscriptionCallback) {
-      onTranscriptionCallback(content, isFinal);
-    }
+    if (participant.isLocal) {
+      // User transcription (Requirements 3.2)
+      if (onTranscriptionCallback) {
+        onTranscriptionCallback(content, isFinal);
+      }
 
-    // Send transcription to agent via data channel
-    if (isFinal && content.trim()) {
-      const message = createUserTranscriptionMessage(content, isFinal);
-      publishMessage(message);
+      // Send transcription to agent via data channel
+      if (isFinal && content.trim()) {
+        const message = createUserTranscriptionMessage(content, isFinal);
+        publishMessage(message);
+      }
+    } else {
+      // Agent transcription (Requirements 3.3)
+      // NOTE: Agent messages are sent via data channel from voice agent
+      // Do NOT duplicate here - the data channel message is authoritative
+      // This transcription is just for logging/debugging
+      if (isFinal && content.trim()) {
+        console.log('[Vakkya] Agent transcription (via LiveKit):', content.substring(0, 50) + '...');
+      }
     }
   }
 

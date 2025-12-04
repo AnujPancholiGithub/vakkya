@@ -2,9 +2,14 @@
 
 This capability searches the project's knowledge base (uploaded PDFs, TXT, MD files)
 and generates answers based on relevant document chunks.
+
+Enhanced with dynamic tool and instruction support for capability-driven architecture.
 """
 
 import logging
+from typing import TYPE_CHECKING, Any, Callable
+
+from livekit.agents import RunContext, function_tool
 
 from .base import Capability, CapabilityContext, CapabilityResponse
 from ..models import DocumentChunk
@@ -13,6 +18,9 @@ from ..rag_service import (
     format_chunks_for_llm,
     get_max_similarity,
 )
+
+if TYPE_CHECKING:
+    from ..models import SessionContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +38,20 @@ class RAGCapability(Capability):
     Searches uploaded documents for relevant context and generates answers.
     Returns low confidence when no relevant documents are found.
     
+    Enhanced Interface:
+    - is_enabled(): Returns True if RAG service is available
+    - get_tools(): Returns search_knowledge tool
+    - get_instruction_fragment(): Returns RAG-specific instructions
+    
     Attributes:
         rag_service: The RAG service for vector search
     """
     
-    def __init__(self, rag_service) -> None:
+    def __init__(self, rag_service=None) -> None:
         """Initialize RAG capability.
         
         Args:
-            rag_service: RAGService instance for document search
+            rag_service: RAGService instance for document search (optional for deferred init)
         """
         self._rag_service = rag_service
         self._no_docs_message = (
@@ -196,3 +209,129 @@ class RAGCapability(Capability):
                 handled=False,
                 metadata={"error": str(e)},
             )
+    
+    # =========================================================================
+    # Enhanced Interface (for capability-driven agent architecture)
+    # =========================================================================
+    
+    def is_enabled(self, session_context: "SessionContext") -> bool:
+        """Check if RAG capability should be enabled.
+        
+        RAG is enabled if a RAG service is available.
+        
+        Args:
+            session_context: The session context
+            
+        Returns:
+            True if RAG service is available
+        """
+        return self._rag_service is not None
+    
+    def get_tools(self, session_context: "SessionContext") -> list[Callable[..., Any]]:
+        """Return RAG-related tools.
+        
+        Provides the search_knowledge tool for querying the knowledge base.
+        
+        Args:
+            session_context: The session context for tool configuration
+            
+        Returns:
+            List containing the search_knowledge tool
+        """
+        if not self._rag_service:
+            return []
+        
+        # Create the search tool with access to RAG service
+        rag_service = self._rag_service
+        
+        @function_tool()
+        async def search_knowledge(
+            context: RunContext[Any],
+            query: str,
+        ) -> str:
+            """Search the knowledge base for information relevant to the user's question.
+
+            Use this tool when the user asks a question that might be answered by
+            the project's uploaded documents. This searches through PDFs, text files,
+            and markdown documents that have been uploaded to the project.
+
+            Args:
+                query: The search query based on what the user is asking about.
+                       Be specific and include key terms from the user's question.
+
+            Returns:
+                Relevant document excerpts that can help answer the user's question,
+                or a message indicating no relevant documents were found.
+            """
+            ctx = context.userdata
+            project_id = ctx.project_id if ctx else session_context.project_id
+            
+            try:
+                chunks = await rag_service.search(
+                    query=query,
+                    project_id=project_id,
+                    top_k=3,
+                )
+                
+                if not chunks:
+                    logger.info(
+                        "RAG search returned no results",
+                        extra={"project_id": project_id, "query_length": len(query)},
+                    )
+                    return "No relevant information found in the knowledge base."
+                
+                max_similarity = get_max_similarity(chunks)
+                result = format_chunks_for_llm(chunks)
+                
+                if max_similarity < LOW_CONFIDENCE_THRESHOLD:
+                    result = f"[Low confidence results - relevance scores below 0.5]\n\n{result}"
+                
+                logger.info(
+                    "RAG search completed",
+                    extra={
+                        "project_id": project_id,
+                        "query_length": len(query),
+                        "num_results": len(chunks),
+                        "max_similarity": round(max_similarity, 3),
+                    },
+                )
+                
+                return result
+                
+            except Exception as e:
+                logger.error(
+                    "RAG search failed",
+                    extra={
+                        "project_id": project_id,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                )
+                return "I couldn't search the knowledge base right now. Please try rephrasing your question."
+        
+        return [search_knowledge]
+    
+    def get_instruction_fragment(self, session_context: "SessionContext") -> str:
+        """Return RAG-specific instructions.
+        
+        Provides guidance on using the knowledge base search.
+        
+        Args:
+            session_context: The session context
+            
+        Returns:
+            RAG instruction fragment
+        """
+        return """### Knowledge Base Search
+You have access to a knowledge base of uploaded documents (PDFs, text files, markdown).
+
+**When to use search_knowledge:**
+- When the user asks a question that might be answered by project documents
+- When you need factual information about the project or company
+- When the user asks "what", "how", "why", "when", "where" questions
+
+**How to use it:**
+- Be specific with your search query
+- Include key terms from the user's question
+- If results have low confidence, acknowledge uncertainty
+- Never fabricate information - say "I don't know" if unsure"""
