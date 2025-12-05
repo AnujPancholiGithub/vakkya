@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { Plus, Loader2, FileText, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { EmptyState } from '@/components/ui/empty-state'
 import { useProjects, type ProjectWithToken } from '@/lib/queries'
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog'
 import { formatRelativeTime, getSetupStatus, cn } from '@/lib/utils'
@@ -91,27 +90,61 @@ export default function ProjectsPage() {
 
   if (projects?.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center max-w-md">
-          <EmptyState
-            illustration="workflow"
-            title="Create your first voice agent"
-            description="Get started in three simple steps: create a project, upload your documents, and embed the widget on your site."
-            action={{
-              label: 'Create Project',
-              onClick: () => setShowCreateDialog(true),
-            }}
-            secondaryAction={{
-              label: 'Read the docs',
-              href: 'https://docs.vakkya.ai/getting-started',
-            }}
-          />
-          <CreateProjectDialog
-            open={showCreateDialog}
-            onOpenChange={setShowCreateDialog}
-          />
+    <div className="max-w-5xl mx-auto py-12">
+        <div className="text-center mb-12 space-y-2">
+           <h1 className="text-3xl font-bold tracking-tight text-white">Let's build something amazing</h1>
+           <p className="text-neutral-400">Choose a starting point for your new voice agent.</p>
         </div>
-      </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+           {/* Starter 1: Blank */}
+           <div 
+             onClick={() => setShowCreateDialog(true)}
+             className="group relative bg-neutral-900 border border-white/10 p-6 rounded-2xl hover:border-primary/50 cursor-pointer transition-all hover:shadow-[0_0_30px_-5px_var(--color-primary)] hover:shadow-primary/20"
+           >
+              <div className="w-12 h-12 rounded-xl bg-neutral-800 border border-white/5 flex items-center justify-center mb-6 text-white group-hover:scale-110 transition-transform">
+                <Plus className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Blank Project</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Start from scratch. Upload your own documents and configure your agent exactly how you want.
+              </p>
+           </div>
+
+           {/* Starter 2: FAQ Bot (Visual Only for now) */}
+           <div 
+             onClick={() => setShowCreateDialog(true)}
+             className="group relative bg-neutral-900 border border-white/10 p-6 rounded-2xl hover:border-blue-500/50 cursor-pointer transition-all hover:shadow-[0_0_30px_-5px_#3b82f640]"
+           >
+              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-6 text-blue-500 group-hover:scale-110 transition-transform">
+                <FileText className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Voice FAQ Bot</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Perfect for documentation. Pre-configured for RAG with PDF uploads.
+              </p>
+           </div>
+
+           {/* Starter 3: Lead Capture (Visual Only) */}
+           <div 
+             onClick={() => setShowCreateDialog(true)}
+             className="group relative bg-neutral-900 border border-white/10 p-6 rounded-2xl hover:border-green-500/50 cursor-pointer transition-all hover:shadow-[0_0_30px_-5px_#22c55e40]"
+           >
+              <div className="w-12 h-12 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center mb-6 text-green-500 group-hover:scale-110 transition-transform">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Lead Capture</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Collect user information through natural flowing conversation.
+              </p>
+           </div>
+        </div>
+
+        <CreateProjectDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+        />
+    </div>
     )
   }
 

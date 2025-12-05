@@ -8,6 +8,8 @@ export interface Project {
   widgetToken: string
   systemPrompt: string | null
   agentName: string | null
+  initiationMode: 'agent_first' | 'user_first'
+  autoTerminate: boolean
   createdAt: string
   updatedAt: string
   documentCount?: number
@@ -26,6 +28,8 @@ export interface UpdateProjectInput {
   name?: string
   systemPrompt?: string | null
   agentName?: string | null
+  initiationMode?: 'agent_first' | 'user_first'
+  autoTerminate?: boolean
 }
 
 // API response wrappers

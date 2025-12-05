@@ -24,12 +24,14 @@ export default function ProjectSettingsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [agentName, setAgentName] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
+  const [initiationMode, setInitiationMode] = useState<'agent_first' | 'user_first'>('agent_first')
   const [hasChanges, setHasChanges] = useState(false)
 
   useEffect(() => {
     if (project) {
       setAgentName(project.agentName || '')
       setSystemPrompt(project.systemPrompt || '')
+      setInitiationMode(project.initiationMode || 'agent_first')
     }
   }, [project])
 
@@ -37,8 +39,9 @@ export default function ProjectSettingsPage() {
     if (!project) return
     const nameChanged = agentName !== (project.agentName || '')
     const promptChanged = systemPrompt !== (project.systemPrompt || '')
-    setHasChanges(nameChanged || promptChanged)
-  }, [agentName, systemPrompt, project])
+    const modeChanged = initiationMode !== (project.initiationMode || 'agent_first')
+    setHasChanges(nameChanged || promptChanged || modeChanged)
+  }, [agentName, systemPrompt, initiationMode, project])
 
   useEffect(() => {
     if (!copiedToken) return
@@ -74,6 +77,7 @@ export default function ProjectSettingsPage() {
       await updateProject.mutateAsync({
         agentName: agentName.trim() || null,
         systemPrompt: systemPrompt.trim() || null,
+        initiationMode,
       })
       toast.success('Settings saved')
       setHasChanges(false)
@@ -142,6 +146,60 @@ export default function ProjectSettingsPage() {
                 {systemPrompt.length}/2000
               </span>
             </div>
+          </div>
+          {hasChanges && (
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSave} disabled={updateProject.isPending}>
+                {updateProject.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1.5" />
+                )}
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Conversation Behavior */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Conversation Behavior</CardTitle>
+          <CardDescription>
+            Control how conversations start
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <Label>Who speaks first?</Label>
+            <div className="flex p-1 bg-muted rounded-lg w-max">
+              <button
+                onClick={() => setInitiationMode('agent_first')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  initiationMode === 'agent_first'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Agent First
+              </button>
+              <button
+                onClick={() => setInitiationMode('user_first')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                  initiationMode === 'user_first'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                User First
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {initiationMode === 'agent_first'
+                ? 'Agent will greet the user automatically when they connect'
+                : 'Agent will wait for the user to speak first'}
+            </p>
           </div>
           {hasChanges && (
             <div className="flex justify-end">

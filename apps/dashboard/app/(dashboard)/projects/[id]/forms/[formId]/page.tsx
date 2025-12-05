@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useForm, useFormSubmissions, useDeleteForm } from '@/lib/queries'
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog'
 import { FormEditorDialog } from '@/components/forms/form-editor-dialog'
+import { SubmissionDetailDialog } from '@/components/forms/submission-detail-dialog'
+import { type FormSubmission } from '@/lib/queries'
 
 export default function FormDetailPage() {
   const params = useParams()
@@ -23,6 +25,7 @@ export default function FormDetailPage() {
   
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null)
 
   const handleDelete = async () => {
     try {
@@ -194,7 +197,11 @@ export default function FormDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {submissions?.map((sub) => (
-                    <tr key={sub.id} className="hover:bg-muted/30">
+                    <tr 
+                        key={sub.id} 
+                        className="hover:bg-muted/50 w-full transition-colors cursor-pointer"
+                        onClick={() => setSelectedSubmission(sub)}
+                    >
                       <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                         {new Date(sub.createdAt).toLocaleString()}
                       </td>
@@ -239,6 +246,12 @@ export default function FormDetailPage() {
         open={showEditDialog}
         onOpenChange={setShowEditDialog}
         form={form}
+      />
+
+      <SubmissionDetailDialog 
+        submission={selectedSubmission}
+        open={!!selectedSubmission}
+        onOpenChange={(open) => !open && setSelectedSubmission(null)}
       />
 
       <DeleteConfirmDialog

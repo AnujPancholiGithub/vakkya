@@ -78,6 +78,7 @@ export default function ProjectOverviewPage() {
             <p>The widget will appear in the ${position.replace('-', ' ')} corner.</p>
           </div>
           <script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js"
+            data-api-url="${process.env.NEXT_PUBLIC_API_URL}"
             data-token="${project.token}"
             data-theme="${theme}"
             data-position="${position}"

@@ -12,6 +12,8 @@ export interface UpdateProjectInput {
   name?: string;
   systemPrompt?: string | null;
   agentName?: string | null;
+  initiationMode?: 'agent_first' | 'user_first';
+  autoTerminate?: boolean;
 }
 
 export interface ProjectConfig {
@@ -26,10 +28,15 @@ export interface ProjectConfig {
 // Security: Max length for system prompt to prevent abuse
 const MAX_SYSTEM_PROMPT_LENGTH = 2000;
 const MAX_AGENT_NAME_LENGTH = 100;
+const MAX_PROJECT_NAME_LENGTH = 100;
 
 /**
- * Sanitize system prompt to prevent prompt injection attacks
- * Removes potentially dangerous patterns while preserving legitimate content
+ * Sanitize system prompt to prevent prompt injection attacks.
+ * Removes potentially dangerous patterns while preserving legitimate content.
+ * 
+ * NOTE: This blocklist is defense-in-depth only. Determined attackers can bypass
+ * with unicode lookalikes, word splitting, etc. The primary protection is in the
+ * voice agent's system prompt structure which sandboxes user-provided content.
  */
 function sanitizeSystemPrompt(prompt: string | undefined | null): string | null {
   if (!prompt) return null;
@@ -63,6 +70,21 @@ function sanitizeAgentName(name: string | undefined | null): string | null {
   return name.trim().slice(0, MAX_AGENT_NAME_LENGTH) || null;
 }
 
+/**
+ * Validate and sanitize project name
+ * Throws if name is empty or invalid
+ */
+function validateProjectName(name: string): string {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Project name is required');
+  }
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    throw new Error('Project name cannot be empty');
+  }
+  return trimmed.slice(0, MAX_PROJECT_NAME_LENGTH);
+}
+
 export class ProjectService {
   /**
    * Create a new project with a unique widget token
@@ -70,6 +92,9 @@ export class ProjectService {
    */
   async create(input: CreateProjectInput) {
     const { userId, name, systemPrompt, agentName } = input;
+
+    // Validate project name
+    const validatedName = validateProjectName(name);
 
     // Check project limit (10 per user)
     const projectCount = await prisma.project.count({
@@ -86,7 +111,7 @@ export class ProjectService {
     const project = await prisma.project.create({
       data: {
         userId,
-        name,
+        name: validatedName,
         widgetToken,
         systemPrompt: sanitizeSystemPrompt(systemPrompt),
         agentName: sanitizeAgentName(agentName),
@@ -145,7 +170,7 @@ export class ProjectService {
     const updateData: Record<string, unknown> = {};
     
     if (input.name !== undefined) {
-      updateData.name = input.name;
+      updateData.name = validateProjectName(input.name);
     }
     
     if (input.systemPrompt !== undefined) {
@@ -154,6 +179,14 @@ export class ProjectService {
     
     if (input.agentName !== undefined) {
       updateData.agentName = sanitizeAgentName(input.agentName);
+    }
+
+    if (input.initiationMode !== undefined) {
+      updateData.initiationMode = input.initiationMode;
+    }
+
+    if (input.autoTerminate !== undefined) {
+      updateData.autoTerminate = input.autoTerminate;
     }
 
     const project = await prisma.project.update({

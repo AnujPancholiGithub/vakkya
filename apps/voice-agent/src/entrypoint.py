@@ -788,6 +788,26 @@ async def entrypoint(ctx: JobContext) -> None:
             },
         )
 
+        # Handle conversation initiation based on mode (Requirements 1.2, 1.3)
+        # Use session.generate_reply() to make the agent speak first
+        initiation_mode = agent_config.initiation_mode if agent_config else "agent_first"
+        
+        if initiation_mode == "agent_first":
+            # Requirement 1.2: Agent greets user automatically within 2 seconds
+            logger.info(
+                "Agent-first mode: generating greeting",
+                extra={"room": room_name, "project_id": project_id},
+            )
+            await session.generate_reply(
+                instructions="Greet the user warmly and offer your assistance. Keep it brief and friendly."
+            )
+        else:
+            # Requirement 1.3: Agent waits for user to speak first
+            logger.info(
+                "User-first mode: waiting for user to speak",
+                extra={"room": room_name, "project_id": project_id},
+            )
+
         # NOTE: Do NOT send form_activate here automatically!
         # Requirements 1.1, 1.3, 2.1 specify that:
         # - The agent SHALL greet the user first

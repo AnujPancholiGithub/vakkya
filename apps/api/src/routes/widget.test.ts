@@ -41,19 +41,21 @@ describe('Widget Token Validation API', () => {
   });
 
   afterEach(async () => {
-    // Clean up test data
-    if (projectId) {
-      await prisma.project.delete({
-        where: { id: projectId },
-      });
-    }
-    if (userId) {
-      await prisma.user.delete({
-        where: { id: userId },
-      });
-    }
-    if (app) {
-      await app.close();
+    // Clean up test data - use try/catch to ensure all cleanup runs
+    try {
+      if (projectId) {
+        await prisma.project.delete({ where: { id: projectId } }).catch(() => {});
+      }
+    } finally {
+      try {
+        if (userId) {
+          await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+        }
+      } finally {
+        if (app) {
+          await app.close();
+        }
+      }
     }
   });
 

@@ -103,91 +103,141 @@ export default function ConversationDetailPage() {
   }
 
   const timeline = mergeTimeline(conversation.turns || [], formEvents || [])
+  
+  // Extract collected fields
+  const collectedFields = formEvents
+    ?.filter(e => e.eventType === 'field_collected' && e.fieldName && e.fieldValue)
+    .reduce((acc, curr) => {
+      // Use the latest value for a given field
+      if (curr.fieldName) acc[curr.fieldName] = curr.fieldValue;
+      return acc;
+    }, {} as Record<string, string | null>) || {};
+
+  const hasCollectedData = Object.keys(collectedFields).length > 0;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href={`/projects/${projectId}`}>
+        <Link href={`/projects/${projectId}/conversations`}>
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
           <h1 className="text-2xl font-bold">Conversation</h1>
-          <p className="text-muted-foreground">
-            {new Date(conversation.startedAt).toLocaleString()} · {conversation.turnCount} turns
-          </p>
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <span>{new Date(conversation.startedAt).toLocaleString()}</span>
+            <span>·</span>
+            <span>{conversation.turnCount} turns</span>
+            <span>·</span>
+            <span className="font-mono">{conversation.sessionId}</span>
+          </div>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Transcript</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {timeline.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No messages in this conversation
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {timeline.map((item, index) => {
-                if (item.type === 'form_event') {
-                  return (
-                    <div key={`event-${item.data.id}`} className="flex justify-center py-2">
-                      <FormEventBadge event={item.data} />
-                    </div>
-                  )
-                }
-
-                const turn = item.data
-                return (
-                  <div key={turn.id} className="space-y-3">
-                    {/* User message */}
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">User</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(turn.timestamp).toLocaleTimeString()}
-                          </span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-lg">Transcript</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {timeline.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No messages in this conversation
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {timeline.map((item, index) => {
+                    if (item.type === 'form_event') {
+                      return (
+                        <div key={`event-${item.data.id}`} className="flex justify-center py-2">
+                          <FormEventBadge event={item.data} />
                         </div>
-                        <p className={cn(
-                          'text-sm p-3 rounded-lg bg-muted',
-                          'max-w-[80%]'
-                        )}>
-                          {turn.userQuery}
-                        </p>
-                      </div>
-                    </div>
+                      )
+                    }
 
-                    {/* Agent response */}
-                    <div className="flex gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <Bot className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">Agent</span>
+                    const turn = item.data
+                    return (
+                      <div key={turn.id} className="space-y-3">
+                        {/* User message */}
+                        <div className="flex gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium">User</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(turn.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <p className={cn(
+                              'text-sm p-3 rounded-lg bg-muted',
+                              'max-w-[80%]'
+                            )}>
+                              {turn.userQuery}
+                            </p>
+                          </div>
                         </div>
-                        <p className={cn(
-                          'text-sm p-3 rounded-lg bg-green-50 dark:bg-green-950/30',
-                          'max-w-[80%]'
-                        )}>
-                          {turn.agentResponse}
-                        </p>
+
+                        {/* Agent response */}
+                        <div className="flex gap-3">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                            <Bot className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium">Agent</span>
+                            </div>
+                            <p className={cn(
+                              'text-sm p-3 rounded-lg bg-green-50 dark:bg-green-950/30',
+                              'max-w-[80%]'
+                            )}>
+                              {turn.agentResponse}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Submission Data</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {hasCollectedData ? (
+                <dl className="grid gap-4 text-sm">
+                  {Object.entries(collectedFields).map(([key, value]) => (
+                    <div key={key} className="p-3 bg-muted/40 rounded-lg border">
+                      <dt className="font-medium text-muted-foreground capitalize text-xs mb-1">
+                        {key.replace(/_/g, ' ')}
+                      </dt>
+                      <dd className="font-medium break-all">
+                        {value || <span className="text-muted-foreground italic">Empty</span>}
+                      </dd>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </dl>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm">
+                    No data collected yet
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }
