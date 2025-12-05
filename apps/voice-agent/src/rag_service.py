@@ -266,6 +266,49 @@ def format_chunks_for_llm(chunks: list[DocumentChunk]) -> str:
     return "\n\n".join(parts)
 
 
+# Similarity threshold for "confident" answers
+# Below this, we should indicate uncertainty
+LOW_CONFIDENCE_THRESHOLD = 0.5
+
+
+def get_max_similarity(chunks: list[DocumentChunk]) -> float:
+    """
+    Get the maximum similarity score from chunks.
+    
+    Args:
+        chunks: List of DocumentChunk objects
+        
+    Returns:
+        Maximum similarity score, or 0.0 if no chunks
+    """
+    if not chunks:
+        return 0.0
+    
+    max_sim = 0.0
+    for chunk in chunks:
+        try:
+            sim = float(chunk.metadata.get("similarity", "0"))
+            if sim > max_sim:
+                max_sim = sim
+        except (ValueError, TypeError):
+            continue
+    
+    return max_sim
+
+
+def is_low_confidence_result(chunks: list[DocumentChunk]) -> bool:
+    """
+    Check if RAG results are low confidence based on similarity scores.
+    
+    Args:
+        chunks: List of DocumentChunk objects
+        
+    Returns:
+        True if results are below confidence threshold
+    """
+    return get_max_similarity(chunks) < LOW_CONFIDENCE_THRESHOLD
+
+
 # Factory function for creating RAG service from config
 def create_rag_service(
     database_url: str,

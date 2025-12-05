@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { conversationService } from '../services/conversation.service.js';
 import { projectService } from '../services/project.service.js';
+import { formEventService } from '../services/form-event.service.js';
 import type { Env } from '../config/env.js';
 
 // Zod schemas for validation
@@ -189,6 +190,7 @@ export async function conversationRoutes(app: FastifyInstance, env: Env) {
           sessionId: c.sessionId,
           startedAt: c.startedAt,
           turnCount: c.turnCount,
+          firstQuery: c.firstQuery,
         })),
       });
     } catch (error) {
@@ -297,6 +299,72 @@ export async function conversationRoutes(app: FastifyInstance, env: Env) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to get conversation',
+          requestId: request.id,
+        },
+      });
+    }
+  });
+
+  // GET /conversations/:id/form-events - Get form events for conversation (dashboard)
+  // Requirement 11.5: Display form interactions inline with conversation turns
+  app.get('/conversations/:id/form-events', async (request, reply) => {
+    try {
+      // Authenticate user
+      await authMiddleware(request, reply, env);
+      if (reply.sent) return;
+
+      const params = ConversationIdParamSchema.parse(request.params);
+      const userId = request.user!.id;
+
+      // Verify user owns the conversation
+      const conversation = await conversationService.getWithOwnership(
+        params.id,
+        userId
+      );
+
+      if (!conversation) {
+        reply.code(404).send({
+          error: {
+            code: 'CONVERSATION_NOT_FOUND',
+            message: 'Conversation not found or access denied',
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      const events = await formEventService.getEventsForConversation(params.id);
+
+      reply.send({
+        events: events.map((e) => ({
+          id: e.id,
+          formSchemaId: e.formSchemaId,
+          eventType: e.eventType,
+          fieldName: e.fieldName,
+          fieldValue: e.fieldValue,
+          attemptCount: e.attemptCount,
+          metadata: e.metadata,
+          timestamp: e.timestamp,
+        })),
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        reply.code(400).send({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid conversation ID',
+            details: error.errors,
+            requestId: request.id,
+          },
+        });
+        return;
+      }
+
+      request.log.error(error, 'Get form events error');
+      reply.code(500).send({
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to get form events',
           requestId: request.id,
         },
       });

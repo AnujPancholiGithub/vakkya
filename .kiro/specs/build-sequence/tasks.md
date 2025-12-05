@@ -62,86 +62,356 @@ This is the master execution plan for building Vakkya. Follow these phases in or
   - _Requirements: 1.1, 2.A_
   - **Completed:** Context collector already in livekit-manager.js, added property tests
 
-- [ ] 7.1.2 Implement capability orchestrator in voice agent
+- [x] 7.1.2 Implement capability orchestrator in voice agent
   - **Execute:** Voice Forms task 2 (subtasks 2.1-2.4)
   - _Requirements: Architecture Principle_
 
-- [ ] 7.1.3 Improve RAG responses
+- [x] 7.1.3 Improve RAG responses
   - **Execute:** Voice Forms task 3 (subtasks 3.1-3.2)
   - _Requirements: 2.A_
+  - **Completed:** Added similarity-based confidence, "I don't know" fallback, FAQ-optimized prompts
 
-- [ ] 7.1.4 Checkpoint
+- [x] 7.1.4 Checkpoint
   - **Execute:** Voice Forms task 4
-  - Ensure all tests pass
+  - ✅ All 601 tests passing
+  - ✅ Fixed enum field validation bug
 
 ### 7.2 Form Schema Backend (Voice Forms Phase 2)
 
-- [ ] 7.2.1 Add database models for forms
+- [x] 7.2.1 Add database models for forms
   - **Execute:** Voice Forms task 5 (subtasks 5.1-5.3)
   - _Requirements: 3_
+  - ✅ Prisma migration created (FormSchema, FormSubmission)
+  - ✅ Zod validation schemas added (formFieldSchema, createFormSchemaSchema, etc.)
+  - ✅ 25 property tests added to packages/schemas
 
-- [ ] 7.2.2 Implement Form Schema API endpoints
+- [x] 7.2.2 Implement Form Schema API endpoints
   - **Execute:** Voice Forms task 6 (subtasks 6.1-6.3)
   - _Requirements: 3_
+  - ✅ form.service.ts with CRUD operations
+  - ✅ form routes (POST/GET/PUT/DELETE /projects/:id/forms)
+  - ✅ 19 unit tests passing
 
-- [ ] 7.2.3 Checkpoint
+- [x] 7.2.3 Checkpoint
   - **Execute:** Voice Forms task 7
-  - Ensure all tests pass
+  - ✅ All 620 tests passing (schemas: 27, api: 168, voice-agent: 224, widget: 148, dashboard: 53)
 
 ### 7.3 Webhook Delivery (Voice Forms Phase 3)
 
-- [ ] 7.3.1 Implement webhook delivery service
+- [x] 7.3.1 Implement webhook delivery service
   - **Execute:** Voice Forms task 8 (subtasks 8.1-8.3)
   - _Requirements: 3, Integration Strategy_
+  - ✅ webhook.service.ts with retry logic (1s, 5s, 30s) and HMAC signatures
+  - ✅ Property test for webhook delivery
 
-- [ ] 7.3.2 Add internal form submission endpoint
+- [x] 7.3.2 Add internal form submission endpoint
   - **Execute:** Voice Forms task 9 (subtask 9.1)
   - _Requirements: 3_
+  - ✅ POST /internal/forms/:formId/submit endpoint
 
-- [ ] 7.3.3 Checkpoint
+- [x] 7.3.3 Checkpoint
   - **Execute:** Voice Forms task 10
-  - Ensure all tests pass
+  - ✅ All 635 tests passing (schemas: 27, api: 184, voice-agent: 224, widget: 148, dashboard: 53)
 
 ### 7.4 Form Capability - Voice Agent (Voice Forms Phase 4)
 
-- [ ] 7.4.1 Create FormCapability in voice agent
+- [x] 7.4.1 Create FormCapability in voice agent
   - **Execute:** Voice Forms task 11 (subtasks 11.1-11.4)
   - _Requirements: 2.B_
+  - ✅ FormCapability implemented with form state management
+  - ✅ Field extraction for string, email, phone, number, enum types
+  - ✅ Navigation support (back, skip)
+  - ✅ Form submission to API endpoint
+  - ✅ 34 property tests added
 
-- [ ] 7.4.2 Integrate FormCapability with orchestrator
+- [x] 7.4.2 Integrate FormCapability with orchestrator
   - **Execute:** Voice Forms task 12 (subtasks 12.1-12.2)
   - _Requirements: Architecture Principle, 2.B_
+  - ✅ FormCapability exported from capabilities module
+  - ✅ Ready for orchestrator registration (will be done in entrypoint integration)
 
-- [ ] 7.4.3 Checkpoint
+- [x] 7.4.3 Checkpoint
   - **Execute:** Voice Forms task 13
-  - Ensure all tests pass
+  - ✅ All 258 tests passing (224 existing + 34 new)
 
 ### 7.5 Hybrid Form UI - Widget (Voice Forms Phase 5)
 
-- [ ] 7.5.1 Create Form UI component in widget
+- [x] 7.5.1 Create Form UI component in widget
   - **Execute:** Voice Forms task 14 (subtasks 14.1-14.4)
   - _Requirements: 2.B_
+  - ✅ form-ui.js with Typeform-style one-question-at-a-time UI
+  - ✅ Support for all field types (string, email, phone, number, enum, text)
+  - ✅ Progress dots, back/skip navigation
+  - ✅ Voice + keyboard input support
+  - ✅ 40 unit tests added
 
-- [ ] 7.5.2 Integrate Form UI with voice agent
+- [x] 7.5.2 Integrate Form UI with voice agent
   - **Execute:** Voice Forms task 15 (subtasks 15.1-15.3)
   - _Requirements: 2.B_
+  - ✅ showFormUI(), handleFormSubmit(), handleFormAnswer() methods
+  - ✅ setFormAnswer(), getCurrentFormField() for voice coordination
+  - ✅ Form state cleanup in handleClose()
 
-- [ ] 7.5.3 Checkpoint
+- [x] 7.5.3 Checkpoint
   - **Execute:** Voice Forms task 16
-  - Ensure all tests pass
+  - ✅ All 188 widget tests passing
 
 ### 7.6 Dashboard Form Builder (Voice Forms Phase 6)
 
-- [ ] 7.6.1 Create form builder UI in dashboard
+- [x] 7.6.1 Create form builder UI in dashboard
   - **Execute:** Voice Forms task 17 (subtasks 17.1-17.3)
   - _Requirements: 3_
+  - ✅ Forms list page at /projects/[id]/forms
+  - ✅ FormEditorDialog with field editor (all types: string, email, phone, number, enum, text)
+  - ✅ Webhook URL configuration with test button
 
-- [ ] 7.6.2 Create form submissions view
+- [x] 7.6.2 Create form submissions view
   - **Execute:** Voice Forms task 18 (subtask 18.1)
   - _Requirements: 3_
+  - ✅ Form detail page at /projects/[id]/forms/[formId]
+  - ✅ Submissions table with data preview, timestamp, webhook status
 
-- [ ] 7.6.3 Final Checkpoint
+- [x] 7.6.3 Final Checkpoint
   - **Execute:** Voice Forms task 19
-  - Ensure all tests pass
-  - Voice Forms feature complete
+  - ✅ All 710 tests passing (schemas: 27, api: 184, voice-agent: 258, widget: 188, dashboard: 53)
+  - ✅ Voice Forms feature complete
 
+
+
+---
+
+## Phase 8: Conversational Forms V2 (Enhanced Dynamic Forms)
+
+**Overview:** Transform rigid form-filling into dynamic, agent-driven conversational inquiries with multi-form support, confirmation loops, and graceful error recovery.
+
+**Detailed tasks:** `.kiro/specs/conversational-forms-v2/tasks.md`
+
+### 8.1 Database Schema & API Foundation (V2 Phase 1)
+
+- [x] 8.1.1 Extend database schema for V2 forms
+  - **Execute:** Conversational Forms V2 task 1 (subtasks 1.1-1.5)
+  - Add description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive
+  - Add FormEvent table for analytics
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 11.1-11.4_
+  - ✅ Prisma migration created and applied
+  - ✅ Zod schemas updated with V2 fields
+  - ✅ 12 property tests added (Property 19)
+  - ✅ All 184 API tests passing, 40 schema tests passing
+
+- [x] 8.1.2 Implement trigger phrase conflict detection
+  - **Execute:** Conversational Forms V2 task 2 (subtasks 2.1-2.2)
+  - _Requirements: 9.5_
+  - ✅ checkTriggerPhraseConflicts() method in form.service.ts
+  - ✅ TriggerPhraseConflictError class with conflict details
+  - ✅ Conflict detection on create and update (case-insensitive)
+  - ✅ 8 property tests added (Property 20)
+
+- [x] 8.1.3 Implement form event logging service
+  - **Execute:** Conversational Forms V2 task 3 (subtasks 3.1-3.2)
+  - _Requirements: 11.1-11.4_
+  - ✅ form-event.service.ts with logFormActivation, logFieldCollected, logFormSubmitted, logFormAbandoned
+  - ✅ Event retrieval methods for form, conversation, and session
+  - ✅ 14 property tests added (Property 22)
+
+- [x] 8.1.4 Update form API endpoints for V2
+  - **Execute:** Conversational Forms V2 task 4 (subtasks 4.1-4.3)
+  - _Requirements: 2.1, 9.1-9.4_
+  - ✅ POST/PUT endpoints accept all V2 fields (description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive)
+  - ✅ GET /internal/projects/:projectId/forms/all returns all active forms with trigger phrases
+  - ✅ Unit tests for all V2 endpoint functionality
+
+- [x] 8.1.5 Checkpoint
+  - **Execute:** Conversational Forms V2 task 5
+  - ✅ All 754 tests passing (schemas: 40, api: 215, voice-agent: 258, widget: 188, dashboard: 53)
+
+### 8.2 Widget Form State Manager (V2 Phase 2)
+
+- [x] 8.2.1 Create form state manager module
+  - **Execute:** Conversational Forms V2 task 6 (subtasks 6.1-6.3)
+  - State persistence, confirmation flow
+  - _Requirements: 4.1-4.5, 7.1-7.2_
+  - ✅ form-state-manager.js with FormStateManager interface
+  - ✅ State: currentForm, currentFieldIndex, answers, pendingConfirmation, mode
+  - ✅ localStorage persistence with 24-hour expiration
+  - ✅ 30 property tests (Property 14)
+
+- [x] 8.2.2 Implement confirmation flow in state manager
+  - **Execute:** Conversational Forms V2 task 7 (subtasks 7.1-7.6)
+  - Keyboard bypass, extraction fallback
+  - _Requirements: 4.1-4.6_
+  - ✅ setPendingConfirmation, confirmAnswer, rejectAnswer
+  - ✅ Keyboard inputs auto-confirm (Property 8)
+  - ✅ fallbackToKeyboard after 3 failed attempts (Property 9)
+  - ✅ Property tests for confirmation state machine (Property 7)
+
+- [x] 8.2.3 Implement input priority resolution
+  - **Execute:** Conversational Forms V2 task 8 (subtasks 8.1-8.2)
+  - _Requirements: 5.5_
+  - ✅ Timestamp tracking in FieldAnswer
+  - ✅ Property test for input priority (Property 10)
+
+- [x] 8.2.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 9
+  - ✅ All 529 tests passing (schemas: 40, api: 215, widget: 221, dashboard: 53)
+
+### 8.3 Data Channel Protocol (V2 Phase 3)
+
+- [x] 8.3.1 Define and implement data channel protocol
+  - **Execute:** Conversational Forms V2 task 10 (subtasks 10.1-10.4)
+  - Widget ↔ Agent bidirectional sync
+  - _Requirements: 3.5, 10.1-10.3_
+  - ✅ data-channel-protocol.js with message types and serialization
+  - ✅ publishMessage and send* methods in livekit-manager.js
+  - ✅ Agent message handler with deserializeMessage
+  - ✅ 47 property tests for data channel protocol (Property 21)
+
+- [x] 8.3.2 Implement form activation sync
+  - **Execute:** Conversational Forms V2 task 11 (subtasks 11.1-11.2)
+  - _Requirements: 2.4, 3.5_
+  - ✅ handleAgentMessage in widget.js handles all agent message types
+  - ✅ form_activate triggers showFormUI with schema from agent
+  - ✅ Added focusField, showPendingValue, confirmValue, showSummary, showSuccess to form-ui.js
+
+- [x] 8.3.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 12
+  - ✅ All 579 tests passing (schemas: 40, api: 215, widget: 271, dashboard: 53)
+
+### 8.4 Widget Lazy Loading & Form UI Updates (V2 Phase 4)
+
+- [x] 8.4.1 Implement lazy form loading
+  - **Execute:** Conversational Forms V2 task 13 (subtasks 13.1-13.7)
+  - Parallel fetch, caching, graceful degradation
+  - _Requirements: 1.1-1.4_
+  - ✅ fetchAllForms() with caching, parallel fetch in connect(), graceful degradation
+  - ✅ 19 property tests added (Properties 1, 2, 3)
+
+- [x] 8.4.2 Update form UI for confirmation flow
+  - **Execute:** Conversational Forms V2 task 14 (subtasks 14.1-14.3)
+  - Confirmation UI, summary view
+  - _Requirements: 4.1, 4.6, 6.1, 6.4_
+  - ✅ Pending confirmation UI with confirm/reject buttons
+  - ✅ Attempt counter and keyboard fallback hint after 3 failures
+  - ✅ Summary view with per-field edit buttons
+  - ✅ 15 new unit tests added (305 total widget tests)
+
+- [x] 8.4.3 Implement local submission queue
+  - **Execute:** Conversational Forms V2 task 15 (subtasks 15.1-15.2)
+  - _Requirements: 7.3_
+  - ✅ submission-queue.js with enqueue, retry, persistence
+  - ✅ 21 property tests for local queue (Property 16)
+
+- [x] 8.4.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 16
+  - ✅ All 634 tests passing (schemas: 40, api: 215, widget: 326, dashboard: 53)
+
+### 8.5 Voice Agent FormCapabilityV2 (V2 Phase 5)
+
+- [x] 8.5.1 Create FormCapabilityV2 class
+  - **Execute:** Conversational Forms V2 task 17 (subtasks 17.1-17.3)
+  - State machine, trigger phrase matching
+  - _Requirements: 2.2, 4.1-4.4, 6.1_
+  - ✅ form_capability_v2.py with FormStateEnum (7 states) and FormContext
+  - ✅ Trigger phrase matching with 0.95 confidence
+  - ✅ 33 property tests (Properties 5, 7, 9, 11, 12, 17)
+
+- [x] 8.5.2 Implement confirmation flow in agent
+  - **Execute:** Conversational Forms V2 task 18 (subtasks 18.1-18.4)
+  - Re-ask on rejection, validation re-ask
+  - _Requirements: 4.1-4.4, 7.4_
+  - ✅ _generate_confirmation_prompt() for natural confirmation
+  - ✅ _handle_confirming() handles yes/no/correction responses
+  - ✅ _handle_collecting() re-asks on failed extraction
+  - ✅ Property 17 (Validation Re-ask) tested
+
+- [x] 8.5.3 Implement summary and submission flow
+  - **Execute:** Conversational Forms V2 task 19 (subtasks 19.1-19.6)
+  - Edit without restart, retry logic
+  - _Requirements: 6.1, 6.4, 6.6_
+  - ✅ _generate_summary() creates human-readable summary
+  - ✅ _handle_edit_request() allows editing one field without restart
+  - ✅ _handle_submitting() with retry on failure
+  - ✅ Properties 11, 12, 13 tested
+
+- [x] 8.5.4 Checkpoint
+  - **Execute:** Conversational Forms V2 task 20
+  - ✅ All 925 tests passing (schemas: 40, api: 215, voice-agent: 291, widget: 326, dashboard: 53)
+
+### 8.6 Mode Transitions & Recovery (V2 Phase 6)
+
+- [x] 8.6.1 Implement mode transitions in agent
+  - **Execute:** Conversational Forms V2 task 21 (subtasks 21.1-21.4)
+  - Pause/resume, abandonment, post-completion
+  - _Requirements: 3.4, 8.1-8.5_
+  - ✅ Added PAUSED state to FormStateEnum
+  - ✅ pause() and resume() methods in FormContext
+  - ✅ _is_rag_question() detects unrelated questions
+  - ✅ _pause_for_rag() pauses form for RAG detour
+  - ✅ _handle_paused() handles resume commands
+  - ✅ Abandonment confirmation flow with _request_abandonment_confirmation()
+  - ✅ 11 property tests added (Property 18)
+
+- [x] 8.6.2 Implement connection recovery
+  - **Execute:** Conversational Forms V2 task 22 (subtasks 22.1-22.3)
+  - State restoration on reconnect
+  - _Requirements: 7.1, 7.2, 7.6_
+  - ✅ Automatic reconnection with 3 retries (1s, 3s, 5s delays)
+  - ✅ Token data caching for reconnection
+  - ✅ Form state preservation via form-state-manager (already existed)
+  - ✅ Form state restoration on successful reconnection
+  - ✅ Reconnecting UI state handling
+  - ✅ 3 property tests added (Property 15)
+
+- [x] 8.6.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 23
+  - ✅ All 939 tests passing (schemas: 40, api: 215, voice-agent: 302, widget: 329, dashboard: 53)
+
+### 8.7 Dashboard Updates (V2 Phase 7)
+
+- [x] 8.7.1 Update form editor for V2 fields
+  - **Execute:** Conversational Forms V2 task 24 (subtasks 24.1-24.5)
+  - Trigger phrases, description, messages, webhook secret
+  - _Requirements: 9.1-9.4_
+  - ✅ FormSchema type updated with V2 fields (description, triggerPhrases, greetingMessage, completionMessage, webhookSecret, isActive)
+  - ✅ FormEditorDialog updated with all V2 field inputs
+  - ✅ Trigger phrases multi-value input with add/remove
+  - ✅ 14 unit tests added
+
+- [x] 8.7.2 Add form events to conversation view
+  - **Execute:** Conversational Forms V2 task 25 (subtasks 25.1-25.2)
+  - _Requirements: 11.5_
+  - ✅ GET /conversations/:id/form-events endpoint added
+  - ✅ useFormEvents query hook added
+  - ✅ Conversation detail page displays form events inline with turns
+  - ✅ FormEventBadge component with event type icons and colors
+  - ✅ 3 unit tests added for form-events endpoint
+
+- [x] 8.7.3 Checkpoint
+  - **Execute:** Conversational Forms V2 task 26
+  - ✅ All 956 tests passing (schemas: 40, api: 218, voice-agent: 302, widget: 329, dashboard: 67)
+
+### 8.8 Multi-Form Support & Agent Integration (V2 Phase 8)
+
+- [x] 8.8.1 Implement multi-form availability
+  - **Execute:** Conversational Forms V2 task 27 (subtasks 27.1-27.3)
+  - All forms available to agent, selection logic
+  - _Requirements: 2.1, 2.3, 2.5_
+  - ✅ _find_all_matching_forms() detects multiple trigger phrase matches
+  - ✅ _handle_form_selection() handles user form choice
+  - ✅ _generate_form_selection_prompt() asks user to choose between forms
+  - ✅ 17 property tests added (Property 4)
+
+- [x] 8.8.2 Integrate FormCapabilityV2 with orchestrator
+  - **Execute:** Conversational Forms V2 task 28 (subtasks 28.1-28.3)
+  - Data channel message handling
+  - _Requirements: 10.1-10.3_
+  - ✅ FormCapabilityV2 exported from capabilities module
+  - ✅ send_widget_message() helper for agent→widget messages
+  - ✅ Enhanced data channel handler for all widget message types
+  - ✅ 12 new tests added (330 total voice-agent tests)
+
+- [x] 8.8.3 Final Checkpoint
+  - **Execute:** Conversational Forms V2 task 29
+  - All 22 correctness properties validated
+  - Full integration test: multi-form, confirmation, recovery
+  - ✅ All 984 tests passing (schemas: 40, api: 218, voice-agent: 330, widget: 329, dashboard: 67)
+  - ✅ Phase 8 (Conversational Forms V2) complete

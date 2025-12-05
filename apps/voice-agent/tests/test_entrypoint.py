@@ -12,6 +12,8 @@ from src.entrypoint import _extract_project_id, entrypoint
 os.environ.setdefault("LIVEKIT_API_KEY", "test-api-key")
 os.environ.setdefault("LIVEKIT_API_SECRET", "test-api-secret")
 os.environ.setdefault("LIVEKIT_URL", "wss://test.livekit.cloud")
+os.environ.setdefault("DATABASE_URL", "postgresql://localhost/test")
+os.environ.setdefault("OPENAI_API_KEY", "sk-test")
 
 # Constants
 TEST_PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -360,7 +362,7 @@ class TestSearchKnowledgeTool:
     async def test_search_knowledge_returns_results(self, reset_rag_service) -> None:
         """Test search_knowledge returns formatted results from RAG service."""
         from src.entrypoint import search_knowledge
-        from src.models import SessionContext
+        from src.models import SessionContext, DocumentChunk
         
         mock_context = MagicMock()
         mock_context.userdata = SessionContext(
@@ -369,15 +371,19 @@ class TestSearchKnowledgeTool:
         )
         
         mock_rag = AsyncMock()
-        mock_rag.search_formatted = AsyncMock(
-            return_value="[Document 1] (relevance: 0.95)\nRelevant content here"
-        )
+        # Mock search() to return chunks with high similarity
+        mock_rag.search = AsyncMock(return_value=[
+            DocumentChunk(
+                content="Relevant content here",
+                metadata={"id": "chunk-1", "chunk_index": "0", "similarity": "0.95"},
+            )
+        ])
         
         with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
             result = await search_knowledge(mock_context, "How do I reset my password?")
         
         assert "Relevant content" in result
-        mock_rag.search_formatted.assert_called_once_with(
+        mock_rag.search.assert_called_once_with(
             query="How do I reset my password?",
             project_id=TEST_PROJECT_ID,
             top_k=3,
@@ -393,7 +399,7 @@ class TestSearchKnowledgeTool:
         
         result = await search_knowledge(mock_context, "test query")
         
-        assert result == "No relevant documents found."
+        assert "no relevant information" in result.lower()
 
     @pytest.mark.asyncio
     async def test_search_knowledge_handles_rag_error(self, reset_rag_service) -> None:
@@ -408,7 +414,7 @@ class TestSearchKnowledgeTool:
         )
         
         mock_rag = AsyncMock()
-        mock_rag.search_formatted = AsyncMock(side_effect=Exception("Database error"))
+        mock_rag.search = AsyncMock(side_effect=Exception("Database error"))
         
         with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
             result = await search_knowledge(mock_context, "test query")
@@ -683,3 +689,246 @@ class TestErrorHandling:
         
         # Assert session was still started
         mock_session_components["session"].start.assert_called_once()
+
+
+# ============================================================================
+# TestDataChannelFormMessages (Requirements 10.1-10.3)
+# ============================================================================
+
+
+class TestDataChannelFormMessages:
+    """Tests for form-related data channel message handling.
+    
+    Validates: Requirements 10.1, 10.2, 10.3
+    """
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_page_context_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling page_context message type."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "page_context",
+            "url": "https://example.com/contact",
+            "title": "Contact Us"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_keyboard_input_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling keyboard_input message from widget (Requirement 10.3)."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "keyboard_input",
+            "fieldName": "email",
+            "value": "test@example.com"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_field_confirmed_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling field_confirmed message from widget."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "field_confirmed",
+            "fieldName": "name"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_field_rejected_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling field_rejected message from widget."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "field_rejected",
+            "fieldName": "phone"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_form_abandoned_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling form_abandoned message from widget."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "form_abandoned"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_submission_approved_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling submission_approved message from widget."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "submission_approved"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_edit_requested_message(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling edit_requested message from widget."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "edit_requested",
+            "fieldName": "email"
+        }).encode("utf-8")
+        
+        # Should not raise exception
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_unknown_message_type(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling unknown message type gracefully."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "type": "unknown_type",
+            "data": "some data"
+        }).encode("utf-8")
+        
+        # Should not raise exception - should log debug message
+        captured["handler"](mock_data_packet)
+
+    @pytest.mark.asyncio
+    async def test_data_channel_handles_legacy_page_context_format(
+        self, mock_ctx: MagicMock, mock_session_components: dict
+    ) -> None:
+        """Test handling legacy page context format (without type field)."""
+        captured = setup_data_handler_capture(mock_ctx)
+
+        await entrypoint(mock_ctx)
+
+        # Legacy format: just url field, no type
+        mock_data_packet = MagicMock()
+        mock_data_packet.data = json.dumps({
+            "url": "https://example.com/page"
+        }).encode("utf-8")
+        
+        # Should not raise exception - should handle as legacy format
+        captured["handler"](mock_data_packet)
+
+
+# ============================================================================
+# TestSendWidgetMessage
+# ============================================================================
+
+
+class TestSendWidgetMessage:
+    """Tests for send_widget_message helper function."""
+
+    @pytest.mark.asyncio
+    async def test_send_widget_message_success(self) -> None:
+        """Test sending message to widget successfully."""
+        from src.entrypoint import send_widget_message
+        
+        mock_room = MagicMock()
+        mock_room.local_participant.publish_data = AsyncMock()
+        
+        result = await send_widget_message(mock_room, {
+            "type": "form_activate",
+            "schema": {"id": "form_123", "name": "Contact Form"}
+        })
+        
+        assert result is True
+        mock_room.local_participant.publish_data.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_send_widget_message_failure(self) -> None:
+        """Test handling failure when sending message to widget."""
+        from src.entrypoint import send_widget_message
+        
+        mock_room = MagicMock()
+        mock_room.local_participant.publish_data = AsyncMock(
+            side_effect=Exception("Publish failed")
+        )
+        
+        result = await send_widget_message(mock_room, {
+            "type": "field_focus",
+            "fieldName": "email"
+        })
+        
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_send_widget_message_serializes_json(self) -> None:
+        """Test that message is properly serialized to JSON."""
+        from src.entrypoint import send_widget_message
+        
+        mock_room = MagicMock()
+        mock_room.local_participant.publish_data = AsyncMock()
+        
+        message = {
+            "type": "value_extracted",
+            "fieldName": "email",
+            "value": "test@example.com",
+            "utterance": "my email is test at example dot com"
+        }
+        
+        await send_widget_message(mock_room, message)
+        
+        # Verify the data was serialized correctly
+        call_args = mock_room.local_participant.publish_data.call_args
+        sent_data = call_args[0][0]
+        
+        import json
+        parsed = json.loads(sent_data.decode("utf-8"))
+        assert parsed["type"] == "value_extracted"
+        assert parsed["fieldName"] == "email"
+        assert parsed["value"] == "test@example.com"

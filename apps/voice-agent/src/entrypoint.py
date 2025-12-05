@@ -23,6 +23,8 @@ from .models import AgentConfig, PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
 from .validation import ValidationException, validate_and_parse_page_context
+from .capabilities.form_capability import FormCapability
+from .capabilities.form_capability_v2 import FormCapabilityV2, FormContext, FormStateEnum, FORM_STATE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,45 @@ async def get_rag_service() -> RAGService:
         await _rag_service.initialize()
         logger.info("RAG service initialized")
     return _rag_service
+
+
+async def send_widget_message(room: rtc.Room, message: dict) -> bool:
+    """
+    Send a message to the widget via data channel.
+    
+    Message types (Requirements 10.1, 10.2):
+    - form_activate: Activate form UI with schema
+    - field_focus: Focus on a specific field
+    - value_extracted: Show extracted value for confirmation
+    - value_confirmed: Confirm a value
+    - show_summary: Display form summary
+    - submission_success: Form submitted successfully
+    - submission_failed: Form submission failed
+    - form_deactivated: Form closed/completed
+    
+    Args:
+        room: LiveKit room instance
+        message: Message dict with 'type' and payload
+        
+    Returns:
+        True if sent successfully, False otherwise
+    """
+    import json
+    
+    try:
+        data = json.dumps(message).encode("utf-8")
+        await room.local_participant.publish_data(data, reliable=True)
+        logger.debug(
+            "Widget message sent",
+            extra={"type": message.get("type")},
+        )
+        return True
+    except Exception as e:
+        logger.warning(
+            "Failed to send widget message",
+            extra={"type": message.get("type"), "error": str(e)},
+        )
+        return False
 
 
 @function_tool()
@@ -97,28 +138,60 @@ async def search_knowledge(
     Returns:
         Relevant document excerpts that can help answer the user's question,
         or a message indicating no relevant documents were found.
+        Results include relevance scores - lower scores (below 0.5) indicate uncertainty.
     """
     session_context = context.userdata
     if not session_context:
         logger.warning("No session context available for RAG search")
-        return "No relevant documents found."
+        return "No relevant information found."
     
     project_id = session_context.project_id
     
     try:
         rag_service = await get_rag_service()
-        result = await rag_service.search_formatted(
+        
+        # Get raw chunks to analyze similarity scores
+        chunks = await rag_service.search(
             query=query,
             project_id=project_id,
             top_k=3,
         )
+        
+        if not chunks:
+            logger.info(
+                "RAG search returned no results",
+                extra={
+                    "project_id": project_id,
+                    "query_length": len(query),
+                },
+            )
+            return "No relevant information found in the knowledge base."
+        
+        # Calculate max similarity for confidence assessment
+        max_similarity = 0.0
+        for chunk in chunks:
+            try:
+                sim = float(chunk.metadata.get("similarity", "0"))
+                if sim > max_similarity:
+                    max_similarity = sim
+            except (ValueError, TypeError):
+                continue
+        
+        # Format results
+        from .rag_service import format_chunks_for_llm
+        result = format_chunks_for_llm(chunks)
+        
+        # Add confidence indicator for low similarity results
+        if max_similarity < 0.5:
+            result = f"[Low confidence results - relevance scores below 0.5]\n\n{result}"
         
         logger.info(
             "RAG search completed",
             extra={
                 "project_id": project_id,
                 "query_length": len(query),
-                "has_results": result != "No relevant documents found.",
+                "num_results": len(chunks),
+                "max_similarity": round(max_similarity, 3),
             },
         )
         
@@ -228,6 +301,33 @@ async def entrypoint(ctx: JobContext) -> None:
         agent_config=agent_config,
     )
     
+    # Fetch active form for this project (if any)
+    active_form = None
+    try:
+        config = get_config()
+        if config.api_server_url:
+            form_capability = FormCapability(api_base_url=config.api_server_url)
+            active_form = await form_capability._fetch_active_form(project_id)
+            if active_form:
+                logger.info(
+                    "Active form loaded for project",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "form_id": active_form.get("id"),
+                        "form_name": active_form.get("name"),
+                    },
+                )
+    except Exception as e:
+        logger.warning(
+            "Failed to fetch active form - continuing without form mode",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "error": str(e),
+            },
+        )
+    
     # Create API conversation for logging (if widget_token is available)
     # Get config for API URL - gracefully handle if not available
     try:
@@ -274,6 +374,7 @@ async def entrypoint(ctx: JobContext) -> None:
         instructions = _build_agent_instructions(
             page_url=page_url,
             agent_config=agent_config,
+            active_form=active_form,
         )
         
         # Create agent with tools for knowledge grounding and page context
@@ -316,51 +417,132 @@ async def entrypoint(ctx: JobContext) -> None:
         )
         raise  # Permanent error - invalid configuration
     
-    # Set up data channel handler for page context
+    # Set up data channel handler for page context and form messages
     # Page context is stored in session_context.userdata and will be accessible
     # in agent tools via RunContext parameter (Task 5)
+    # Form messages are handled for widget-agent sync (Requirements 10.1-10.3)
     @ctx.room.on("data_received")
     def on_data_received(data: rtc.DataPacket) -> None:
         """
         Handle data channel messages from widget.
         
+        Message types (Requirements 10.1-10.3):
+        - page_context: Page URL and title
+        - keyboard_input: User typed a value in the form
+        - field_confirmed: User confirmed a voice-extracted value
+        - field_rejected: User rejected a voice-extracted value
+        - form_abandoned: User abandoned the form
+        - submission_approved: User approved submission from summary
+        - edit_requested: User wants to edit a field from summary
+        
         Errors in data channel processing are logged but don't interrupt
         the voice session (transient errors).
         """
         try:
-            # Validate and parse page context (includes size check, JSON parsing, and Pydantic validation)
-            page_context_input = validate_and_parse_page_context(data.data)
+            import json
             
-            # Store validated page context in session userdata
-            # This will be accessible in agent tools via context.userdata.page_context
-            session_context.page_context = PageContext(url=page_context_input.url)
+            # Parse JSON message
+            try:
+                message = json.loads(data.data.decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Try legacy page context format
+                page_context_input = validate_and_parse_page_context(data.data)
+                session_context.page_context = PageContext(url=page_context_input.url)
+                logger.info(
+                    "Page context received (legacy)",
+                    extra={"room": room_name, "project_id": project_id, "page_url": page_context_input.url},
+                )
+                return
             
-            logger.info(
-                "Page context received",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "page_url": page_context_input.url,
-                },
-            )
+            msg_type = message.get("type")
+            
+            if msg_type == "page_context":
+                # Handle page context message
+                session_context.page_context = PageContext(url=message.get("url", ""))
+                logger.info(
+                    "Page context received",
+                    extra={"room": room_name, "project_id": project_id, "page_url": message.get("url")},
+                )
+            
+            elif msg_type == "keyboard_input":
+                # Handle keyboard input from widget (Requirement 10.3)
+                # Store in session context for form capability to process
+                field_name = message.get("fieldName")
+                value = message.get("value")
+                if field_name and value is not None:
+                    if not hasattr(session_context, "pending_keyboard_input"):
+                        session_context.pending_keyboard_input = {}
+                    session_context.pending_keyboard_input[field_name] = value
+                    logger.debug(
+                        "Keyboard input received",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "field_confirmed":
+                # Handle field confirmation from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    if not hasattr(session_context, "confirmed_fields"):
+                        session_context.confirmed_fields = set()
+                    session_context.confirmed_fields.add(field_name)
+                    logger.debug(
+                        "Field confirmed via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "field_rejected":
+                # Handle field rejection from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    if not hasattr(session_context, "rejected_fields"):
+                        session_context.rejected_fields = set()
+                    session_context.rejected_fields.add(field_name)
+                    logger.debug(
+                        "Field rejected via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            elif msg_type == "form_abandoned":
+                # Handle form abandonment from widget
+                session_context.form_abandoned = True
+                logger.info(
+                    "Form abandoned via widget",
+                    extra={"room": room_name, "project_id": project_id},
+                )
+            
+            elif msg_type == "submission_approved":
+                # Handle submission approval from widget
+                session_context.submission_approved = True
+                logger.info(
+                    "Submission approved via widget",
+                    extra={"room": room_name, "project_id": project_id},
+                )
+            
+            elif msg_type == "edit_requested":
+                # Handle edit request from widget
+                field_name = message.get("fieldName")
+                if field_name:
+                    session_context.edit_requested_field = field_name
+                    logger.debug(
+                        "Edit requested via widget",
+                        extra={"room": room_name, "field": field_name},
+                    )
+            
+            else:
+                logger.debug(
+                    "Unknown message type",
+                    extra={"room": room_name, "type": msg_type},
+                )
+                
         except ValidationException as e:
             logger.warning(
-                "Invalid page context data",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "error": str(e),
-                },
+                "Invalid data channel message",
+                extra={"room": room_name, "project_id": project_id, "error": str(e)},
             )
         except Exception as e:
             logger.warning(
                 "Failed to process data channel message",
-                extra={
-                    "room": room_name,
-                    "project_id": project_id,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
+                extra={"room": room_name, "project_id": project_id, "error": str(e), "error_type": type(e).__name__},
             )
     
     # Set up conversation logging if API conversation was created
@@ -583,6 +765,7 @@ async def _extract_project_id(ctx: JobContext) -> Optional[str]:
 def _build_agent_instructions(
     page_url: Optional[str] = None,
     agent_config: Optional[AgentConfig] = None,
+    active_form: Optional[dict] = None,
 ) -> str:
     """
     Build agent instructions with optional page context and custom configuration.
@@ -590,10 +773,79 @@ def _build_agent_instructions(
     Args:
         page_url: Current page URL the user is viewing (optional)
         agent_config: Custom agent configuration from project settings (optional)
+        active_form: Active form schema for form-filling mode (optional)
         
     Returns:
         Agent instructions string
     """
+    # If there's an active form, use form-filling mode
+    if active_form:
+        form_name = active_form.get("name", "Contact Form")
+        fields = active_form.get("fields", [])
+        
+        # Build field descriptions
+        field_descriptions = []
+        for i, field in enumerate(fields, 1):
+            field_type = field.get("type", "string")
+            label = field.get("label", field.get("name", f"Field {i}"))
+            required = field.get("required", True)
+            options = field.get("options", [])
+            
+            desc = f"{i}. {label} ({field_type})"
+            if not required:
+                desc += " - optional"
+            if options:
+                desc += f" - options: {', '.join(options)}"
+            field_descriptions.append(desc)
+        
+        fields_list = "\n".join(field_descriptions)
+        
+        agent_name = "a helpful assistant"
+        if agent_config and agent_config.agent_name:
+            agent_name = agent_config.agent_name
+        
+        base_instructions = f"""You are {agent_name} helping collect information through a conversational form called "{form_name}".
+
+YOUR PRIMARY TASK: Guide the user through filling out this form by asking questions one at a time.
+
+FORM FIELDS TO COLLECT:
+{fields_list}
+
+HOW TO CONDUCT THE FORM:
+1. Start by greeting the user and explaining you'll help them fill out the {form_name}
+2. Ask for each field ONE AT A TIME in order
+3. After each answer, confirm what you heard and move to the next question
+4. For optional fields, let the user know they can skip
+5. When all fields are collected, summarize the information and confirm
+
+EXTRACTING ANSWERS:
+- For email: Listen for email addresses (e.g., "john at gmail dot com" = john@gmail.com)
+- For phone: Listen for phone numbers in any format
+- For enum/select fields: Match the user's answer to the closest option
+- If you can't understand an answer, politely ask them to repeat
+
+IMPORTANT RULES:
+- Be conversational and friendly, not robotic
+- Keep questions short and clear
+- Confirm each answer before moving on
+- If the user asks unrelated questions, briefly answer using search_knowledge, then guide back to the form
+- Never skip required fields without an answer
+
+EXAMPLE FLOW:
+"Hi! I'll help you fill out our {form_name}. Let's start - what's your name?"
+[User: "I'm John"]
+"Great, John! And what's your email address?"
+[User: "john at example dot com"]
+"Got it - john@example.com. And your phone number?"
+..."""
+
+        if page_url:
+            base_instructions += f"""
+
+Current context: The user is viewing: {page_url}"""
+        
+        return base_instructions
+    
     # Use custom system prompt if provided, otherwise use default
     if agent_config and agent_config.system_prompt:
         # Custom prompt - wrap with essential capabilities
@@ -611,24 +863,37 @@ Communication style:
 - Speak naturally as if having a real conversation
 - Keep responses brief unless more detail is needed"""
     else:
-        # Default instructions
+        # Default FAQ-optimized instructions
         base_instructions = """You are a helpful voice assistant for website visitors.
 
-Your primary role is to answer questions using the knowledge base. When a user asks a question:
-1. Use the search_knowledge tool to find relevant information from the uploaded documents
-2. Base your answer on the search results
-3. If no relevant documents are found, be honest and say you don't have that information
+Your primary role is to answer questions using the knowledge base.
 
-You also have access to page context:
-- Use the get_page_context tool when users ask what page they're on or need context about their location
-- The page context updates dynamically as users navigate
+ANSWERING QUESTIONS:
+1. Use the search_knowledge tool to find relevant information
+2. Synthesize the search results into a clear, direct answer
+3. If results mention "not entirely sure" or have low relevance scores, acknowledge uncertainty
+4. If no relevant information is found, say "I don't have information about that" - don't make things up
 
-Communication style:
-- Be conversational, friendly, and concise
-- Speak naturally as if having a real conversation
-- Keep responses brief - aim for 1-2 sentences unless more detail is needed
-- Don't mention "documents" or "knowledge base" - just answer naturally
-- If you're unsure, say so honestly"""
+RESPONSE STYLE FOR FAQ:
+- Give direct answers first, then brief explanation if needed
+- Keep responses to 1-3 sentences for simple questions
+- For complex topics, break into digestible points
+- Use natural, conversational language - avoid robotic phrasing
+- Never say "according to the documents" or "based on my search" - just answer naturally
+
+HANDLING UNCERTAINTY:
+- If search results have low confidence, say "I'm not entirely sure, but..."
+- If you can't find relevant info, offer to help with something else
+- Never fabricate information - honesty builds trust
+
+PAGE CONTEXT:
+- Use get_page_context when users ask about their current page
+- Context updates as users navigate
+
+TONE:
+- Friendly and helpful, like a knowledgeable colleague
+- Concise but not curt
+- Confident when you have good information, humble when uncertain"""
 
     if page_url:
         base_instructions += f"""

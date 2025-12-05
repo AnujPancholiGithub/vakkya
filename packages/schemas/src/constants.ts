@@ -46,3 +46,8 @@ export const ERROR_CODES = {
   INVALID_FILE_TYPE: 'INVALID_FILE_TYPE',
   PROCESSING_FAILED: 'PROCESSING_FAILED',
 } as const;
+
+// Webhook settings
+export const WEBHOOK_TIMEOUT_MS = 10000; // 10 seconds
+export const WEBHOOK_RETRY_DELAYS = [1000, 5000, 30000] as const; // 1s, 5s, 30s
+export const WEBHOOK_MAX_RETRIES = 3;

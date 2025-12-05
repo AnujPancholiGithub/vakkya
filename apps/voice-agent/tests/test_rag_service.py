@@ -479,3 +479,89 @@ class TestConstants:
     def test_default_top_k(self):
         """Test default top_k is 3."""
         assert DEFAULT_TOP_K == 3
+
+
+# ============================================================================
+# Similarity Helper Tests
+# ============================================================================
+
+
+class TestSimilarityHelpers:
+    """Tests for similarity score helper functions."""
+
+    def test_get_max_similarity_with_chunks(self):
+        """Test get_max_similarity returns highest score."""
+        from src.rag_service import get_max_similarity
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={"similarity": "0.7"}),
+            DocumentChunk(content="B", metadata={"similarity": "0.95"}),
+            DocumentChunk(content="C", metadata={"similarity": "0.8"}),
+        ]
+        
+        result = get_max_similarity(chunks)
+        assert result == 0.95
+
+    def test_get_max_similarity_empty_list(self):
+        """Test get_max_similarity returns 0.0 for empty list."""
+        from src.rag_service import get_max_similarity
+        
+        result = get_max_similarity([])
+        assert result == 0.0
+
+    def test_get_max_similarity_missing_metadata(self):
+        """Test get_max_similarity handles missing similarity metadata."""
+        from src.rag_service import get_max_similarity
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={}),
+            DocumentChunk(content="B", metadata={"similarity": "0.8"}),
+        ]
+        
+        result = get_max_similarity(chunks)
+        assert result == 0.8
+
+    def test_get_max_similarity_invalid_value(self):
+        """Test get_max_similarity handles invalid similarity values."""
+        from src.rag_service import get_max_similarity
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={"similarity": "invalid"}),
+            DocumentChunk(content="B", metadata={"similarity": "0.6"}),
+        ]
+        
+        result = get_max_similarity(chunks)
+        assert result == 0.6
+
+    def test_is_low_confidence_below_threshold(self):
+        """Test is_low_confidence returns True for low scores."""
+        from src.rag_service import is_low_confidence_result
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={"similarity": "0.3"}),
+            DocumentChunk(content="B", metadata={"similarity": "0.4"}),
+        ]
+        
+        assert is_low_confidence_result(chunks) is True
+
+    def test_is_low_confidence_above_threshold(self):
+        """Test is_low_confidence returns False for high scores."""
+        from src.rag_service import is_low_confidence_result
+        
+        chunks = [
+            DocumentChunk(content="A", metadata={"similarity": "0.7"}),
+        ]
+        
+        assert is_low_confidence_result(chunks) is False
+
+    def test_is_low_confidence_empty_list(self):
+        """Test is_low_confidence returns True for empty list."""
+        from src.rag_service import is_low_confidence_result
+        
+        assert is_low_confidence_result([]) is True
+
+    def test_low_confidence_threshold_value(self):
+        """Test LOW_CONFIDENCE_THRESHOLD is 0.5."""
+        from src.rag_service import LOW_CONFIDENCE_THRESHOLD
+        
+        assert LOW_CONFIDENCE_THRESHOLD == 0.5

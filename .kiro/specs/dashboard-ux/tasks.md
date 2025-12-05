@@ -1,0 +1,149 @@
+# Implementation Plan
+
+- [x] 1. Add utility functions for formatting and state derivation
+  - [x] 1.1 Add formatRelativeTime function to lib/utils.ts
+    - Implement relative time formatting (Xh ago, Yesterday, Nov 28)
+    - Handle edge cases: future dates, invalid dates
+    - _Requirements: 3.2, 6.4, 6.5_
+  - [x] 1.2 Write property test for formatRelativeTime
+    - **Property 4: Relative Time Formatting**
+    - **Validates: Requirements 3.2, 6.4, 6.5**
+  - [x] 1.3 Add truncateText function to lib/utils.ts
+    - Implement text truncation with ellipsis at maxLength
+    - Handle edge cases: empty string, string shorter than maxLength
+    - _Requirements: 6.1_
+  - [x] 1.4 Write property test for truncateText
+    - **Property 8: Text Truncation with Ellipsis**
+    - **Validates: Requirements 6.1**
+  - [x] 1.5 Add getFileTypeIcon function to lib/utils.ts
+    - Map file extensions (.pdf, .txt, .md) to icon identifiers
+    - Handle unknown extensions with default icon
+    - _Requirements: 5.5_
+  - [x] 1.6 Write property test for getFileTypeIcon
+    - **Property 7: File Type Icon Mapping**
+    - **Validates: Requirements 5.5**
+  - [x] 1.7 Add getSetupStep function to lib/utils.ts
+    - Derive setup step from document count and conversation count
+    - Return step index: 0 (create), 1 (upload), 2 (embed), 3 (complete)
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
+  - [x] 1.8 Write property test for getSetupStep
+    - **Property 2: Progress Step State Consistency**
+    - **Validates: Requirements 2.2**
+
+- [x] 2. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 3. Create reusable UI components
+  - [x] 3.1 Create EmptyState component
+    - Create components/ui/empty-state.tsx
+    - Implement props: icon, title, description, action, secondaryAction
+    - Add illustration variants for workflow, documents, conversations
+    - Include documentation link in all variants
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+  - [x] 3.2 Write property test for EmptyState documentation link
+    - **Property 1: Empty State Documentation Link Presence**
+    - **Validates: Requirements 1.5**
+  - [x] 3.3 Create ProgressSteps component
+    - Create components/ui/progress-steps.tsx
+    - Implement horizontal step indicator with 3 states (completed, current, pending)
+    - Add checkmark icons for completed steps
+    - Use color coding: green (complete), primary (current), muted (pending)
+    - _Requirements: 2.1, 2.2_
+
+- [x] 4. Enhance project cards with metrics
+  - [x] 4.1 Update project cards in projects/page.tsx
+    - Add metrics row with document count (file icon) and conversation count (chat icon)
+    - Add last activity timestamp in relative format
+    - Add setup status badge for incomplete projects
+    - Ensure consistent card heights
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - [x] 4.2 Write property test for project card metrics display
+    - **Property 3: Project Card Metrics Display**
+    - **Validates: Requirements 3.1**
+  - [x] 4.3 Write property test for setup status badge logic
+    - **Property 5: Setup Status Badge Logic**
+    - **Validates: Requirements 3.3**
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Enhance empty states across dashboard
+  - [x] 6.1 Update projects page empty state
+    - Replace basic empty state with EmptyState component
+    - Add three-step workflow illustration (Create → Upload → Embed)
+    - Include headline, description, and Create Project CTA
+    - Add documentation link
+    - _Requirements: 1.1, 1.2_
+  - [x] 6.2 Update documents tab empty state
+    - Replace basic empty state with EmptyState component
+    - Add file type icons (PDF, TXT, MD) with format badges
+    - Include educational text about how documents power RAG
+    - Add documentation link
+    - _Requirements: 1.3_
+  - [x] 6.3 Update conversations tab empty state
+    - Replace basic empty state with EmptyState component
+    - Add visual showing widget → conversation flow
+    - Include educational text about how conversations appear
+    - Add documentation link
+    - _Requirements: 1.4_
+
+- [x] 7. Add progress indicator to project detail page
+  - [x] 7.1 Integrate ProgressSteps into project detail page
+    - Add progress indicator below project header
+    - Connect to getSetupStep function for current step
+    - Show/hide based on setup completion status
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+- [x] 8. Add contextual tooltips
+  - [x] 8.1 Add tooltip to widget token field
+    - Wrap token input with Tooltip component
+    - Add explanation about token authentication and privacy
+    - _Requirements: 4.1_
+  - [x] 8.2 Add helper text to embed code section
+    - Add instructional text below embed code input
+    - Explain where to paste (before closing body tag)
+    - _Requirements: 4.2_
+  - [x] 8.3 Enhance agent settings section
+    - Add example system prompts as placeholder text
+    - Ensure character count is visible
+    - Add brief guidance text
+    - _Requirements: 4.3, 4.5_
+  - [x] 8.4 Add tooltips to document status badges
+    - Wrap DocumentStatusBadge with Tooltip
+    - Map each status to explanatory text
+    - _Requirements: 4.4_
+  - [x] 8.5 Write property test for document status tooltip mapping
+    - **Property 6: Document Status Tooltip Mapping**
+    - **Validates: Requirements 4.4**
+
+- [x] 9. Improve document upload experience
+  - [x] 9.1 Add drag-and-drop zone to documents tab
+    - Implement drag-over visual feedback (highlighted border)
+    - Show drop zone with upload icon when dragging
+    - Handle drop event to trigger upload
+    - _Requirements: 5.1_
+  - [x] 9.2 Enhance upload feedback
+    - Show file name with loading spinner during upload
+    - Display success toast on completion
+    - Show error message with reason on failure
+    - _Requirements: 5.2, 5.3, 5.4_
+  - [x] 9.3 Add file type icons to documents list
+    - Replace generic FileText icon with type-specific icons
+    - Use getFileTypeIcon utility function
+    - _Requirements: 5.5_
+
+- [x] 10. Enhance conversation list with previews
+  - [x] 10.1 Add query preview to conversation rows
+    - Display truncated first user query (60 chars max)
+    - Use truncateText utility function
+    - _Requirements: 6.1_
+  - [x] 10.2 Enhance conversation metadata display
+    - Show turn count with message icon
+    - Format timestamps using formatRelativeTime
+    - _Requirements: 6.2, 6.4, 6.5_
+  - [x] 10.3 Add total conversation count to tab header
+    - Display count metric in conversations tab header
+    - _Requirements: 6.3_
+
+- [x] 11. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

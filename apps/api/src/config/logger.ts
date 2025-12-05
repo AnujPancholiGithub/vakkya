@@ -45,3 +45,9 @@ export function createLogger(env: Env) {
     },
   });
 }
+
+// Default logger for services (silent in test mode)
+const nodeEnv = process.env.NODE_ENV || 'development';
+export const logger = pino({
+  level: nodeEnv === 'test' ? 'silent' : nodeEnv === 'development' ? 'debug' : 'info',
+});
