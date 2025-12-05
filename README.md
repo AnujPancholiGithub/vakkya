@@ -26,7 +26,7 @@
 
 - **🎙️ Real-time Voice Agents** — Sub-500ms latency voice conversations powered by LiveKit and GPT-4o
 - **📄 RAG-Powered Answers** — Upload PDFs, TXT, or Markdown files and get accurate answers from your docs
-- **� CPonversational Forms** — Typeform-style voice forms with webhook delivery to 5000+ integrations
+- **� CPonversational Forms** — Typeform-style voice forms with webhook delivery.
 - **⚡ One-Line Integration** — Drop in a script tag and you're live
 - **🎨 Developer Dashboard** — Manage projects, view conversations, build forms, configure agents
 
@@ -36,7 +36,7 @@
 
 ```html
 <!-- Add to any website -->
-<script src="https://cdn.vakkya.ai/widget.js" data-token="your-project-token"></script>
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="your-project-token"></script>
 ```
 
 That's it. Your visitors can now talk to your AI agent.

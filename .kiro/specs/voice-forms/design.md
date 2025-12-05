@@ -16,7 +16,7 @@ Design principles: Simplicity, <500ms latency, extensibility.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  Website: <script src="cdn.vakkya.ai/widget.js" data-token="x">  │
+│  Website: <script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="x">  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼

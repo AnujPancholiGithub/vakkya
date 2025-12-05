@@ -53,7 +53,7 @@ export function parseConfig(scriptElement) {
   }
 
   // API URL can be overridden for development
-  const apiUrl = scriptElement.getAttribute('data-api-url') || 'https://api.vakkya.ai';
+  const apiUrl = scriptElement.getAttribute('data-api-url') || 'https://api.vakkya.com';
 
   // Parse customization attributes (Requirements 6.1, 6.2)
   const accentColor = parseAccentColor(scriptElement.getAttribute('data-accent-color'));

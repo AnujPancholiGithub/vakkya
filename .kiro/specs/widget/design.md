@@ -326,5 +326,5 @@ export default {
 ### URL Structure
 
 ```
-https://cdn.vakkya.ai/widget.js
+https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js
 ```

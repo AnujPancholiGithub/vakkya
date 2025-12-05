@@ -46,7 +46,7 @@ export function ConversationsTab({ projectId }: ConversationsTabProps) {
                 description="When users interact with your embedded widget, their conversations will appear here. You'll be able to review transcripts, see what questions are being asked, and improve your agent's responses."
                 secondaryAction={{
                   label: 'Learn about the widget',
-                  href: 'https://docs.vakkya.ai/widget',
+                  href: 'https://docs.vakkya.com/widget',
                 }}
               />
             </div>

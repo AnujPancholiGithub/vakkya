@@ -25,4 +25,4 @@ wrangler r2 object put "${R2_BUCKET}/widget.js" \
     --cache-control "public, max-age=3600"
 
 echo "✅ Widget deployed successfully!"
-echo "CDN URL: https://cdn.vakkya.ai/widget.js"
+echo "CDN URL: https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js"

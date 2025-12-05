@@ -8,4 +8,4 @@ binding = "WIDGET_BUCKET"
 bucket_name = "vakkyaclfbucket"
 
 # Custom domain (configure in Cloudflare dashboard)
-# routes = [{ pattern = "cdn.vakkya.ai/*", zone_name = "vakkya.ai" }]
+# routes = [{ pattern = "cdn.vakkya.com/*", zone_name = "vakkya.com" }]

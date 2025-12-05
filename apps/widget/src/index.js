@@ -2,7 +2,7 @@
  * Vakkya Widget - Embeddable voice assistant
  * 
  * Usage:
- * <script src="https://cdn.vakkya.ai/widget.js" data-token="your-project-token"></script>
+ * <script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="your-project-token"></script>
  */
 
 import { VakkyaWidget } from './widget.js';
