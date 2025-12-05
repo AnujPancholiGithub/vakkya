@@ -245,6 +245,48 @@ export function createFormStateManager(sessionId = null) {
   }
 
   /**
+   * Directly confirm a value without pending confirmation step
+   * Used when agent skips value_extracted and directly sends value_confirmed
+   * @param {string} fieldName
+   * @param {unknown} value
+   * @returns {{ field: Object, value: unknown, shouldTransitionToSummary: boolean } | null}
+   */
+  function confirmAnswerDirect(fieldName, value) {
+    if (!state.currentForm) return null;
+
+    const existingAnswer = state.answers[fieldName];
+    const confirmedField = state.currentForm.fields?.find(f => f.name === fieldName);
+    
+    if (!confirmedField) return null;
+
+    state.answers[fieldName] = {
+      value,
+      confirmed: true,
+      source: 'voice',
+      attempts: existingAnswer ? existingAnswer.attempts : 1,
+      timestamp: Date.now(),
+    };
+
+    state.pendingConfirmation = null;
+    state.fallbackToKeyboard = false;
+    
+    const previousIndex = state.currentFieldIndex;
+    advanceToNextField();
+    const shouldTransitionToSummary = state.mode === 'summary';
+    
+    saveToStorage();
+    notifyListeners();
+
+    return {
+      field: confirmedField,
+      value,
+      shouldTransitionToSummary,
+      previousIndex,
+      newIndex: state.currentFieldIndex,
+    };
+  }
+
+  /**
    * Reject the pending answer
    * Property 7: Rejection returns to COLLECTING state
    * @param {string} fieldName
@@ -601,6 +643,7 @@ export function createFormStateManager(sessionId = null) {
     setAnswer,
     setPendingConfirmation,
     confirmAnswer,
+    confirmAnswerDirect,
     rejectAnswer,
     editField,
     setActiveFieldIndex,

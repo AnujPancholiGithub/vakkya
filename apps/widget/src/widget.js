@@ -167,6 +167,7 @@ export class VakkyaWidget {
     this.chatPanel = createChatPanel(this.shadow, {
       onClose: () => this.handleClose(),
       onMicClick: () => this.handleMicClick(),
+      onMuteToggle: () => this.handleMuteToggle(),
       onKeyboardInput: (fieldName, value) => this.handleFormAnswer(fieldName, value),
       onConfirmValue: (fieldName) => this.handleFieldConfirm(fieldName),
       onRejectValue: (fieldName) => this.handleFieldReject(fieldName),
@@ -331,12 +332,21 @@ export class VakkyaWidget {
 
   /**
    * Handle close button click
+   * Requirements 4.2, 4.3, 4.4: Send user_ended_session before disconnect, return to collapsed state
    */
   async handleClose() {
     // Stop animation loop first
     this._animating = false;
     
-    // Disconnect from LiveKit
+    // Send user_ended_session notification to agent before disconnecting (Requirements 4.3)
+    // This must happen BEFORE cleanup begins to ensure the message is delivered
+    if (this.livekitManager && this.livekitManager.isConnected()) {
+      this.livekitManager.sendUserEndedSession();
+      // Small delay to ensure message is published before disconnect
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    
+    // Disconnect from LiveKit (Requirements 4.2)
     if (this.livekitManager) {
       await this.livekitManager.disconnect();
     }
@@ -347,7 +357,7 @@ export class VakkyaWidget {
       this.audioProcessor = null;
     }
     
-    // Release microphone
+    // Release microphone (Requirements 4.2)
     if (this.micStream) {
       releaseMicrophone(this.micStream);
       this.micStream = null;
@@ -360,7 +370,7 @@ export class VakkyaWidget {
       this.chatPanel = null;
     }
     
-    // Show button again
+    // Return to initial collapsed button state (Requirements 4.4)
     if (this.button) {
       this.button.style.display = 'flex';
     }
@@ -496,9 +506,10 @@ export class VakkyaWidget {
       console.warn('[Vakkya] handleFormAnswer: no result from setAnswer or missing chatPanel');
     }
     
-    // Send keyboard input to voice agent via data channel
+    // Send field_completed to voice agent via data channel
+    // Requirements 1.1, 4.2: Notify agent immediately when user submits a field via keyboard
     if (this.livekitManager && this.livekitManager.isConnected()) {
-      this.livekitManager.sendKeyboardInput(fieldName, value);
+      this.livekitManager.sendFieldCompleted(fieldName, value, 'keyboard');
     }
   }
 
@@ -510,6 +521,25 @@ export class VakkyaWidget {
     // Mic is always active when chat panel is open
     // This could be extended to toggle mute state if needed
     console.log('[Vakkya] Mic button clicked');
+  }
+
+  /**
+   * Handle mute toggle button click in chat panel
+   * Requirements 3.1, 3.4, 5.5: Toggle microphone mute state
+   */
+  handleMuteToggle() {
+    if (!this.livekitManager) return;
+    
+    const currentMuted = this.livekitManager.getMuted();
+    const newMuted = !currentMuted;
+    
+    const success = this.livekitManager.setMuted(newMuted);
+    
+    if (success && this.chatPanel) {
+      this.chatPanel.setMuted(newMuted);
+    }
+    
+    console.log('[Vakkya] Mute toggled:', newMuted);
   }
 
   /**
@@ -700,6 +730,9 @@ export class VakkyaWidget {
         break;
       case 'validation_error':
         this.handleValidationError(message.fieldName, message.error);
+        break;
+      case 'session_end':
+        this.handleSessionEnd(message.reason, message.message);
         break;
       default:
         console.warn('[Vakkya] Unknown agent message type:', message.type);
@@ -893,8 +926,14 @@ export class VakkyaWidget {
     // Get the field info
     const field = this.formSchema?.fields?.find(f => f.name === fieldName);
     
-    // Confirm in form state manager
-    const result = this.formStateManager?.confirmAnswer(fieldName);
+    // Try to confirm existing pending confirmation (normal flow: value_extracted → value_confirmed)
+    let result = this.formStateManager?.confirmAnswer(fieldName);
+    
+    // If no pending confirmation, agent skipped value_extracted step
+    // Use direct confirmation method instead
+    if (!result && this.formStateManager) {
+      result = this.formStateManager.confirmAnswerDirect(fieldName, value);
+    }
     
     if (this.chatPanel && field) {
       // Add answer card to chat for the completed field (Requirement 1.3, 3.1)
@@ -1142,6 +1181,45 @@ export class VakkyaWidget {
   }
 
   /**
+   * Handle session_end message from agent
+   * Requirements 2.3, 2.4: Display closing message overlay for 3 seconds, then cleanup
+   * @param {string} reason - Termination reason
+   * @param {string} [closingMessage] - Optional closing message to display
+   */
+  handleSessionEnd(reason, closingMessage) {
+    console.log('[Vakkya] Session end received:', reason, closingMessage);
+    
+    // Generate appropriate message based on reason if not provided
+    const message = closingMessage || this.getSessionEndMessage(reason);
+    
+    // Display closing message overlay in chat panel (Requirements 2.4)
+    if (this.chatPanel) {
+      this.chatPanel.showSessionEndOverlay(message, reason);
+    }
+    
+    // Trigger cleanup after 3 seconds (Requirements 2.4)
+    setTimeout(() => {
+      this.handleClose();
+    }, 3000);
+  }
+
+  /**
+   * Get default message for session end reason
+   * @param {string} reason - Termination reason
+   * @returns {string} Default message for the reason
+   */
+  getSessionEndMessage(reason) {
+    const messages = {
+      conversation_complete: 'Thank you for chatting! Have a great day.',
+      user_inactive: 'Session ended due to inactivity.',
+      form_submitted: 'Your form has been submitted. Thank you!',
+      user_requested: 'Session ended. Goodbye!',
+      error: 'An error occurred. Please try again later.',
+    };
+    return messages[reason] || messages.error;
+  }
+
+  /**
    * Set form answer from voice input (called by voice agent)
    * @param {string} fieldName
    * @param {any} value
@@ -1188,6 +1266,11 @@ export class VakkyaWidget {
     // Apply custom accent color (Requirement 6.1, 6.3)
     if (this.config.accentColor) {
       applyAccentColor(this.host, this.config.accentColor);
+      
+      // Update waveform color if chat panel exists
+      if (this.chatPanel) {
+        this.chatPanel.updateAccentColor(this.config.accentColor);
+      }
     }
 
     // Apply theme (Requirement 6.2)
@@ -1198,6 +1281,8 @@ export class VakkyaWidget {
     // Apply position
     if (this.config.position === 'bottom-left') {
       this.host.setAttribute('data-position', 'bottom-left');
+    } else {
+      this.host.removeAttribute('data-position');
     }
   }
 }

@@ -10,19 +10,19 @@ const BUTTON_STYLES = `
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background-color: #3B82F6;
+    background-color: var(--vakkya-accent, #3B82F6);
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--vakkya-accent, #3B82F6), transparent 60%);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   
   .vakkya-button:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--vakkya-accent, #3B82F6), transparent 50%);
   }
   
   .vakkya-button:active {

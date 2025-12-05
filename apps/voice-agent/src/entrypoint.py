@@ -24,7 +24,9 @@ from .capabilities import (
     InstructionBuilder,
     RAGCapability,
 )
-from .config import get_config
+from .config import get_config, setup_langfuse_telemetry
+from .form_aware_agent import FormAwareAgent
+from .form_state import FormCollectionState
 from .models import AgentConfig, PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
@@ -157,6 +159,19 @@ async def entrypoint(ctx: JobContext) -> None:
     room_name = ctx.room.name
     logger.info("Agent worker starting", extra={"room": room_name})
 
+    # Setup Langfuse telemetry with session metadata for trace grouping
+    config = get_config()
+    trace_provider = setup_langfuse_telemetry(
+        config,
+        metadata={"langfuse.session.id": room_name},
+    )
+    
+    # Flush traces on session shutdown to ensure all data is sent
+    if trace_provider:
+        async def flush_traces():
+            trace_provider.force_flush()
+        ctx.add_shutdown_callback(flush_traces)
+
     try:
         # Connect to the room
         await ctx.connect()
@@ -230,7 +245,6 @@ async def entrypoint(ctx: JobContext) -> None:
     )
 
     # Fetch active form for this project (if any)
-    config = get_config()
     active_form = await _fetch_active_form(project_id, room_name, config)
     if active_form:
         session_context.active_form = active_form
@@ -323,19 +337,22 @@ async def entrypoint(ctx: JobContext) -> None:
         tool_names = [getattr(t, "__name__", str(t)) for t in tools]
         
         # Create agent with dynamically collected tools
-        agent = Agent(
+        # Using FormAwareAgent to enable keyboard input acknowledgment hooks
+        agent = FormAwareAgent(
             instructions=instructions,
             tools=tools,
         )
 
         logger.info(
-            "Agent created with capability-driven architecture",
+            "FormAwareAgent created with capability-driven architecture and hooks enabled",
             extra={
                 "room": room_name,
                 "project_id": project_id,
                 "instructions_length": len(instructions),
                 "tools": tool_names,
                 "enabled_capabilities": [c.name for c in registry.get_enabled_capabilities(session_context)],
+                "hooks_enabled": True,
+                "agent_type": "FormAwareAgent",
             },
         )
 
@@ -348,6 +365,10 @@ async def entrypoint(ctx: JobContext) -> None:
             vad=silero.VAD.load(),
             userdata=session_context,
         )
+        
+        # Pass session reference to agent so hooks can access userdata
+        # This enables on_user_turn_completed to inject keyboard inputs into chat context
+        agent._session = session
 
         logger.info(
             "AgentSession initialized",
@@ -450,6 +471,61 @@ async def entrypoint(ctx: JobContext) -> None:
                         extra={"room": room_name, "field": field_name, "value": value},
                     )
 
+            elif msg_type == "field_completed":
+                # Handle field_completed message from widget (Requirements 1.1, 1.2, 7.2)
+                # This is sent when user submits a field via keyboard
+                # Immediately update FormCollectionState and add to pending acknowledgments
+                field_name = message.get("fieldName")
+                value = message.get("value")
+                source = message.get("source", "keyboard")
+                
+                if field_name and value is not None:
+                    # Initialize FormCollectionState if not exists and form is active
+                    if session_context.form_collection_state is None and session_context.active_form:
+                        form_id = session_context.active_form.get("id", "")
+                        fields = session_context.active_form.get("fields", [])
+                        session_context.form_collection_state = FormCollectionState(
+                            form_id=form_id,
+                            total_fields=len(fields),
+                        )
+                        session_context.form_collection_state.set_required_fields(fields)
+                    
+                    # Update confirmed_fields immediately
+                    if session_context.form_collection_state:
+                        session_context.form_collection_state.add_confirmed_field(
+                            field_name=field_name,
+                            value=value,
+                            source=source,
+                        )
+                        
+                        # Add to pending_keyboard_inputs for agent to acknowledge via hook
+                        session_context.pending_keyboard_inputs.append({
+                            "field_name": field_name,
+                            "value": value,
+                            "source": source,
+                        })
+                        
+                        logger.info(
+                            "Field completed via keyboard - state updated",
+                            extra={
+                                "room": room_name,
+                                "field_name": field_name,
+                                "value": value,
+                                "source": source,
+                                "total_confirmed": len(session_context.form_collection_state.confirmed_fields),
+                                "is_complete": session_context.form_collection_state.is_complete,
+                            },
+                        )
+                    else:
+                        logger.warning(
+                            "Field completed but no form collection state",
+                            extra={
+                                "room": room_name,
+                                "field_name": field_name,
+                                "has_active_form": session_context.active_form is not None,
+                            },
+                        )
+
             elif msg_type == "field_confirmed":
                 # Handle field confirmation from widget
                 field_name = message.get("fieldName")
@@ -499,6 +575,32 @@ async def entrypoint(ctx: JobContext) -> None:
                         "Edit requested via widget",
                         extra={"room": room_name, "field": field_name},
                     )
+
+            elif msg_type == "mute_status_changed":
+                # Handle mute status change from widget (Requirements 3.5, 3.7)
+                # Store mute state in session context for agent awareness
+                muted = message.get("muted", False)
+                session_context.is_user_muted = bool(muted)
+                logger.info(
+                    "User mute status changed",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "is_muted": session_context.is_user_muted,
+                    },
+                )
+
+            elif msg_type == "user_ended_session":
+                # Handle user-initiated session end (Requirement 4.3)
+                # Log session end with "user_requested" reason for analytics
+                logger.info(
+                    "Session ended by user",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "reason": "user_requested",
+                    },
+                )
 
             else:
                 logger.debug(
@@ -807,20 +909,43 @@ async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
         # Extract agent config (optional)
         system_prompt = metadata.get("system_prompt")
         agent_name = metadata.get("agent_name")
+        
+        # Extract session control settings (Requirements 1.4, 1.5)
+        # Default to "agent_first" if not specified
+        initiation_mode = metadata.get("initiation_mode", "agent_first")
+        if initiation_mode not in ("agent_first", "user_first"):
+            logger.warning(
+                "Invalid initiation_mode, defaulting to agent_first",
+                extra={"room": ctx.room.name, "received": initiation_mode},
+            )
+            initiation_mode = "agent_first"
+        
+        # Default to True if not specified
+        auto_terminate = metadata.get("auto_terminate", True)
+        if not isinstance(auto_terminate, bool):
+            logger.warning(
+                "Invalid auto_terminate type, defaulting to True",
+                extra={"room": ctx.room.name, "received": auto_terminate},
+            )
+            auto_terminate = True
 
-        if system_prompt or agent_name:
-            result.agent_config = AgentConfig(
-                system_prompt=system_prompt,
-                agent_name=agent_name,
-            )
-            logger.info(
-                "Agent config loaded",
-                extra={
-                    "room": ctx.room.name,
-                    "has_system_prompt": system_prompt is not None,
-                    "agent_name": agent_name,
-                },
-            )
+        # Always create AgentConfig to ensure session control settings are available
+        result.agent_config = AgentConfig(
+            system_prompt=system_prompt,
+            agent_name=agent_name,
+            initiation_mode=initiation_mode,
+            auto_terminate=auto_terminate,
+        )
+        logger.info(
+            "Agent config loaded",
+            extra={
+                "room": ctx.room.name,
+                "has_system_prompt": system_prompt is not None,
+                "agent_name": agent_name,
+                "initiation_mode": initiation_mode,
+                "auto_terminate": auto_terminate,
+            },
+        )
 
         return result
 

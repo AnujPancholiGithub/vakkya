@@ -19,6 +19,8 @@ export interface ProjectConfig {
   name: string;
   systemPrompt: string | null;
   agentName: string | null;
+  initiationMode: string;
+  autoTerminate: boolean;
 }
 
 // Security: Max length for system prompt to prevent abuse
@@ -186,6 +188,8 @@ export class ProjectService {
         name: true,
         systemPrompt: true,
         agentName: true,
+        initiationMode: true,
+        autoTerminate: true,
       },
     });
 
@@ -198,6 +202,8 @@ export class ProjectService {
       name: project.name,
       systemPrompt: project.systemPrompt,
       agentName: project.agentName,
+      initiationMode: project.initiationMode,
+      autoTerminate: project.autoTerminate,
     };
   }
 }

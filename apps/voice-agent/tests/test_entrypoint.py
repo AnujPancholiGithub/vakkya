@@ -67,9 +67,9 @@ def mock_ctx_no_metadata() -> MagicMock:
 
 @pytest.fixture
 def mock_session_components():
-    """Create mocked Agent and AgentSession."""
+    """Create mocked FormAwareAgent and AgentSession."""
     with patch("src.entrypoint.AgentSession") as mock_session_class, \
-         patch("src.entrypoint.Agent") as mock_agent_class:
+         patch("src.entrypoint.FormAwareAgent") as mock_agent_class:
         
         mock_agent = MagicMock()
         mock_agent_class.return_value = mock_agent

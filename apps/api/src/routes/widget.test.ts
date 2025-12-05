@@ -75,6 +75,10 @@ describe('Widget Token Validation API', () => {
       expect(data.livekitToken).toBeDefined();
       expect(data.roomName).toBeDefined();
       expect(data.roomName).toMatch(/^vakkya-/);
+      // Session config with defaults (Requirements 6.2, 6.3)
+      expect(data.sessionConfig).toBeDefined();
+      expect(data.sessionConfig.initiationMode).toBe('agent_first');
+      expect(data.sessionConfig.autoTerminate).toBe(true);
     });
 
     it('should return 401 for invalid token', async () => {

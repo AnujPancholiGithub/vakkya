@@ -18,12 +18,14 @@ export const CSS_VARIABLES = `
     --vakkya-text-primary: #1F2937;
     --vakkya-text-secondary: #6B7280;
     --vakkya-accent: var(--vakkya-custom-accent, #3B82F6);
+    --vakkya-accent-hover: color-mix(in srgb, var(--vakkya-accent), black 10%);
     --vakkya-accent-light: color-mix(in srgb, var(--vakkya-accent) 15%, white);
-    --vakkya-user-bubble: #E0E7FF;
+    --vakkya-user-bubble: color-mix(in srgb, var(--vakkya-accent) 15%, white);
     --vakkya-agent-bubble: #F3F4F6;
     --vakkya-border: #E5E7EB;
     --vakkya-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
     --vakkya-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --vakkya-shadow-accent: 0 2px 8px color-mix(in srgb, var(--vakkya-accent), transparent 70%);
     
     /* Spacing */
     --vakkya-radius-sm: 8px;
@@ -43,7 +45,8 @@ export const CSS_VARIABLES = `
     --vakkya-bg-chat: #111827;
     --vakkya-text-primary: #F9FAFB;
     --vakkya-text-secondary: #9CA3AF;
-    --vakkya-user-bubble: #312E81;
+    --vakkya-user-bubble: color-mix(in srgb, var(--vakkya-accent) 30%, #1F2937);
+    --vakkya-user-text: #F9FAFB;
     --vakkya-agent-bubble: #374151;
     --vakkya-border: #4B5563;
     --vakkya-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
@@ -243,7 +246,9 @@ export const CHAT_PANEL_STYLES = `
     background: var(--vakkya-bg-secondary);
   }
 
-  .vakkya-mic-button {
+  /* Mute button - Requirements 3.1, 3.4, 5.5 */
+  /* Primary action button using accent color for visibility */
+  .vakkya-mute-button {
     width: 44px;
     height: 44px;
     border-radius: var(--vakkya-radius-full);
@@ -254,50 +259,56 @@ export const CHAT_PANEL_STYLES = `
     align-items: center;
     justify-content: center;
     transition: transform var(--vakkya-transition), 
+                background var(--vakkya-transition),
                 box-shadow var(--vakkya-transition);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    color: white;
+    box-shadow: var(--vakkya-shadow-accent);
   }
 
-  .vakkya-mic-button:hover {
+  .vakkya-mute-button:hover {
     transform: scale(1.05);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--vakkya-accent), transparent 60%);
   }
 
-  .vakkya-mic-button:active {
+  .vakkya-mute-button:active {
     transform: scale(0.95);
   }
 
-  .vakkya-mic-button:focus {
+  .vakkya-mute-button:focus {
     outline: 2px solid var(--vakkya-accent);
     outline-offset: 2px;
   }
 
-  .vakkya-mic-button svg {
+  .vakkya-mute-button svg {
     width: 20px;
     height: 20px;
-    fill: white;
+    fill: currentColor;
   }
 
-  /* Voice status states */
-  .vakkya-mic-button.listening {
-    animation: vakkya-mic-pulse 2s infinite;
-  }
-
-  .vakkya-mic-button.processing {
-    background: var(--vakkya-text-secondary);
-  }
-
-  .vakkya-mic-button.speaking {
-    background: #10B981;
-  }
-
-  .vakkya-mic-button.error {
+  /* Muted state - distinct red visual indicator (Requirements 3.4, 5.5) */
+  .vakkya-mute-button.muted {
     background: #EF4444;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  }
+
+  .vakkya-mute-button.muted:hover {
+    background: #DC2626;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+  }
+
+  :host([data-theme="dark"]) .vakkya-mute-button.muted {
+    background: #DC2626;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+  }
+
+  :host([data-theme="dark"]) .vakkya-mute-button.muted:hover {
+    background: #EF4444;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.6);
   }
 
   @keyframes vakkya-mic-pulse {
-    0%, 100% { box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
-    50% { box-shadow: 0 2px 16px rgba(59, 130, 246, 0.6); }
+    0%, 100% { box-shadow: 0 2px 8px color-mix(in srgb, var(--vakkya-accent), transparent 70%); }
+    50% { box-shadow: 0 2px 16px color-mix(in srgb, var(--vakkya-accent), transparent 40%); }
   }
 
   /* Status text */
@@ -901,8 +912,8 @@ export const CHAT_PANEL_STYLES = `
   }
 
   @keyframes vakkya-pending-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2); }
-    50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--vakkya-accent), transparent 80%); }
+    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--vakkya-accent), transparent 90%); }
   }
 
   .vakkya-sticky-pending-header {
@@ -1008,6 +1019,68 @@ export const CHAT_PANEL_STYLES = `
       min-width: 60px;
     }
   }
+
+  /* Session End Overlay (Requirements 2.3, 2.4) */
+  .vakkya-session-end-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity var(--vakkya-transition-slow);
+  }
+
+  .vakkya-session-end-overlay.vakkya-session-end-visible {
+    opacity: 1;
+  }
+
+  .vakkya-session-end-content {
+    background: var(--vakkya-bg-chat);
+    border-radius: var(--vakkya-radius-lg);
+    padding: 24px 32px;
+    text-align: center;
+    max-width: 280px;
+    box-shadow: var(--vakkya-shadow);
+  }
+
+  .vakkya-session-end-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--vakkya-accent-light);
+  }
+
+  .vakkya-session-end-icon svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--vakkya-accent);
+  }
+
+  /* Error state styling */
+  .vakkya-session-end-error .vakkya-session-end-icon {
+    background: #FEE2E2;
+  }
+
+  .vakkya-session-end-error .vakkya-session-end-icon svg {
+    fill: #DC2626;
+  }
+
+  .vakkya-session-end-message {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--vakkya-text-primary);
+  }
 `;
 
 /**
@@ -1017,6 +1090,8 @@ export const CHAT_PANEL_STYLES = `
  */
 export function applyAccentColor(host, accentColor) {
   if (accentColor && isValidColor(accentColor)) {
+    // Set both --vakkya-accent directly AND --vakkya-custom-accent for proper cascading
+    host.style.setProperty('--vakkya-accent', accentColor);
     host.style.setProperty('--vakkya-custom-accent', accentColor);
   }
 }

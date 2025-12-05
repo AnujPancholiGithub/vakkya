@@ -687,3 +687,71 @@ describe('Multi-Form Manager Methods', () => {
     expect(manager.getFormById('form_123')).toBeNull();
   });
 });
+
+/**
+ * Mute State Management Tests
+ * Requirements 3.2, 3.3, 3.5: Mute/unmute control and notification
+ */
+describe('Mute State Management', () => {
+  let manager;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    manager = createLiveKitManager('token', 'https://api.test.com');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should have getMuted method', () => {
+    expect(manager.getMuted).toBeInstanceOf(Function);
+  });
+
+  it('should have setMuted method', () => {
+    expect(manager.setMuted).toBeInstanceOf(Function);
+  });
+
+  it('should start with muted state as false', () => {
+    expect(manager.getMuted()).toBe(false);
+  });
+
+  it('should update mute state when setMuted is called', () => {
+    expect(manager.getMuted()).toBe(false);
+    
+    manager.setMuted(true);
+    expect(manager.getMuted()).toBe(true);
+    
+    manager.setMuted(false);
+    expect(manager.getMuted()).toBe(false);
+  });
+
+  it('should return true when mute state changes successfully', () => {
+    const result = manager.setMuted(true);
+    expect(result).toBe(true);
+  });
+
+  it('should return true when setting same mute state (no-op)', () => {
+    manager.setMuted(true);
+    const result = manager.setMuted(true);
+    expect(result).toBe(true);
+  });
+
+  it('should return false for invalid muted value', () => {
+    const result = manager.setMuted('invalid');
+    expect(result).toBe(false);
+    expect(console.warn).toHaveBeenCalledWith('[Vakkya] setMuted requires a boolean value');
+  });
+
+  it('should return false for undefined muted value', () => {
+    const result = manager.setMuted(undefined);
+    expect(result).toBe(false);
+  });
+
+  it('should return false for null muted value', () => {
+    const result = manager.setMuted(null);
+    expect(result).toBe(false);
+  });
+});

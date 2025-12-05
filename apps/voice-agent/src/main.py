@@ -58,6 +58,9 @@ def main() -> None:
     # Configure structured logging
     configure_logging(log_level=config.log_level)
     
+    # Note: Langfuse telemetry is configured per-session in entrypoint.py
+    # This allows session-specific metadata (room_name) for trace grouping
+    
     logger.info(
         "Starting voice agent worker",
         extra={

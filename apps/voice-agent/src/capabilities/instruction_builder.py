@@ -121,6 +121,10 @@ class InstructionBuilder:
         Provides consistent greeting, tone, and communication style
         that applies to all agents regardless of capabilities.
         
+        Handles initiation mode (Requirements 1.2, 1.3):
+        - agent_first: Agent greets user automatically (default)
+        - user_first: Agent waits for user to speak first
+        
         Args:
             agent_config: Optional config for agent name customization
             
@@ -131,7 +135,28 @@ class InstructionBuilder:
         if agent_config and agent_config.agent_name:
             agent_name = agent_config.agent_name
         
+        # Determine initiation mode (Requirements 1.2, 1.3, 1.4)
+        initiation_mode = "agent_first"
+        if agent_config and hasattr(agent_config, "initiation_mode"):
+            initiation_mode = agent_config.initiation_mode
+        
+        # Build initiation behavior section based on mode
+        if initiation_mode == "user_first":
+            # Requirement 1.3: Agent waits for user to speak first
+            initiation_section = """## Conversation Start
+- Wait for the user to speak first before responding
+- Do NOT greet the user or initiate conversation
+- Only respond after the user has spoken
+- When the user speaks, respond naturally to their message"""
+        else:
+            # Requirement 1.2: Agent greets user automatically (default)
+            initiation_section = """## Conversation Start
+- Greet the user warmly when the conversation begins
+- Introduce yourself briefly and offer to help"""
+        
         return f"""You are {agent_name}.
+
+{initiation_section}
 
 ## Communication Style
 - Be conversational and concise

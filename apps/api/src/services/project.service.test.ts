@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fc from 'fast-check';
 import { ProjectService } from './project.service.js';
 import { prisma } from '../lib/prisma.js';
 import { hashSync } from 'bcrypt';
@@ -207,5 +208,77 @@ describe('ProjectService', () => {
       expect(newProject).toBeDefined();
       expect(newProject.name).toBe('New Project After Delete');
     }, 15000);
+  });
+
+  /**
+   * **Feature: session-control-features, Property 1: Initiation Mode Default**
+   * *For any* project without explicit initiation mode configuration, 
+   * the system shall default to "agent_first" behavior.
+   * **Validates: Requirements 1.4, 6.3**
+   */
+  describe('Session Control Configuration Property Tests', () => {
+    it('Property 1: Initiation Mode Default - projects default to agent_first', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
+          async (projectName) => {
+            const project = await projectService.create({
+              userId: testUserId,
+              name: projectName,
+            });
+
+            // Verify defaults are applied
+            expect(project.initiationMode).toBe('agent_first');
+            expect(project.autoTerminate).toBe(true);
+
+            // Clean up
+            await projectService.delete(testUserId, project.id);
+          }
+        ),
+        { numRuns: 10 } // Limit runs due to database operations
+      );
+    }, 30000);
+
+    /**
+     * **Feature: session-control-features, Property 6: Configuration Persistence Round Trip**
+     * *For any* session configuration with valid initiationMode and autoTerminate values,
+     * saving and then retrieving shall return identical values.
+     * **Validates: Requirements 6.1, 6.2, 6.4**
+     */
+    it('Property 6: Configuration Persistence Round Trip - config values persist correctly', async () => {
+      await fc.assert(
+        fc.asyncProperty(
+          fc.string({ minLength: 1, maxLength: 50 }).filter(s => s.trim().length > 0),
+          fc.constantFrom('agent_first', 'user_first'),
+          fc.boolean(),
+          async (projectName, initiationMode, autoTerminate) => {
+            // Create project with default values first
+            const project = await projectService.create({
+              userId: testUserId,
+              name: projectName,
+            });
+
+            // Update with specific session config values via direct Prisma update
+            // (since ProjectService.update doesn't expose these fields yet)
+            await prisma.project.update({
+              where: { id: project.id },
+              data: { initiationMode, autoTerminate },
+            });
+
+            // Retrieve via validateToken (the round-trip path)
+            const config = await projectService.validateToken(project.widgetToken);
+
+            // Verify round-trip consistency
+            expect(config).not.toBeNull();
+            expect(config!.initiationMode).toBe(initiationMode);
+            expect(config!.autoTerminate).toBe(autoTerminate);
+
+            // Clean up
+            await projectService.delete(testUserId, project.id);
+          }
+        ),
+        { numRuns: 10 } // Limit runs due to database operations
+      );
+    }, 30000);
   });
 });

@@ -10,6 +10,7 @@ import { createWaveformRenderer, generateIdleData } from './waveform.js';
 // SVG Icons
 const CLOSE_ICON = `<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
 const MIC_ICON = `<svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>`;
+const MIC_OFF_ICON = `<svg viewBox="0 0 24 24"><path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/></svg>`;
 const CHAT_ICON = `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>`;
 const EDIT_ICON = `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`;
 const CHECK_ICON = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
@@ -56,6 +57,7 @@ const ERROR_ICON = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4
  * @param {Object} callbacks - Event callbacks
  * @param {Function} callbacks.onClose - Called when panel is closed
  * @param {Function} [callbacks.onMicClick] - Called when mic button is clicked
+ * @param {Function} [callbacks.onMuteToggle] - Called when mute button is clicked (Requirements 3.1, 3.4)
  * @param {Function} [callbacks.onKeyboardInput] - Called when user types in form input
  * @param {Function} [callbacks.onConfirmValue] - Called when user confirms voice-extracted value
  * @param {Function} [callbacks.onRejectValue] - Called when user rejects voice-extracted value
@@ -96,11 +98,14 @@ export function createChatPanel(shadow, callbacks, options = {}) {
 
   // References to dynamic elements
   let messagesContainer = null;
-  let micButton = null;
+  let muteButton = null;
   let waveformCanvas = null;
   let waveformRenderer = null;
   let statusText = null;
   let stickyInputContainer = null;
+  
+  // Mute state (Requirements 3.1, 3.4, 5.5)
+  let isMuted = false;
 
   // Sticky input state
   let stickyInputState = {
@@ -181,21 +186,26 @@ export function createChatPanel(shadow, callbacks, options = {}) {
     waveformContainer.appendChild(waveformCanvas);
 
     // Initialize waveform renderer
-    waveformRenderer = createWaveformRenderer(waveformCanvas);
+    // Requirement 7.1: Visual feedback for voice activity
+    // Use accent color for better visibility in light theme (Requirement 5.5)
+    waveformRenderer = createWaveformRenderer(
+      waveformCanvas, 
+      options.accentColor || '#3B82F6'
+    );
     waveformRenderer.start();
 
-    // Mic button
-    micButton = document.createElement('button');
-    micButton.className = 'vakkya-mic-button';
-    micButton.setAttribute('aria-label', 'Toggle microphone');
-    micButton.setAttribute('type', 'button');
-    micButton.innerHTML = MIC_ICON;
-    micButton.addEventListener('click', () => {
-      if (callbacks.onMicClick) callbacks.onMicClick();
+    // Mute button - single button for mic control (Requirements 3.1, 3.4, 5.5)
+    muteButton = document.createElement('button');
+    muteButton.className = 'vakkya-mute-button';
+    muteButton.setAttribute('aria-label', 'Mute microphone');
+    muteButton.setAttribute('type', 'button');
+    muteButton.innerHTML = MIC_ICON;
+    muteButton.addEventListener('click', () => {
+      if (callbacks.onMuteToggle) callbacks.onMuteToggle();
     });
 
     voiceBar.appendChild(waveformContainer);
-    voiceBar.appendChild(micButton);
+    voiceBar.appendChild(muteButton);
 
     // Assemble
     element.appendChild(header);
@@ -1186,27 +1196,6 @@ export function createChatPanel(shadow, callbacks, options = {}) {
       speaking: 'Speaking...',
     };
 
-    // Aria labels for accessibility
-    const ariaLabels = {
-      idle: 'Start voice conversation',
-      listening: 'Listening to your voice',
-      processing: 'Processing your request',
-      speaking: 'Agent is speaking',
-    };
-
-    if (micButton) {
-      // Remove all status classes
-      micButton.classList.remove('listening', 'processing', 'speaking', 'error');
-      
-      // Add current status class
-      if (status !== 'idle') {
-        micButton.classList.add(status);
-      }
-
-      // Update aria-label for accessibility (Requirement 7.4)
-      micButton.setAttribute('aria-label', ariaLabels[status] || 'Toggle microphone');
-    }
-
     // Update status text
     if (statusText) {
       const message = statusMessages[status] || '';
@@ -1222,6 +1211,43 @@ export function createChatPanel(shadow, callbacks, options = {}) {
     if (status === 'idle' || status === 'processing') {
       showIdleWaveform();
     }
+  }
+
+  /**
+   * Set mute state and update visual indicator
+   * Requirements 3.1, 3.4, 5.5: Visual muted state indicator
+   * @param {boolean} muted - True if muted, false if unmuted
+   */
+  function setMuted(muted) {
+    isMuted = muted;
+
+    if (muteButton) {
+      if (muted) {
+        muteButton.classList.add('muted');
+        muteButton.innerHTML = MIC_OFF_ICON;
+        muteButton.setAttribute('aria-label', 'Unmute microphone');
+      } else {
+        muteButton.classList.remove('muted');
+        muteButton.innerHTML = MIC_ICON;
+        muteButton.setAttribute('aria-label', 'Mute microphone');
+      }
+    }
+
+    // Update status text when muted (Requirements 5.5)
+    if (statusText && muted) {
+      statusText.textContent = 'Muted';
+      statusText.style.display = 'block';
+    } else if (statusText && !muted && state.voiceStatus === 'idle') {
+      statusText.style.display = 'none';
+    }
+  }
+
+  /**
+   * Get current mute state
+   * @returns {boolean}
+   */
+  function getMuted() {
+    return isMuted;
   }
 
   /**
@@ -1262,12 +1288,6 @@ export function createChatPanel(shadow, callbacks, options = {}) {
   function showError(message) {
     state.voiceStatus = 'idle';
 
-    if (micButton) {
-      micButton.classList.remove('listening', 'processing', 'speaking');
-      micButton.classList.add('error');
-      micButton.setAttribute('aria-label', `Error: ${message || 'Microphone error'}`);
-    }
-
     if (statusText) {
       statusText.textContent = message || 'Error occurred';
       statusText.style.display = 'block';
@@ -1279,10 +1299,6 @@ export function createChatPanel(shadow, callbacks, options = {}) {
    * Clear error status
    */
   function clearError() {
-    if (micButton) {
-      micButton.classList.remove('error');
-    }
-
     if (statusText) {
       statusText.style.color = '';
       setVoiceStatus('idle');
@@ -1521,6 +1537,55 @@ export function createChatPanel(shadow, callbacks, options = {}) {
     });
   }
 
+  /**
+   * Show session end overlay with closing message
+   * Requirements 2.3, 2.4: Display closing message overlay for 3 seconds based on reason
+   * @param {string} message - Closing message to display
+   * @param {string} reason - Termination reason for styling
+   */
+  function showSessionEndOverlay(message, reason) {
+    // Create overlay element
+    const overlay = document.createElement('div');
+    overlay.className = 'vakkya-session-end-overlay';
+    overlay.setAttribute('role', 'alert');
+    overlay.setAttribute('aria-live', 'assertive');
+    
+    // Add reason-specific class for styling
+    if (reason) {
+      overlay.classList.add(`vakkya-session-end-${reason.replace(/_/g, '-')}`);
+    }
+    
+    // Create message content
+    const content = document.createElement('div');
+    content.className = 'vakkya-session-end-content';
+    
+    // Add icon based on reason
+    const icon = document.createElement('div');
+    icon.className = 'vakkya-session-end-icon';
+    if (reason === 'error') {
+      icon.innerHTML = ERROR_ICON;
+    } else {
+      icon.innerHTML = CHECK_ICON;
+    }
+    
+    // Add message text
+    const text = document.createElement('p');
+    text.className = 'vakkya-session-end-message';
+    text.textContent = message;
+    
+    content.appendChild(icon);
+    content.appendChild(text);
+    overlay.appendChild(content);
+    
+    // Add overlay to chat panel
+    element.appendChild(overlay);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+      overlay.classList.add('vakkya-session-end-visible');
+    });
+  }
+
   return {
     element,
     expand,
@@ -1538,6 +1603,9 @@ export function createChatPanel(shadow, callbacks, options = {}) {
     getState,
     scrollToBottom,
     destroy,
+    // Mute control methods (Requirements 3.1, 3.4, 5.5)
+    setMuted,
+    getMuted,
     // Form input methods
     addFormInput,
     setFormInputPending,
@@ -1562,6 +1630,8 @@ export function createChatPanel(shadow, callbacks, options = {}) {
     setStickyInputSpeaking,
     updateStickyInputValue,
     isStickyInputVisible,
+    // Session end methods (Requirements 2.3, 2.4)
+    showSessionEndOverlay,
   };
 }
 

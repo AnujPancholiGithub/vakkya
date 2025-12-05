@@ -8,7 +8,7 @@ This module provides the capability-driven architecture for the voice agent:
 """
 
 from .base import Capability, CapabilityContext, CapabilityResponse
-from .core_capability import CoreCapability
+from .core_capability import CoreCapability, VALID_TERMINATION_REASONS
 from .form_capability import FormCapabilityV2, FormContext, FormStateEnum, FORM_STATE_KEY
 from .instruction_builder import InstructionBuilder
 from .orchestrator import CapabilityOrchestrator
@@ -30,6 +30,7 @@ __all__ = [
     "CapabilityOrchestrator",
     # Core capability (always-on)
     "CoreCapability",
+    "VALID_TERMINATION_REASONS",
     # Form capability
     "FormCapability",
     "FormCapabilityV2",

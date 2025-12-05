@@ -13,6 +13,7 @@ from typing import Any, Optional
 import httpx
 
 from .base import Capability, CapabilityContext, CapabilityResponse
+from ..form_state import FormCollectionState
 
 logger = logging.getLogger(__name__)
 
@@ -1423,6 +1424,7 @@ class FormCapabilityV2(Capability):
         
         active_form = getattr(session_context, 'active_form', None)
         room = getattr(session_context, 'room', None)
+        api_base_url = self._api_base_url  # Capture for nested functions
         
         if not active_form:
             return []
@@ -1472,11 +1474,28 @@ class FormCapabilityV2(Capability):
             
             if success:
                 # Initialize field tracking in session context (Requirement 4.1)
+                fields = form.get("fields", [])
                 if ctx:
                     ctx.current_field_index = 0
+                    
+                    # Create FormCollectionState for centralized state tracking (Requirement 7.3)
+                    form_id = form.get("id", "")
+                    form_collection_state = FormCollectionState(
+                        form_id=form_id,
+                        total_fields=len(fields),
+                    )
+                    form_collection_state.set_required_fields(fields)
+                    ctx.form_collection_state = form_collection_state
+                    
+                    logger.info(
+                        "FormCollectionState created",
+                        extra={
+                            "form_id": form_id,
+                            "total_fields": len(fields),
+                        },
+                    )
                 
                 # Send field_focus for the first field (Requirement 4.3)
-                fields = form.get("fields", [])
                 if fields:
                     first_field = fields[0]
                     await send_widget_message(
@@ -1503,7 +1522,7 @@ class FormCapabilityV2(Capability):
                     },
                 )
                 form_name = form.get("name", "the form")
-                field_count = len(form.get("fields", []))
+                field_count = len(fields)
                 return f"Form '{form_name}' activated with {field_count} fields. The user can now see the form inputs. Ask them each question one at a time, starting with the first field."
             else:
                 logger.warning(
@@ -1567,8 +1586,11 @@ class FormCapabilityV2(Capability):
             and you've confirmed it with them. This stores the value and sends
             confirmation to the widget, then advances to the next field.
 
+            IMPORTANT: Use the exact field NAME from the schema (e.g., "full_name", "email"),
+            NOT the label (e.g., "Full Name", "Email Address").
+
             Args:
-                field_name: The name of the field (e.g., "email", "name")
+                field_name: The exact field name from schema (e.g., "email", "full_name")
                 value: The confirmed value to store
 
             Returns:
@@ -1580,6 +1602,42 @@ class FormCapabilityV2(Capability):
             
             if not room_ref:
                 return "Unable to confirm - no room connection."
+            
+            # Normalize field_name: if LLM passed a label, convert to actual field name
+            fields = form.get("fields", []) if form else []
+            normalized_field_name = field_name
+            
+            # Check if field_name matches any field's name directly
+            field_names = {f.get("name"): f for f in fields}
+            field_labels = {f.get("label", "").lower(): f.get("name") for f in fields}
+            
+            if field_name not in field_names:
+                # Try to match by label (case-insensitive)
+                label_lower = field_name.lower()
+                if label_lower in field_labels:
+                    normalized_field_name = field_labels[label_lower]
+                    logger.info(
+                        "Field name normalized from label",
+                        extra={
+                            "original": field_name,
+                            "normalized": normalized_field_name,
+                        },
+                    )
+                else:
+                    # Try fuzzy match - label might have different casing or spacing
+                    for f in fields:
+                        if f.get("label", "").lower() == label_lower or f.get("name", "").lower() == label_lower:
+                            normalized_field_name = f.get("name")
+                            logger.info(
+                                "Field name fuzzy matched",
+                                extra={
+                                    "original": field_name,
+                                    "normalized": normalized_field_name,
+                                },
+                            )
+                            break
+            
+            field_name = normalized_field_name
             
             # Send value_confirmed to widget
             success = await send_widget_message(
@@ -1605,7 +1663,21 @@ class FormCapabilityV2(Capability):
                     confirmed_index = i
                     break
             
-            # Track confirmed fields in session context
+            # Update FormCollectionState with voice confirmation (Requirements 4.1, 7.1)
+            form_collection_state = getattr(ctx, 'form_collection_state', None) if ctx else None
+            if form_collection_state:
+                form_collection_state.add_confirmed_field(field_name, value, source="voice")
+                logger.info(
+                    "Voice confirmation stored in FormCollectionState",
+                    extra={
+                        "field_name": field_name,
+                        "value": value,
+                        "source": "voice",
+                        "total_confirmed": len(form_collection_state.confirmed_fields),
+                    },
+                )
+            
+            # Also track in legacy confirmed_fields set for backward compatibility
             if ctx:
                 if not hasattr(ctx, 'confirmed_fields'):
                     ctx.confirmed_fields = set()
@@ -1641,16 +1713,20 @@ class FormCapabilityV2(Capability):
                 else:
                     return f"Confirmed {field_name}: {value}."
             
-            # Normal flow: advance to next uncollected field (Requirement 4.2)
-            confirmed_fields = getattr(ctx, 'confirmed_fields', set()) if ctx else set()
-            next_index = current_index + 1
-            
-            # Skip already confirmed fields
-            while next_index < len(fields):
-                next_field_name = fields[next_index].get("name")
-                if next_field_name not in confirmed_fields:
-                    break
-                next_index += 1
+            # Use FormCollectionState.get_next_uncollected_field_index for advancement (Requirements 1.3, 2.3)
+            # This ensures we skip already confirmed fields from both voice and keyboard
+            if form_collection_state and fields:
+                next_index = form_collection_state.get_next_uncollected_field_index(fields)
+                form_collection_state.current_field_index = next_index
+            else:
+                # Fallback to legacy logic if FormCollectionState not available
+                confirmed_fields_set = getattr(ctx, 'confirmed_fields', set()) if ctx else set()
+                next_index = current_index + 1
+                while next_index < len(fields):
+                    next_field_name = fields[next_index].get("name")
+                    if next_field_name not in confirmed_fields_set:
+                        break
+                    next_index += 1
             
             if ctx:
                 ctx.current_field_index = next_index
@@ -1687,7 +1763,7 @@ class FormCapabilityV2(Capability):
         async def submit_form(
             context: RunContext[Any],
         ) -> str:
-            """Submit the completed form to the server.
+            """Submit the completed form to the server and persist to database.
 
             Call this tool ONLY after:
             1. All required fields have been collected and confirmed
@@ -1697,6 +1773,8 @@ class FormCapabilityV2(Capability):
             Returns:
                 Success message with submission ID, or error message.
             """
+            import asyncio
+            
             ctx = context.userdata
             form = getattr(ctx, 'active_form', None) if ctx else active_form
             room_ref = getattr(ctx, 'room', None) if ctx else room
@@ -1707,40 +1785,181 @@ class FormCapabilityV2(Capability):
             if not room_ref:
                 return "Unable to submit - no room connection."
             
-            # Check for submission approval from widget
-            submission_approved = getattr(ctx, 'submission_approved', False)
+            # Get form collection state for confirmed field values (Requirement 6.1, 6.2)
+            form_state = getattr(ctx, 'form_collection_state', None)
             
-            # Get collected answers from session context
-            # Note: In the current architecture, answers are tracked by the LLM
-            # This tool signals the widget to submit
-            try:
-                # Send submission request to widget
-                success = await send_widget_message(
-                    room_ref,
-                    {
-                        "type": "submission_success",
-                        "submissionId": f"sub_{int(__import__('time').time())}",
-                    },
+            # Collect submission data from FormCollectionState
+            if form_state and form_state.confirmed_fields:
+                submission_data = form_state.get_confirmed_values()
+            else:
+                # Fallback: no confirmed fields tracked
+                logger.warning(
+                    "No form_collection_state found, submitting empty data",
+                    extra={"form_id": form.get("id")},
                 )
-                
-                if success:
-                    # Clear submission flag
-                    if hasattr(ctx, 'submission_approved'):
-                        ctx.submission_approved = False
+                submission_data = {}
+            
+            # Build submission payload with session_id and conversation_id (Requirement 6.2)
+            form_id = form.get("id")
+            session_id = getattr(ctx, 'project_id', None) or "unknown"
+            conversation_id = getattr(ctx, 'api_conversation_id', None)
+            
+            submission_payload = {
+                "sessionId": session_id,
+                "data": submission_data,
+            }
+            logger.info(
+                "Form Submitting lOOP",
+                extra={
+                    "form_id": form_id,
+                    "submission_payload": submission_payload,
+                    "api_base_url": api_base_url,
+                },
+            )
+            if conversation_id:
+                submission_payload["conversationId"] = conversation_id
+            
+            # Retry logic with exponential backoff (Requirement 6.5)
+            max_retries = 3
+            backoff_delays = [1, 2, 4]  # seconds: 1s, 2s, 4s
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    async with httpx.AsyncClient(timeout=10.0) as client:
+                        logger.info(
+                            "Form Submitting lOOP",
+                            extra={
+                                "form_id": form_id,
+                                "submission_payload": submission_payload,
+                                "api_base_url": api_base_url,
+                            },
+                        )
+                        response = await client.post(
+                            f"{api_base_url}/internal/forms/{form_id}/submit",
+                            json=submission_payload,
+                        )
                     
-                    logger.info(
-                        "Form submitted successfully",
-                        extra={"form_id": form.get("id")},
+                    if response.status_code == 201:
+                        result = response.json()
+                        submission_id = result.get("submission", {}).get("id", f"sub_{int(__import__('time').time())}")
+                        
+                        # Send success message to widget
+                        await send_widget_message(
+                            room_ref,
+                            {
+                                "type": "submission_success",
+                                "submissionId": submission_id,
+                            },
+                        )
+                        
+                        # Clear form state after successful submission
+                        if hasattr(ctx, 'form_collection_state'):
+                            ctx.form_collection_state = None
+                        
+                        logger.info(
+                            "Form submitted successfully",
+                            extra={
+                                "form_id": form_id,
+                                "submission_id": submission_id,
+                                "field_count": len(submission_data),
+                            },
+                        )
+                        return f"Form submitted successfully! Submission ID: {submission_id}. Ask if there's anything else you can help with."
+                    
+                    # Non-201 response - log and retry
+                    last_error = f"API returned status {response.status_code}"
+                    logger.warning(
+                        "Form submission failed, will retry",
+                        extra={
+                            "form_id": form_id,
+                            "attempt": attempt + 1,
+                            "status_code": response.status_code,
+                        },
                     )
-                    return "Form submitted successfully! Ask if there's anything else you can help with."
-                else:
-                    return "Failed to submit form. Please try again."
                     
-            except Exception as e:
-                logger.error(f"Form submission error: {e}")
-                return f"Error submitting form: {str(e)}"
+                except Exception as e:
+                    last_error = str(e)
+                    logger.warning(
+                        "Form submission error, will retry",
+                        extra={
+                            "form_id": form_id,
+                            "attempt": attempt + 1,
+                            "error": str(e),
+                        },
+                    )
+                
+                # Wait before retry (except on last attempt)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(backoff_delays[attempt])
+            
+            # All retries exhausted
+            logger.error(
+                "Form submission failed after all retries",
+                extra={
+                    "form_id": form_id,
+                    "max_retries": max_retries,
+                    "last_error": last_error,
+                },
+            )
+            return f"Failed to submit form after {max_retries} attempts. Please try again later."
 
-        return [activate_form, check_keyboard_input, confirm_form_field, submit_form]
+        @function_tool()
+        async def get_form_state(
+            context: RunContext[Any],
+        ) -> str:
+            """Get the current form collection state including all confirmed fields.
+
+            **IMPORTANT:** Do NOT rely on your memory of collected fields. Always call
+            this tool to get the current state from the source of truth.
+
+            **When to call this tool:**
+            - User says "I already submitted", "I filled that out", "I typed it", or similar
+            - User asks "what have I entered so far?" or "what do you have?"
+            - Before asking for any field, to avoid redundant questions
+            - When resuming a paused form conversation
+            - Anytime you're uncertain about what's been collected
+
+            **What you'll get back:**
+            - List of all confirmed fields with their values and source (voice/keyboard)
+            - Whether the form is complete
+            - Current progress (which field you should ask for next)
+
+            Use this information to:
+            - Skip fields that are already collected
+            - Acknowledge keyboard inputs the user has submitted
+            - Know which field to ask for next
+
+            Returns:
+                JSON string with confirmed fields, completion status, and progress.
+            """
+            import json
+            
+            ctx = context.userdata
+            if not ctx:
+                return json.dumps({"status": "no_context"})
+            
+            form_state = getattr(ctx, 'form_collection_state', None)
+            
+            if not form_state:
+                return json.dumps({"status": "no_form_active"})
+            
+            # Use the to_dict method from FormCollectionState
+            state_dict = form_state.to_dict()
+            state_dict["status"] = "active"
+            
+            logger.info(
+                "Form state queried",
+                extra={
+                    "form_id": form_state.form_id,
+                    "confirmed_count": len(form_state.confirmed_fields),
+                    "is_complete": form_state.is_complete,
+                },
+            )
+            
+            return json.dumps(state_dict)
+
+        return [activate_form, check_keyboard_input, confirm_form_field, submit_form, get_form_state]
     
     def get_instruction_fragment(self, session_context) -> str:
         """Return form-specific instructions.
@@ -1799,8 +2018,31 @@ After asking each question:
 5. After all fields: present a summary and ask for approval
 6. On approval: use submit_form tool
 
+**Form State Management - CRITICAL:**
+
+When collecting form data, you MUST use the get_form_state tool to check which fields have already been collected. Do NOT rely on your memory or conversation history.
+
+**When to call get_form_state:**
+- User says "I already submitted", "I filled that out", "I typed it", or similar phrases
+- User asks "what have I entered so far?" or "what do you have?"
+- Before asking for any field, to avoid asking for already-collected data
+- When resuming a paused form conversation
+- Anytime you're uncertain about what's been collected
+
+**Keyboard Input Acknowledgment:**
+When you receive a SYSTEM NOTIFICATION about keyboard inputs (this happens automatically when users type and submit fields), you MUST:
+1. Acknowledge each field the user submitted
+2. Mention the field name and value naturally in your response
+3. Proceed to the next uncollected field or summary
+
+Example: "I see you entered john@example.com for your email. Great! Now, what's your phone number?"
+
+**State Source of Truth:**
+The confirmed_fields dictionary in FormCollectionState is the ONLY source of truth for collected values. Never assume a field is collected based on conversation history alone - always check using get_form_state.
+
 **Tools Available:**
 - activate_form: Show the form UI in the widget
+- get_form_state: Check current form state and all confirmed fields (call this frequently!)
 - check_keyboard_input(field_name): Check if user typed an answer
 - confirm_form_field(field_name, value): Store confirmed value
 - submit_form: Submit the completed form
@@ -1810,5 +2052,8 @@ After asking each question:
 - Ask ONE question at a time
 - Users can answer via voice OR by typing in the form
 - Confirm each answer before moving on
+- ALWAYS call get_form_state before asking for a field to check if it's already collected
+- If user mentions submitting via keyboard, call get_form_state immediately
+- When you see SYSTEM NOTIFICATION about keyboard inputs, acknowledge them in your next response
 - If user asks unrelated questions, answer briefly then guide back
 - If user declines, respect their choice and continue without the form"""

@@ -116,6 +116,24 @@ describe('FormStateManager', () => {
       });
     });
 
+    it('should directly confirm value without pending confirmation', () => {
+      const manager = createFormStateManager();
+      manager.activateForm(mockFormSchema);
+
+      // Agent skips value_extracted and directly confirms
+      const result = manager.confirmAnswerDirect('name', 'John Doe');
+
+      expect(result).toBeTruthy();
+      expect(result.value).toBe('John Doe');
+      
+      const state = manager.getState();
+      expect(state.answers.name.confirmed).toBe(true);
+      expect(state.answers.name.value).toBe('John Doe');
+      expect(state.answers.name.source).toBe('voice');
+      expect(state.currentFieldIndex).toBe(1); // Advanced to next field
+      expect(state.pendingConfirmation).toBeNull();
+    });
+
     it('should confirm answer and advance to next field', () => {
       const manager = createFormStateManager();
       manager.activateForm(mockFormSchema);

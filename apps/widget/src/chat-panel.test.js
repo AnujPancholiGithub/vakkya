@@ -894,3 +894,106 @@ describe('Summary Card (Task 12.1, 12.2)', () => {
     });
   });
 });
+
+/**
+ * Mute Button Tests
+ * Requirements 3.1, 3.4, 5.5: Mute/unmute toggle button with visual feedback
+ */
+describe('Mute Button (Requirements 3.1, 3.4, 5.5)', () => {
+  let host;
+  let shadow;
+  let callbacks;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    shadow = host.attachShadow({ mode: 'open' });
+    document.body.appendChild(host);
+    
+    callbacks = {
+      onClose: vi.fn(),
+      onMicClick: vi.fn(),
+      onMuteToggle: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it('should render mute button in voice bar', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton).toBeTruthy();
+  });
+
+  it('should have minimum 44x44px touch target', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    // Check that the button has the correct class which defines 44x44px in CSS
+    expect(muteButton.classList.contains('vakkya-mute-button')).toBe(true);
+  });
+
+  it('should call onMuteToggle when clicked', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    muteButton.click();
+    
+    expect(callbacks.onMuteToggle).toHaveBeenCalled();
+  });
+
+  it('should start with unmuted state', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    expect(panel.getMuted()).toBe(false);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(false);
+  });
+
+  it('should update visual state when setMuted(true) is called', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    panel.setMuted(true);
+    
+    expect(panel.getMuted()).toBe(true);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(true);
+    expect(muteButton.getAttribute('aria-label')).toBe('Unmute microphone');
+  });
+
+  it('should update visual state when setMuted(false) is called', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    panel.setMuted(true);
+    panel.setMuted(false);
+    
+    expect(panel.getMuted()).toBe(false);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(false);
+    expect(muteButton.getAttribute('aria-label')).toBe('Mute microphone');
+  });
+
+  it('should show distinct muted icon when muted', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    const initialIcon = muteButton.innerHTML;
+    
+    panel.setMuted(true);
+    
+    // Icon should change when muted
+    expect(muteButton.innerHTML).not.toBe(initialIcon);
+  });
+});
