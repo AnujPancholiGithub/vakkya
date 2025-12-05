@@ -18,8 +18,12 @@ import {
   createSubmissionApprovedMessage,
   createEditRequestedMessage,
   createPageContextMessage,
+  createMuteStatusMessage,
+  createUserEndedSessionMessage,
+  isValidSessionEndReason,
   WIDGET_TO_AGENT_TYPES,
   AGENT_TO_WIDGET_TYPES,
+  VALID_SESSION_END_REASONS,
 } from './data-channel-protocol.js';
 
 describe('Data Channel Protocol', () => {
@@ -248,6 +252,37 @@ describe('Data Channel Protocol', () => {
         expect(isValidWidgetMessage(message)).toBe(true);
       });
     });
+
+    describe('createMuteStatusMessage', () => {
+      it('should create valid mute status message when muted', () => {
+        const message = createMuteStatusMessage(true);
+
+        expect(message).toEqual({
+          type: 'mute_status_changed',
+          muted: true,
+        });
+        expect(isValidWidgetMessage(message)).toBe(true);
+      });
+
+      it('should create valid mute status message when unmuted', () => {
+        const message = createMuteStatusMessage(false);
+
+        expect(message).toEqual({
+          type: 'mute_status_changed',
+          muted: false,
+        });
+        expect(isValidWidgetMessage(message)).toBe(true);
+      });
+    });
+
+    describe('createUserEndedSessionMessage', () => {
+      it('should create valid user ended session message', () => {
+        const message = createUserEndedSessionMessage();
+
+        expect(message).toEqual({ type: 'user_ended_session' });
+        expect(isValidWidgetMessage(message)).toBe(true);
+      });
+    });
   });
 
   /**
@@ -373,6 +408,81 @@ describe('Data Channel Protocol', () => {
       // Widget rejects
       const rejectMessage = createFieldRejectedMessage('name');
       expect(isValidWidgetMessage(rejectMessage)).toBe(true);
+    });
+  });
+
+  /**
+   * Session Control Messages
+   * Validates: Requirements 2.3, 3.5, 4.3
+   */
+  describe('Session Control Messages', () => {
+    describe('session_end message', () => {
+      it('should support session_end message with reason', () => {
+        const message = {
+          type: 'session_end',
+          reason: 'conversation_complete',
+        };
+        expect(isValidAgentMessage(message)).toBe(true);
+      });
+
+      it('should support session_end message with reason and optional message', () => {
+        const message = {
+          type: 'session_end',
+          reason: 'form_submitted',
+          message: 'Thank you for your submission!',
+        };
+        expect(isValidAgentMessage(message)).toBe(true);
+      });
+
+      it('should deserialize session_end message correctly', () => {
+        const original = {
+          type: 'session_end',
+          reason: 'user_requested',
+          message: 'Goodbye!',
+        };
+        const serialized = new TextEncoder().encode(JSON.stringify(original));
+        const deserialized = deserializeMessage(serialized);
+
+        expect(deserialized).toEqual(original);
+      });
+    });
+
+    describe('isValidSessionEndReason', () => {
+      it.each(VALID_SESSION_END_REASONS)('should accept valid reason: %s', (reason) => {
+        expect(isValidSessionEndReason(reason)).toBe(true);
+      });
+
+      it('should reject invalid reasons', () => {
+        expect(isValidSessionEndReason('invalid_reason')).toBe(false);
+        expect(isValidSessionEndReason('')).toBe(false);
+        expect(isValidSessionEndReason('CONVERSATION_COMPLETE')).toBe(false);
+      });
+    });
+
+    describe('mute_status_changed message', () => {
+      it('should serialize and deserialize mute status message', () => {
+        const message = createMuteStatusMessage(true);
+        const serialized = serializeMessage(message);
+        
+        const decoder = new TextDecoder();
+        const json = decoder.decode(serialized);
+        const parsed = JSON.parse(json);
+        
+        expect(parsed).toEqual(message);
+      });
+    });
+
+    describe('user_ended_session message', () => {
+      it('should serialize and deserialize user ended session message', () => {
+        const message = createUserEndedSessionMessage();
+        const serialized = serializeMessage(message);
+        
+        const decoder = new TextDecoder();
+        const json = decoder.decode(serialized);
+        const parsed = JSON.parse(json);
+        
+        expect(parsed).toEqual(message);
+      });
     });
   });
 });

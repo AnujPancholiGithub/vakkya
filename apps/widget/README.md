@@ -30,10 +30,85 @@ pnpm build
 
 ## Configuration
 
-| Attribute | Required | Description |
-|-----------|----------|-------------|
-| `data-token` | Yes | Your project token from the dashboard |
-| `data-api-url` | No | Custom API URL (default: https://api.vakkya.ai) |
+### Required Attributes
+
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `data-token` | Your project token from the dashboard | `data-token="your-project-token"` |
+
+### Optional Attributes
+
+| Attribute | Default | Options | Description |
+|-----------|---------|---------|-------------|
+| `data-api-url` | `https://api.vakkya.ai` | Any URL | Custom API URL (useful for development) |
+| `data-accent-color` | `#3B82F6` | Any valid CSS color | Primary accent color for the widget |
+| `data-theme` | `light` | `light`, `dark` | Widget theme mode |
+| `data-position` | `bottom-right` | `bottom-right`, `bottom-left` | Widget button position |
+
+### Color Customization Examples
+
+The `data-accent-color` attribute accepts any valid CSS color format:
+
+**Hex Colors:**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token" 
+  data-accent-color="#8B5CF6"></script>
+```
+
+**RGB/RGBA:**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token" 
+  data-accent-color="rgba(59, 130, 246, 0.9)"></script>
+```
+
+**HSL/HSLA:**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token" 
+  data-accent-color="hsl(217, 91%, 60%)"></script>
+```
+
+**Named Colors:**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token" 
+  data-accent-color="purple"></script>
+```
+
+### Complete Configuration Examples
+
+**Purple Dark Theme:**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token"
+  data-accent-color="#8B5CF6"
+  data-theme="dark"
+  data-position="bottom-right"></script>
+```
+
+**Green Light Theme (Left Position):**
+```html
+<script src="https://cdn.vakkya.ai/widget.js" 
+  data-token="your-token"
+  data-accent-color="#10B981"
+  data-theme="light"
+  data-position="bottom-left"></script>
+```
+
+### Demo Files
+
+The project includes several demo files showcasing different configurations:
+
+- `demo-index.html` - Index page with links to all demos
+- `demo.html` - Complete documentation with all options
+- `demo-purple-dark.html` - Purple accent with dark theme
+- `demo-pink-light.html` - Pink accent with light theme
+- `demo-green-left.html` - Green accent with left position
+- `demo-orange-dark.html` - Orange accent with dark theme
+
+Run the development server and visit these files to see the different configurations in action.
 
 ## Bundle Size
 

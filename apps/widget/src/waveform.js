@@ -23,11 +23,12 @@ const IDLE_MAX_VALUE = 60;
  * @param {HTMLCanvasElement} canvas
  * @returns {WaveformRenderer}
  */
-export function createWaveformRenderer(canvas) {
+export function createWaveformRenderer(canvas, initialColor = '#FFFFFF') {
   const ctx = canvas.getContext('2d');
   let animationId = null;
   let frequencyData = new Uint8Array(BAR_COUNT);
   let isRunning = false;
+  let color = initialColor;
   
   /**
    * Draw a single frame
@@ -43,7 +44,7 @@ export function createWaveformRenderer(canvas) {
     ctx.clearRect(0, 0, width, height);
     
     // Draw bars
-    ctx.fillStyle = WAVEFORM_COLOR;
+    ctx.fillStyle = color;
     
     for (let i = 0; i < BAR_COUNT; i++) {
       const value = frequencyData[i] || 0;
@@ -115,7 +116,15 @@ export function createWaveformRenderer(canvas) {
     frequencyData = new Uint8Array(0);
   }
   
-  return { start, stop, setData, destroy };
+  /**
+   * Set the waveform color
+   * @param {string} newColor
+   */
+  function setColor(newColor) {
+    color = newColor;
+  }
+  
+  return { start, stop, setData, destroy, setColor };
 }
 
 /**

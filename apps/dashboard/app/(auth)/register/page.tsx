@@ -10,7 +10,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { signup, ApiError } from '@/lib/auth'
 
 const registerSchema = z.object({
@@ -54,20 +53,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Create Account</CardTitle>
-          <CardDescription>Sign up to start building voice agents</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <CardContent className="space-y-4">
+    <>
+      <div className="flex flex-col space-y-2 text-center mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
+          <p className="text-sm text-muted-foreground">
+            Enter your email below to create your account
+          </p>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="name@example.com"
+                className="h-11"
                 {...register('email')}
                 disabled={isLoading}
               />
@@ -80,6 +81,7 @@ export default function RegisterPage() {
               <Input
                 id="password"
                 type="password"
+                className="h-11"
                 placeholder="••••••••"
                 {...register('password')}
                 disabled={isLoading}
@@ -93,6 +95,7 @@ export default function RegisterPage() {
               <Input
                 id="confirmPassword"
                 type="password"
+                className="h-11"
                 placeholder="••••••••"
                 {...register('confirmPassword')}
                 disabled={isLoading}
@@ -101,20 +104,17 @@ export default function RegisterPage() {
                 <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
               )}
             </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Creating account...' : 'Create Account'}
-            </Button>
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <Link href="/login" className="text-primary hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
+          </div>
+          <Button type="submit" size="lg" className="w-full h-11" disabled={isLoading}>
+            {isLoading ? 'Creating account...' : 'Create Account'}
+          </Button>
+          <p className="px-8 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/login" className="underline underline-offset-4 hover:text-primary">
+              Sign in
+            </Link>
+          </p>
         </form>
-      </Card>
-    </main>
+    </>
   )
 }

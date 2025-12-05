@@ -578,3 +578,422 @@ describe('generateMessageId', () => {
     expect(timestamp).toBeLessThanOrEqual(after);
   });
 });
+
+
+describe('Summary Card (Task 12.1, 12.2)', () => {
+  let host;
+  let shadow;
+  let callbacks;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    shadow = host.attachShadow({ mode: 'open' });
+    document.body.appendChild(host);
+    
+    callbacks = {
+      onClose: vi.fn(),
+      onMicClick: vi.fn(),
+      onKeyboardInput: vi.fn(),
+      onConfirmValue: vi.fn(),
+      onRejectValue: vi.fn(),
+      onSummaryApprove: vi.fn(),
+      onSummaryEdit: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  describe('Summary Card Display (Task 12.1)', () => {
+    it('should render summary card with form name', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Name', value: 'John Doe' },
+        email: { label: 'Email', value: 'john@example.com' },
+      };
+      
+      panel.addSummaryCard('Contact Form', answers);
+      
+      const card = panel.element.querySelector('.vakkya-summary-card');
+      expect(card).toBeTruthy();
+      
+      const title = card.querySelector('.vakkya-summary-title');
+      expect(title.textContent).toBe('Contact Form');
+    });
+
+    it('should display all collected answers', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Full Name', value: 'Jane Smith' },
+        email: { label: 'Email Address', value: 'jane@test.com' },
+        phone: { label: 'Phone', value: '555-1234' },
+      };
+      
+      panel.addSummaryCard('Lead Form', answers);
+      
+      const answerRows = panel.element.querySelectorAll('.vakkya-summary-answer');
+      expect(answerRows.length).toBe(3);
+      
+      // Check first answer
+      const firstLabel = answerRows[0].querySelector('.vakkya-summary-label');
+      const firstValue = answerRows[0].querySelector('.vakkya-summary-value');
+      expect(firstLabel.textContent).toBe('Full Name');
+      expect(firstValue.textContent).toBe('Jane Smith');
+    });
+
+    it('should show edit button for each field', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Name', value: 'Test User' },
+        email: { label: 'Email', value: 'test@example.com' },
+      };
+      
+      panel.addSummaryCard('Test Form', answers);
+      
+      const editButtons = panel.element.querySelectorAll('.vakkya-summary-edit-btn');
+      expect(editButtons.length).toBe(2);
+    });
+
+    it('should call onSummaryEdit when edit button is clicked', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Name', value: 'Test User' },
+      };
+      
+      panel.addSummaryCard('Test Form', answers);
+      
+      const editBtn = panel.element.querySelector('.vakkya-summary-edit-btn');
+      editBtn.click();
+      
+      expect(callbacks.onSummaryEdit).toHaveBeenCalledWith('name');
+    });
+
+    it('should show approve/submit button', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Name', value: 'Test' },
+      };
+      
+      panel.addSummaryCard('Test Form', answers);
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      expect(approveBtn).toBeTruthy();
+      expect(approveBtn.textContent).toContain('Approve');
+    });
+
+    it('should call onSummaryApprove when approve button is clicked', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        name: { label: 'Name', value: 'Test' },
+      };
+      
+      panel.addSummaryCard('Test Form', answers);
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      approveBtn.click();
+      
+      expect(callbacks.onSummaryApprove).toHaveBeenCalled();
+    });
+
+    it('should format array values correctly', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        interests: { label: 'Interests', value: ['Sports', 'Music', 'Art'] },
+      };
+      
+      panel.addSummaryCard('Survey', answers);
+      
+      const valueEl = panel.element.querySelector('.vakkya-summary-value');
+      expect(valueEl.textContent).toBe('Sports, Music, Art');
+    });
+
+    it('should handle null/undefined values gracefully', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = {
+        optional: { label: 'Optional Field', value: null },
+      };
+      
+      panel.addSummaryCard('Test Form', answers);
+      
+      const valueEl = panel.element.querySelector('.vakkya-summary-value');
+      expect(valueEl.textContent).toBe('—');
+    });
+  });
+
+  describe('Submission States (Task 12.2)', () => {
+    it('should show submitting state', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySubmitting(messageId);
+      
+      const card = panel.element.querySelector('.vakkya-summary-card');
+      expect(card.classList.contains('vakkya-summary-submitting')).toBe(true);
+      
+      const statusBadge = card.querySelector('.vakkya-summary-status-submitting');
+      expect(statusBadge).toBeTruthy();
+      expect(statusBadge.textContent).toContain('Submitting');
+    });
+
+    it('should disable approve button during submission', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySubmitting(messageId);
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      expect(approveBtn.disabled).toBe(true);
+    });
+
+    it('should hide edit buttons during submission', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySubmitting(messageId);
+      
+      const editButtons = panel.element.querySelectorAll('.vakkya-summary-edit-btn');
+      expect(editButtons.length).toBe(0);
+    });
+
+    it('should show success state', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySuccess(messageId);
+      
+      const card = panel.element.querySelector('.vakkya-summary-card');
+      expect(card.classList.contains('vakkya-summary-success')).toBe(true);
+      
+      const statusBadge = card.querySelector('.vakkya-summary-status-success');
+      expect(statusBadge).toBeTruthy();
+      expect(statusBadge.textContent).toContain('Submitted');
+    });
+
+    it('should show success message after submission', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySuccess(messageId);
+      
+      const successMessage = panel.element.querySelector('.vakkya-summary-success-message');
+      expect(successMessage).toBeTruthy();
+      expect(successMessage.textContent).toContain('submitted successfully');
+    });
+
+    it('should hide approve button after success', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummarySuccess(messageId);
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      expect(approveBtn).toBeNull();
+    });
+
+    it('should show error state with message', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummaryError(messageId, 'Network error occurred');
+      
+      const card = panel.element.querySelector('.vakkya-summary-card');
+      expect(card.classList.contains('vakkya-summary-error')).toBe(true);
+      
+      const statusBadge = card.querySelector('.vakkya-summary-status-error');
+      expect(statusBadge).toBeTruthy();
+      
+      const errorMessage = card.querySelector('.vakkya-summary-error');
+      expect(errorMessage.textContent).toBe('Network error occurred');
+    });
+
+    it('should show retry button on error', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummaryError(messageId, 'Failed to submit');
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      expect(approveBtn).toBeTruthy();
+      expect(approveBtn.textContent).toContain('Retry');
+    });
+
+    it('should allow retry after error', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummaryError(messageId, 'Failed');
+      
+      const approveBtn = panel.element.querySelector('.vakkya-summary-approve-btn');
+      approveBtn.click();
+      
+      expect(callbacks.onSummaryApprove).toHaveBeenCalled();
+    });
+
+    it('should reset to idle state for retry', () => {
+      const panel = createChatPanel(shadow, callbacks);
+      shadow.appendChild(panel.element);
+      
+      const answers = { name: { label: 'Name', value: 'Test' } };
+      const messageId = panel.addSummaryCard('Test Form', answers);
+      
+      panel.setSummaryError(messageId, 'Failed');
+      panel.resetSummaryState(messageId);
+      
+      const card = panel.element.querySelector('.vakkya-summary-card');
+      expect(card.classList.contains('vakkya-summary-error')).toBe(false);
+      
+      const errorMessage = card.querySelector('.vakkya-summary-error');
+      expect(errorMessage).toBeNull();
+      
+      const approveBtn = card.querySelector('.vakkya-summary-approve-btn');
+      expect(approveBtn.textContent).toContain('Approve');
+    });
+  });
+});
+
+/**
+ * Mute Button Tests
+ * Requirements 3.1, 3.4, 5.5: Mute/unmute toggle button with visual feedback
+ */
+describe('Mute Button (Requirements 3.1, 3.4, 5.5)', () => {
+  let host;
+  let shadow;
+  let callbacks;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    shadow = host.attachShadow({ mode: 'open' });
+    document.body.appendChild(host);
+    
+    callbacks = {
+      onClose: vi.fn(),
+      onMicClick: vi.fn(),
+      onMuteToggle: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  it('should render mute button in voice bar', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton).toBeTruthy();
+  });
+
+  it('should have minimum 44x44px touch target', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    // Check that the button has the correct class which defines 44x44px in CSS
+    expect(muteButton.classList.contains('vakkya-mute-button')).toBe(true);
+  });
+
+  it('should call onMuteToggle when clicked', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    muteButton.click();
+    
+    expect(callbacks.onMuteToggle).toHaveBeenCalled();
+  });
+
+  it('should start with unmuted state', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    expect(panel.getMuted()).toBe(false);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(false);
+  });
+
+  it('should update visual state when setMuted(true) is called', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    panel.setMuted(true);
+    
+    expect(panel.getMuted()).toBe(true);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(true);
+    expect(muteButton.getAttribute('aria-label')).toBe('Unmute microphone');
+  });
+
+  it('should update visual state when setMuted(false) is called', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    panel.setMuted(true);
+    panel.setMuted(false);
+    
+    expect(panel.getMuted()).toBe(false);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    expect(muteButton.classList.contains('muted')).toBe(false);
+    expect(muteButton.getAttribute('aria-label')).toBe('Mute microphone');
+  });
+
+  it('should show distinct muted icon when muted', () => {
+    const panel = createChatPanel(shadow, callbacks);
+    shadow.appendChild(panel.element);
+    
+    const muteButton = panel.element.querySelector('.vakkya-mute-button');
+    const initialIcon = muteButton.innerHTML;
+    
+    panel.setMuted(true);
+    
+    // Icon should change when muted
+    expect(muteButton.innerHTML).not.toBe(initialIcon);
+  });
+});

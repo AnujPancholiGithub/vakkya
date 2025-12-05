@@ -4,10 +4,14 @@ This module validates all required environment variables on startup
 and provides a centralized configuration object.
 """
 
+import base64
+import logging
 import os
 import sys
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Config(BaseSettings):
@@ -47,6 +51,11 @@ class Config(BaseSettings):
         default="production",
         description="Application environment"
     )
+    
+    # Langfuse Observability (optional - for tracing STT/LLM/TTS pipeline)
+    langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
+    langfuse_secret_key: str | None = Field(default=None, description="Langfuse secret key")
+    langfuse_base_url: str | None = Field(default=None, description="Langfuse host URL")
     
     @field_validator("log_level")
     @classmethod
@@ -182,3 +191,65 @@ def get_config() -> Config:
     if _config is None:
         _config = load_config()
     return _config
+
+
+def setup_langfuse_telemetry(
+    config: Config,
+    metadata: dict[str, str] | None = None,
+):
+    """
+    Configure LiveKit Agents to send telemetry to Langfuse via OpenTelemetry.
+    
+    This enables automatic tracing of STT, LLM, TTS, and tool calls.
+    Traces appear in Langfuse dashboard with latency, token usage, and errors.
+    
+    Args:
+        config: Application config with Langfuse credentials
+        metadata: Optional metadata to attach to all spans (e.g. session.id)
+    
+    Returns:
+        TracerProvider if configured (for flushing on shutdown), None if skipped
+    """
+    if not all([config.langfuse_public_key, config.langfuse_secret_key, config.langfuse_base_url]):
+        logger.info("Langfuse telemetry disabled (credentials not configured)")
+        return None
+    
+    try:
+        from livekit.agents.telemetry import set_tracer_provider
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        
+        # Base64 encode credentials for Basic Auth
+        auth = base64.b64encode(
+            f"{config.langfuse_public_key}:{config.langfuse_secret_key}".encode()
+        ).decode()
+        
+        # Configure OTLP exporter to Langfuse endpoint
+        host = config.langfuse_base_url.rstrip("/")
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"{host}/api/public/otel"
+        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {auth}"
+        
+        # Create and register tracer provider with batch processing
+        provider = TracerProvider()
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        set_tracer_provider(provider, metadata=metadata)
+        
+        logger.info(
+            "Langfuse telemetry enabled",
+            extra={"langfuse_host": host, "metadata": metadata},
+        )
+        return provider
+        
+    except ImportError as e:
+        logger.warning(
+            "Langfuse telemetry disabled (missing dependencies)",
+            extra={"error": str(e)},
+        )
+        return None
+    except Exception as e:
+        logger.warning(
+            "Langfuse telemetry setup failed",
+            extra={"error": str(e), "error_type": type(e).__name__},
+        )
+        return None

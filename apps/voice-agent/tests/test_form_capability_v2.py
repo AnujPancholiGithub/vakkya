@@ -11,7 +11,7 @@ Property Tests:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.capabilities.form_capability_v2 import (
+from src.capabilities.form_capability import (
     FormCapabilityV2,
     FormContext,
     FormStateEnum,

@@ -67,9 +67,9 @@ def mock_ctx_no_metadata() -> MagicMock:
 
 @pytest.fixture
 def mock_session_components():
-    """Create mocked Agent and AgentSession."""
+    """Create mocked FormAwareAgent and AgentSession."""
     with patch("src.entrypoint.AgentSession") as mock_session_class, \
-         patch("src.entrypoint.Agent") as mock_agent_class:
+         patch("src.entrypoint.FormAwareAgent") as mock_agent_class:
         
         mock_agent = MagicMock()
         mock_agent_class.return_value = mock_agent
@@ -351,206 +351,13 @@ class TestDataChannelHandling:
 
 
 # ============================================================================
-# TestSearchKnowledgeTool
+# NOTE: Tests for search_knowledge, get_page_context, and _build_agent_instructions
+# have been removed as these functions are now part of the capability system.
+# See test_capabilities.py for tests of:
+# - RAGCapability.get_tools() (search_knowledge)
+# - CoreCapability.get_tools() (get_page_context)
+# - InstructionBuilder (instruction composition)
 # ============================================================================
-
-
-class TestSearchKnowledgeTool:
-    """Tests for the search_knowledge RAG tool."""
-
-    @pytest.mark.asyncio
-    async def test_search_knowledge_returns_results(self, reset_rag_service) -> None:
-        """Test search_knowledge returns formatted results from RAG service."""
-        from src.entrypoint import search_knowledge
-        from src.models import SessionContext, DocumentChunk
-        
-        mock_context = MagicMock()
-        mock_context.userdata = SessionContext(
-            project_id=TEST_PROJECT_ID,
-            page_context=None,
-        )
-        
-        mock_rag = AsyncMock()
-        # Mock search() to return chunks with high similarity
-        mock_rag.search = AsyncMock(return_value=[
-            DocumentChunk(
-                content="Relevant content here",
-                metadata={"id": "chunk-1", "chunk_index": "0", "similarity": "0.95"},
-            )
-        ])
-        
-        with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
-            result = await search_knowledge(mock_context, "How do I reset my password?")
-        
-        assert "Relevant content" in result
-        mock_rag.search.assert_called_once_with(
-            query="How do I reset my password?",
-            project_id=TEST_PROJECT_ID,
-            top_k=3,
-        )
-
-    @pytest.mark.asyncio
-    async def test_search_knowledge_no_session_context(self) -> None:
-        """Test search_knowledge handles missing session context gracefully."""
-        from src.entrypoint import search_knowledge
-        
-        mock_context = MagicMock()
-        mock_context.userdata = None
-        
-        result = await search_knowledge(mock_context, "test query")
-        
-        assert "no relevant information" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_search_knowledge_handles_rag_error(self, reset_rag_service) -> None:
-        """Test search_knowledge returns fallback message on RAG error."""
-        from src.entrypoint import search_knowledge
-        from src.models import SessionContext
-        
-        mock_context = MagicMock()
-        mock_context.userdata = SessionContext(
-            project_id=TEST_PROJECT_ID,
-            page_context=None,
-        )
-        
-        mock_rag = AsyncMock()
-        mock_rag.search = AsyncMock(side_effect=Exception("Database error"))
-        
-        with patch("src.entrypoint.get_rag_service", return_value=mock_rag):
-            result = await search_knowledge(mock_context, "test query")
-        
-        assert "couldn't search" in result.lower()
-
-
-# ============================================================================
-# TestGetPageContextTool
-# ============================================================================
-
-
-class TestGetPageContextTool:
-    """Tests for the get_page_context tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_page_context_returns_url(self) -> None:
-        """Test get_page_context returns the current page URL."""
-        from src.entrypoint import get_page_context
-        from src.models import PageContext, SessionContext
-        
-        mock_context = MagicMock()
-        mock_context.userdata = SessionContext(
-            project_id=TEST_PROJECT_ID,
-            page_context=PageContext(url="https://example.com/pricing"),
-        )
-        
-        result = await get_page_context(mock_context)
-        
-        assert "https://example.com/pricing" in result
-        assert "viewing" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_get_page_context_no_session_context(self) -> None:
-        """Test get_page_context handles missing session context."""
-        from src.entrypoint import get_page_context
-        
-        mock_context = MagicMock()
-        mock_context.userdata = None
-        
-        result = await get_page_context(mock_context)
-        
-        assert "don't have information" in result.lower()
-
-    @pytest.mark.asyncio
-    async def test_get_page_context_no_page_context(self) -> None:
-        """Test get_page_context handles missing page context."""
-        from src.entrypoint import get_page_context
-        from src.models import SessionContext
-        
-        mock_context = MagicMock()
-        mock_context.userdata = SessionContext(
-            project_id=TEST_PROJECT_ID,
-            page_context=None,
-        )
-        
-        result = await get_page_context(mock_context)
-        
-        assert "don't have information" in result.lower()
-
-
-# ============================================================================
-# TestBuildAgentInstructions
-# ============================================================================
-
-
-class TestBuildAgentInstructions:
-    """Tests for agent instruction building."""
-
-    def test_build_instructions_without_page_url(self) -> None:
-        """Test building instructions without page context."""
-        from src.entrypoint import _build_agent_instructions
-        
-        instructions = _build_agent_instructions(None)
-        
-        assert "helpful voice assistant" in instructions
-        assert "search_knowledge" in instructions
-        assert "conversational" in instructions
-        assert "viewing:" not in instructions
-
-    def test_build_instructions_with_page_url(self) -> None:
-        """Test building instructions with page context."""
-        from src.entrypoint import _build_agent_instructions
-        
-        instructions = _build_agent_instructions("https://example.com/docs/getting-started")
-        
-        assert "helpful voice assistant" in instructions
-        assert "https://example.com/docs/getting-started" in instructions
-        assert "is viewing:" in instructions
-
-    def test_build_instructions_with_custom_system_prompt(self) -> None:
-        """Test building instructions with custom system prompt."""
-        from src.entrypoint import _build_agent_instructions
-        from src.models import AgentConfig
-        
-        agent_config = AgentConfig(
-            system_prompt="You help customers find the perfect home. Be warm and professional.",
-            agent_name="Sarah from ABC Realty",
-        )
-        
-        instructions = _build_agent_instructions(agent_config=agent_config)
-        
-        assert "Sarah from ABC Realty" in instructions
-        assert "find the perfect home" in instructions
-        assert "search_knowledge" in instructions  # Capabilities still included
-
-    def test_build_instructions_with_custom_prompt_and_page_url(self) -> None:
-        """Test building instructions with both custom prompt and page context."""
-        from src.entrypoint import _build_agent_instructions
-        from src.models import AgentConfig
-        
-        agent_config = AgentConfig(
-            system_prompt="You are a technical support specialist.",
-            agent_name="TechBot",
-        )
-        
-        instructions = _build_agent_instructions(
-            page_url="https://docs.example.com/api",
-            agent_config=agent_config,
-        )
-        
-        assert "TechBot" in instructions
-        assert "technical support" in instructions
-        assert "https://docs.example.com/api" in instructions
-
-    def test_build_instructions_with_agent_name_only(self) -> None:
-        """Test building instructions with only agent name (no custom prompt)."""
-        from src.entrypoint import _build_agent_instructions
-        from src.models import AgentConfig
-        
-        agent_config = AgentConfig(agent_name="Helper Bot")
-        
-        instructions = _build_agent_instructions(agent_config=agent_config)
-        
-        # Should use default instructions since no system_prompt
-        assert "helpful voice assistant" in instructions
 
 
 # ============================================================================
@@ -608,15 +415,23 @@ class TestAgentWithRagTool:
     async def test_agent_created_with_tools(
         self, mock_ctx: MagicMock, mock_session_components: dict
     ) -> None:
-        """Test that Agent is created with search_knowledge and get_page_context tools."""
-        from src.entrypoint import get_page_context, search_knowledge
+        """Test that Agent is created with tools from capability system.
         
+        The capability-driven architecture collects tools dynamically:
+        - CoreCapability always provides get_page_context
+        - RAGCapability provides search_knowledge (if RAG service available)
+        - FormCapability provides activate_form (if API server configured)
+        """
         await entrypoint(mock_ctx)
 
         call_kwargs = mock_session_components["agent_class"].call_args.kwargs
         assert "tools" in call_kwargs
-        assert search_knowledge in call_kwargs["tools"]
-        assert get_page_context in call_kwargs["tools"]
+        
+        # Get tool names from the dynamically collected tools
+        tool_names = [getattr(t, "__name__", str(t)) for t in call_kwargs["tools"]]
+        
+        # CoreCapability always provides get_page_context
+        assert "get_page_context" in tool_names, f"Expected get_page_context in {tool_names}"
 
 
 # ============================================================================
@@ -876,7 +691,7 @@ class TestSendWidgetMessage:
     @pytest.mark.asyncio
     async def test_send_widget_message_success(self) -> None:
         """Test sending message to widget successfully."""
-        from src.entrypoint import send_widget_message
+        from src.utils import send_widget_message
         
         mock_room = MagicMock()
         mock_room.local_participant.publish_data = AsyncMock()
@@ -892,7 +707,7 @@ class TestSendWidgetMessage:
     @pytest.mark.asyncio
     async def test_send_widget_message_failure(self) -> None:
         """Test handling failure when sending message to widget."""
-        from src.entrypoint import send_widget_message
+        from src.utils import send_widget_message
         
         mock_room = MagicMock()
         mock_room.local_participant.publish_data = AsyncMock(
@@ -909,7 +724,7 @@ class TestSendWidgetMessage:
     @pytest.mark.asyncio
     async def test_send_widget_message_serializes_json(self) -> None:
         """Test that message is properly serialized to JSON."""
-        from src.entrypoint import send_widget_message
+        from src.utils import send_widget_message
         
         mock_room = MagicMock()
         mock_room.local_participant.publish_data = AsyncMock()
@@ -932,3 +747,53 @@ class TestSendWidgetMessage:
         assert parsed["type"] == "value_extracted"
         assert parsed["fieldName"] == "email"
         assert parsed["value"] == "test@example.com"
+
+
+class TestSanitizeUrlForLogging:
+    """Tests for sanitize_url_for_logging utility function."""
+
+    def test_sanitize_removes_query_params(self) -> None:
+        """Test that query parameters are removed from URL."""
+        from src.utils import sanitize_url_for_logging
+        
+        url = "https://example.com/page?token=secret123&user=test"
+        result = sanitize_url_for_logging(url)
+        
+        assert result == "https://example.com/page"
+        assert "token" not in result
+        assert "secret" not in result
+
+    def test_sanitize_removes_fragment(self) -> None:
+        """Test that URL fragments are removed."""
+        from src.utils import sanitize_url_for_logging
+        
+        url = "https://example.com/page#section-with-data"
+        result = sanitize_url_for_logging(url)
+        
+        assert result == "https://example.com/page"
+        assert "#" not in result
+
+    def test_sanitize_preserves_path(self) -> None:
+        """Test that URL path is preserved."""
+        from src.utils import sanitize_url_for_logging
+        
+        url = "https://example.com/docs/api/v1/users"
+        result = sanitize_url_for_logging(url)
+        
+        assert result == "https://example.com/docs/api/v1/users"
+
+    def test_sanitize_handles_empty_url(self) -> None:
+        """Test handling of empty URL."""
+        from src.utils import sanitize_url_for_logging
+        
+        assert sanitize_url_for_logging("") == ""
+        assert sanitize_url_for_logging(None) == ""
+
+    def test_sanitize_handles_invalid_url(self) -> None:
+        """Test handling of invalid URL."""
+        from src.utils import sanitize_url_for_logging
+        
+        # Invalid URLs should return a safe placeholder
+        result = sanitize_url_for_logging("not-a-valid-url")
+        # Should not raise, should return something safe
+        assert isinstance(result, str)

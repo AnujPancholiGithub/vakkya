@@ -1,37 +1,111 @@
 """Main entrypoint for LiveKit agent worker."""
 
 import logging
-from typing import Optional
-
 from dataclasses import dataclass
+from typing import Dict, Optional
 
 from livekit import rtc
 from livekit.agents import (
     Agent,
     AgentSession,
+    ConversationItemAddedEvent,
     JobContext,
-    RunContext,
-    function_tool,
     inference,
 )
 from livekit.plugins import silero
 
-from livekit.agents import ConversationItemAddedEvent
-
-from .config import get_config
+from .capabilities import (
+    CapabilityRegistry,
+    CoreCapability,
+    FormCapabilityV2,
+    FormContext,
+    FormStateEnum,
+    FORM_STATE_KEY,
+    InstructionBuilder,
+    RAGCapability,
+)
+from .config import get_config, setup_langfuse_telemetry
+from .form_aware_agent import FormAwareAgent
+from .form_state import FormCollectionState
 from .models import AgentConfig, PageContext, SessionContext, Turn
 from .rag_service import RAGService, create_rag_service
 from .session_manager import SessionManager
+from .utils import sanitize_url_for_logging, send_widget_message
 from .validation import ValidationException, validate_and_parse_page_context
-from .capabilities.form_capability import FormCapability
-from .capabilities.form_capability_v2 import FormCapabilityV2, FormContext, FormStateEnum, FORM_STATE_KEY
 
 logger = logging.getLogger(__name__)
 
+
+async def _fetch_active_form(project_id: str, room_name: str, config) -> Optional[Dict]:
+    """Fetch active form for the given project from the API.
+
+    Args:
+        project_id: The project ID to fetch the form for
+        room_name: Name of the room for logging
+        config: Application config with API server URL
+
+    Returns:
+        Dictionary containing form data if found, None otherwise
+    """
+    if not config.api_server_url:
+        logger.warning(
+            "API server URL not configured - cannot fetch forms",
+            extra={"room": room_name},
+        )
+        return None
+
+    try:
+        logger.info(
+            "Fetching active form from API",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "api_url": f"{config.api_server_url}/api/internal/projects/{project_id}/active-form",
+            },
+        )
+
+        form_capability = FormCapabilityV2(api_base_url=config.api_server_url)
+        active_form = await form_capability._fetch_active_form(project_id)
+
+        if active_form:
+            logger.info(
+                "Active form loaded for project",
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                    "form_id": active_form.get("id"),
+                    "form_name": active_form.get("name"),
+                    "field_count": len(active_form.get("fields", [])),
+                },
+            )
+        else:
+            logger.info(
+                "No active form found for project - using FAQ mode",
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                },
+            )
+
+        return active_form
+
+    except Exception as e:
+        logger.warning(
+            "Failed to fetch active form - continuing without form mode",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            },
+        )
+        return None
+
+
 # Model descriptors for LiveKit Inference
 STT_MODEL = "assemblyai/universal-streaming:en"
-LLM_MODEL = "openai/gpt-4o-mini"
-TTS_MODEL = "cartesia/sonic-3"
+LLM_MODEL = "google/gemini-2.5-flash"
+TTS_MODEL = "cartesia/sonic-3:f31cc6a7-c1e8-4764-980c-60a361443dd1"
 
 # Global RAG service instance (initialized once per worker)
 _rag_service: Optional[RAGService] = None
@@ -40,7 +114,7 @@ _rag_service: Optional[RAGService] = None
 async def get_rag_service() -> RAGService:
     """
     Get or initialize the RAG service singleton.
-    
+
     Returns:
         Initialized RAGService instance
     """
@@ -59,178 +133,45 @@ async def get_rag_service() -> RAGService:
     return _rag_service
 
 
-async def send_widget_message(room: rtc.Room, message: dict) -> bool:
-    """
-    Send a message to the widget via data channel.
-    
-    Message types (Requirements 10.1, 10.2):
-    - form_activate: Activate form UI with schema
-    - field_focus: Focus on a specific field
-    - value_extracted: Show extracted value for confirmation
-    - value_confirmed: Confirm a value
-    - show_summary: Display form summary
-    - submission_success: Form submitted successfully
-    - submission_failed: Form submission failed
-    - form_deactivated: Form closed/completed
-    
-    Args:
-        room: LiveKit room instance
-        message: Message dict with 'type' and payload
-        
-    Returns:
-        True if sent successfully, False otherwise
-    """
-    import json
-    
-    try:
-        data = json.dumps(message).encode("utf-8")
-        await room.local_participant.publish_data(data, reliable=True)
-        logger.debug(
-            "Widget message sent",
-            extra={"type": message.get("type")},
-        )
-        return True
-    except Exception as e:
-        logger.warning(
-            "Failed to send widget message",
-            extra={"type": message.get("type"), "error": str(e)},
-        )
-        return False
+# send_widget_message is imported from .utils
 
 
-@function_tool()
-async def get_page_context(
-    context: RunContext[SessionContext],
-) -> str:
-    """Get information about the page the user is currently viewing.
-    
-    Use this tool when the user asks about:
-    - What page they're on
-    - The current URL or page title
-    - Context about where they are on the website
-    
-    Returns:
-        Information about the current page URL, or a message if not available.
-    """
-    session_context = context.userdata
-    if not session_context or not session_context.page_context:
-        return "I don't have information about which page you're viewing right now."
-    
-    page_url = session_context.page_context.url
-    return f"You are currently viewing: {page_url}"
 
-
-@function_tool()
-async def search_knowledge(
-    context: RunContext[SessionContext],
-    query: str,
-) -> str:
-    """Search the knowledge base for information relevant to the user's question.
-    
-    Use this tool when the user asks a question that might be answered by
-    the project's uploaded documents. This searches through PDFs, text files,
-    and markdown documents that have been uploaded to the project.
-    
-    Args:
-        query: The search query based on what the user is asking about.
-               Be specific and include key terms from the user's question.
-    
-    Returns:
-        Relevant document excerpts that can help answer the user's question,
-        or a message indicating no relevant documents were found.
-        Results include relevance scores - lower scores (below 0.5) indicate uncertainty.
-    """
-    session_context = context.userdata
-    if not session_context:
-        logger.warning("No session context available for RAG search")
-        return "No relevant information found."
-    
-    project_id = session_context.project_id
-    
-    try:
-        rag_service = await get_rag_service()
-        
-        # Get raw chunks to analyze similarity scores
-        chunks = await rag_service.search(
-            query=query,
-            project_id=project_id,
-            top_k=3,
-        )
-        
-        if not chunks:
-            logger.info(
-                "RAG search returned no results",
-                extra={
-                    "project_id": project_id,
-                    "query_length": len(query),
-                },
-            )
-            return "No relevant information found in the knowledge base."
-        
-        # Calculate max similarity for confidence assessment
-        max_similarity = 0.0
-        for chunk in chunks:
-            try:
-                sim = float(chunk.metadata.get("similarity", "0"))
-                if sim > max_similarity:
-                    max_similarity = sim
-            except (ValueError, TypeError):
-                continue
-        
-        # Format results
-        from .rag_service import format_chunks_for_llm
-        result = format_chunks_for_llm(chunks)
-        
-        # Add confidence indicator for low similarity results
-        if max_similarity < 0.5:
-            result = f"[Low confidence results - relevance scores below 0.5]\n\n{result}"
-        
-        logger.info(
-            "RAG search completed",
-            extra={
-                "project_id": project_id,
-                "query_length": len(query),
-                "num_results": len(chunks),
-                "max_similarity": round(max_similarity, 3),
-            },
-        )
-        
-        return result
-        
-    except Exception as e:
-        logger.error(
-            "RAG search failed",
-            extra={
-                "project_id": project_id,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            },
-        )
-        # Return graceful fallback instead of raising ToolError
-        # This allows the agent to continue the conversation
-        return "I couldn't search the knowledge base right now. Please try rephrasing your question."
 
 
 async def entrypoint(ctx: JobContext) -> None:
     """
     Main entrypoint for LiveKit agent worker.
-    
+
     This function is called when a participant joins a LiveKit room.
     It initializes the AgentSession with LiveKit Inference models and
     starts the voice pipeline (STT → LLM → TTS).
-    
+
     Error Handling:
     - Connection errors: Logged and raised (framework will retry)
     - Invalid project_id: Logged and returns early (permanent error)
     - Session initialization errors: Logged and raised (permanent error)
     - Data channel errors: Logged but don't interrupt session (transient)
-    
+
     Args:
         ctx: JobContext provided by LiveKit Agents framework
     """
     room_name = ctx.room.name
     logger.info("Agent worker starting", extra={"room": room_name})
+
+    # Setup Langfuse telemetry with session metadata for trace grouping
+    config = get_config()
+    trace_provider = setup_langfuse_telemetry(
+        config,
+        metadata={"langfuse.session.id": room_name},
+    )
     
+    # Flush traces on session shutdown to ensure all data is sent
+    if trace_provider:
+        async def flush_traces():
+            trace_provider.force_flush()
+        ctx.add_shutdown_callback(flush_traces)
+
     try:
         # Connect to the room
         await ctx.connect()
@@ -241,7 +182,7 @@ async def entrypoint(ctx: JobContext) -> None:
             exc_info=True,
         )
         raise  # Let framework handle retry
-    
+
     try:
         # Wait for a participant to join
         participant = await ctx.wait_for_participant()
@@ -259,14 +200,14 @@ async def entrypoint(ctx: JobContext) -> None:
             exc_info=True,
         )
         raise  # Let framework handle retry
-    
+
     # Extract project_id, widget_token, and agent config from room metadata
     # In console mode, use defaults for testing
     metadata_result = await _extract_project_metadata(ctx)
     project_id = metadata_result.project_id
     widget_token = metadata_result.widget_token
     agent_config = metadata_result.agent_config
-    
+
     if not project_id:
         # Check if this is console mode (mock room)
         if room_name == "mock_room":
@@ -281,7 +222,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 extra={"room": room_name},
             )
             return  # Permanent error - don't retry
-    
+
     logger.info(
         "Extracted project metadata",
         extra={
@@ -291,7 +232,7 @@ async def entrypoint(ctx: JobContext) -> None:
             "has_agent_config": agent_config is not None,
         },
     )
-    
+
     # Initialize session context for storing page context and other session data
     # This will be accessible in agent tools via RunContext
     session_context = SessionContext(
@@ -299,45 +240,24 @@ async def entrypoint(ctx: JobContext) -> None:
         page_context=None,  # Will be populated by data channel handler
         widget_token=widget_token,
         agent_config=agent_config,
+        room=ctx.room,
+        active_form=None,  # Will be set after fetching from API
     )
-    
+
     # Fetch active form for this project (if any)
-    active_form = None
-    try:
-        config = get_config()
-        if config.api_server_url:
-            form_capability = FormCapability(api_base_url=config.api_server_url)
-            active_form = await form_capability._fetch_active_form(project_id)
-            if active_form:
-                logger.info(
-                    "Active form loaded for project",
-                    extra={
-                        "room": room_name,
-                        "project_id": project_id,
-                        "form_id": active_form.get("id"),
-                        "form_name": active_form.get("name"),
-                    },
-                )
-    except Exception as e:
-        logger.warning(
-            "Failed to fetch active form - continuing without form mode",
-            extra={
-                "room": room_name,
-                "project_id": project_id,
-                "error": str(e),
-            },
-        )
-    
+    active_form = await _fetch_active_form(project_id, room_name, config)
+    if active_form:
+        session_context.active_form = active_form
+
     # Create API conversation for logging (if widget_token is available)
     # Get config for API URL - gracefully handle if not available
     try:
-        config = get_config()
         api_server_url = config.api_server_url
     except SystemExit:
         # Config validation failed - skip API logging
         api_server_url = None
         logger.warning("Config not available - API conversation logging disabled")
-    
+
     if widget_token and api_server_url:
         try:
             session_manager = SessionManager(db_pool=None)  # We only use API logging, not DB
@@ -367,22 +287,75 @@ async def entrypoint(ctx: JobContext) -> None:
                     "error": str(e),
                 },
             )
-    
+
     try:
-        # Build context-aware instructions with custom agent config
-        page_url = session_context.page_context.url if session_context.page_context else None
-        instructions = _build_agent_instructions(
-            page_url=page_url,
+        # Initialize capability registry and register all capabilities
+        # Requirements 1.1, 1.3: Dynamic capability registration
+        registry = CapabilityRegistry()
+        
+        # Register core capability (always-on tools like get_page_context)
+        registry.register(CoreCapability())
+        
+        # Register RAG capability if RAG service is available
+        try:
+            rag_service = await get_rag_service()
+            registry.register(RAGCapability(rag_service=rag_service))
+        except Exception as e:
+            logger.warning(
+                "RAG service not available - RAG capability disabled",
+                extra={"room": room_name, "error": str(e)},
+            )
+        
+        # Register form capability if API server is configured
+        if config.api_server_url:
+            registry.register(FormCapabilityV2(api_base_url=config.api_server_url))
+        
+        # Store registry in session context for access by capabilities
+        # Requirements 1.3: Make registry available to capabilities
+        session_context.capability_registry = registry
+        
+        logger.info(
+            "Capability registry initialized",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "registered_capabilities": registry.capability_names,
+            },
+        )
+        
+        # Build instructions using InstructionBuilder
+        # Requirements 2.1: Composable instruction building
+        instruction_builder = InstructionBuilder(registry)
+        instructions = instruction_builder.build(
+            session_context=session_context,
             agent_config=agent_config,
-            active_form=active_form,
         )
         
-        # Create agent with tools for knowledge grounding and page context
-        agent = Agent(
+        # Collect tools from all enabled capabilities
+        # Requirements 3.1, 6.2: Dynamic tool assembly with logging
+        tools = registry.collect_tools(session_context)
+        tool_names = [getattr(t, "__name__", str(t)) for t in tools]
+        
+        # Create agent with dynamically collected tools
+        # Using FormAwareAgent to enable keyboard input acknowledgment hooks
+        agent = FormAwareAgent(
             instructions=instructions,
-            tools=[search_knowledge, get_page_context],
+            tools=tools,
         )
-        
+
+        logger.info(
+            "FormAwareAgent created with capability-driven architecture and hooks enabled",
+            extra={
+                "room": room_name,
+                "project_id": project_id,
+                "instructions_length": len(instructions),
+                "tools": tool_names,
+                "enabled_capabilities": [c.name for c in registry.get_enabled_capabilities(session_context)],
+                "hooks_enabled": True,
+                "agent_type": "FormAwareAgent",
+            },
+        )
+
         # Initialize AgentSession with LiveKit Inference models
         # These model descriptors use LiveKit's unified gateway
         session = AgentSession[SessionContext](
@@ -393,6 +366,10 @@ async def entrypoint(ctx: JobContext) -> None:
             userdata=session_context,
         )
         
+        # Pass session reference to agent so hooks can access userdata
+        # This enables on_user_turn_completed to inject keyboard inputs into chat context
+        agent._session = session
+
         logger.info(
             "AgentSession initialized",
             extra={
@@ -402,6 +379,14 @@ async def entrypoint(ctx: JobContext) -> None:
                 "llm": LLM_MODEL,
                 "tts": TTS_MODEL,
                 "vad": "silero",
+                "has_form": active_form is not None,
+                "form_id": active_form.get("id") if active_form else None,
+                "form_name": active_form.get("name") if active_form else None,
+                "has_page_context": session_context.page_context is not None,
+                "has_agent_config": agent_config is not None,
+                "instructions_length": len(instructions),
+                "tools": tool_names,
+                "enabled_capabilities": registry.capability_names,
             },
         )
     except Exception as e:
@@ -416,7 +401,7 @@ async def entrypoint(ctx: JobContext) -> None:
             exc_info=True,
         )
         raise  # Permanent error - invalid configuration
-    
+
     # Set up data channel handler for page context and form messages
     # Page context is stored in session_context.userdata and will be accessible
     # in agent tools via RunContext parameter (Task 5)
@@ -425,7 +410,7 @@ async def entrypoint(ctx: JobContext) -> None:
     def on_data_received(data: rtc.DataPacket) -> None:
         """
         Handle data channel messages from widget.
-        
+
         Message types (Requirements 10.1-10.3):
         - page_context: Page URL and title
         - keyboard_input: User typed a value in the form
@@ -434,13 +419,13 @@ async def entrypoint(ctx: JobContext) -> None:
         - form_abandoned: User abandoned the form
         - submission_approved: User approved submission from summary
         - edit_requested: User wants to edit a field from summary
-        
+
         Errors in data channel processing are logged but don't interrupt
         the voice session (transient errors).
         """
         try:
             import json
-            
+
             # Parse JSON message
             try:
                 message = json.loads(data.data.decode("utf-8"))
@@ -450,20 +435,28 @@ async def entrypoint(ctx: JobContext) -> None:
                 session_context.page_context = PageContext(url=page_context_input.url)
                 logger.info(
                     "Page context received (legacy)",
-                    extra={"room": room_name, "project_id": project_id, "page_url": page_context_input.url},
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "page_url": sanitize_url_for_logging(page_context_input.url),
+                    },
                 )
                 return
-            
+
             msg_type = message.get("type")
-            
+
             if msg_type == "page_context":
                 # Handle page context message
                 session_context.page_context = PageContext(url=message.get("url", ""))
                 logger.info(
                     "Page context received",
-                    extra={"room": room_name, "project_id": project_id, "page_url": message.get("url")},
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "page_url": sanitize_url_for_logging(message.get("url", "")),
+                    },
                 )
-            
+
             elif msg_type == "keyboard_input":
                 # Handle keyboard input from widget (Requirement 10.3)
                 # Store in session context for form capability to process
@@ -475,9 +468,64 @@ async def entrypoint(ctx: JobContext) -> None:
                     session_context.pending_keyboard_input[field_name] = value
                     logger.debug(
                         "Keyboard input received",
-                        extra={"room": room_name, "field": field_name},
+                        extra={"room": room_name, "field": field_name, "value": value},
                     )
-            
+
+            elif msg_type == "field_completed":
+                # Handle field_completed message from widget (Requirements 1.1, 1.2, 7.2)
+                # This is sent when user submits a field via keyboard
+                # Immediately update FormCollectionState and add to pending acknowledgments
+                field_name = message.get("fieldName")
+                value = message.get("value")
+                source = message.get("source", "keyboard")
+                
+                if field_name and value is not None:
+                    # Initialize FormCollectionState if not exists and form is active
+                    if session_context.form_collection_state is None and session_context.active_form:
+                        form_id = session_context.active_form.get("id", "")
+                        fields = session_context.active_form.get("fields", [])
+                        session_context.form_collection_state = FormCollectionState(
+                            form_id=form_id,
+                            total_fields=len(fields),
+                        )
+                        session_context.form_collection_state.set_required_fields(fields)
+                    
+                    # Update confirmed_fields immediately
+                    if session_context.form_collection_state:
+                        session_context.form_collection_state.add_confirmed_field(
+                            field_name=field_name,
+                            value=value,
+                            source=source,
+                        )
+                        
+                        # Add to pending_keyboard_inputs for agent to acknowledge via hook
+                        session_context.pending_keyboard_inputs.append({
+                            "field_name": field_name,
+                            "value": value,
+                            "source": source,
+                        })
+                        
+                        logger.info(
+                            "Field completed via keyboard - state updated",
+                            extra={
+                                "room": room_name,
+                                "field_name": field_name,
+                                "value": value,
+                                "source": source,
+                                "total_confirmed": len(session_context.form_collection_state.confirmed_fields),
+                                "is_complete": session_context.form_collection_state.is_complete,
+                            },
+                        )
+                    else:
+                        logger.warning(
+                            "Field completed but no form collection state",
+                            extra={
+                                "room": room_name,
+                                "field_name": field_name,
+                                "has_active_form": session_context.active_form is not None,
+                            },
+                        )
+
             elif msg_type == "field_confirmed":
                 # Handle field confirmation from widget
                 field_name = message.get("fieldName")
@@ -489,7 +537,7 @@ async def entrypoint(ctx: JobContext) -> None:
                         "Field confirmed via widget",
                         extra={"room": room_name, "field": field_name},
                     )
-            
+
             elif msg_type == "field_rejected":
                 # Handle field rejection from widget
                 field_name = message.get("fieldName")
@@ -501,7 +549,7 @@ async def entrypoint(ctx: JobContext) -> None:
                         "Field rejected via widget",
                         extra={"room": room_name, "field": field_name},
                     )
-            
+
             elif msg_type == "form_abandoned":
                 # Handle form abandonment from widget
                 session_context.form_abandoned = True
@@ -509,7 +557,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     "Form abandoned via widget",
                     extra={"room": room_name, "project_id": project_id},
                 )
-            
+
             elif msg_type == "submission_approved":
                 # Handle submission approval from widget
                 session_context.submission_approved = True
@@ -517,7 +565,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     "Submission approved via widget",
                     extra={"room": room_name, "project_id": project_id},
                 )
-            
+
             elif msg_type == "edit_requested":
                 # Handle edit request from widget
                 field_name = message.get("fieldName")
@@ -527,13 +575,39 @@ async def entrypoint(ctx: JobContext) -> None:
                         "Edit requested via widget",
                         extra={"room": room_name, "field": field_name},
                     )
-            
+
+            elif msg_type == "mute_status_changed":
+                # Handle mute status change from widget (Requirements 3.5, 3.7)
+                # Store mute state in session context for agent awareness
+                muted = message.get("muted", False)
+                session_context.is_user_muted = bool(muted)
+                logger.info(
+                    "User mute status changed",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "is_muted": session_context.is_user_muted,
+                    },
+                )
+
+            elif msg_type == "user_ended_session":
+                # Handle user-initiated session end (Requirement 4.3)
+                # Log session end with "user_requested" reason for analytics
+                logger.info(
+                    "Session ended by user",
+                    extra={
+                        "room": room_name,
+                        "project_id": project_id,
+                        "reason": "user_requested",
+                    },
+                )
+
             else:
                 logger.debug(
                     "Unknown message type",
                     extra={"room": room_name, "type": msg_type},
                 )
-                
+
         except ValidationException as e:
             logger.warning(
                 "Invalid data channel message",
@@ -542,15 +616,98 @@ async def entrypoint(ctx: JobContext) -> None:
         except Exception as e:
             logger.warning(
                 "Failed to process data channel message",
-                extra={"room": room_name, "project_id": project_id, "error": str(e), "error_type": type(e).__name__},
+                extra={
+                    "room": room_name,
+                    "project_id": project_id,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                },
             )
-    
+
     # Set up conversation logging if API conversation was created
     pending_user_query: Optional[str] = None
-    
+
+    import asyncio
+
+    # Set up agent message sending to widget (Requirement 3.3)
+    # This sends agent responses as chat messages to the widget for display
+    async def _send_agent_message_async(content: str, is_speaking: bool = False) -> None:
+        """Send agent message to widget via data channel."""
+        try:
+            await send_widget_message(
+                ctx.room,
+                {
+                    "type": "agent_message",
+                    "content": content,
+                    "isSpeaking": is_speaking,
+                },
+            )
+            logger.debug(
+                "Agent message sent to widget",
+                extra={
+                    "room": room_name,
+                    "content_length": len(content),
+                    "is_speaking": is_speaking,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to send agent message to widget",
+                extra={
+                    "room": room_name,
+                    "error": str(e),
+                },
+            )
+
+    async def _send_speaking_state_async(is_speaking: bool) -> None:
+        """Send speaking state indicator to widget."""
+        try:
+            msg_type = "agent_speaking_start" if is_speaking else "agent_speaking_end"
+            await send_widget_message(ctx.room, {"type": msg_type})
+            logger.debug(
+                "Speaking state sent to widget",
+                extra={
+                    "room": room_name,
+                    "is_speaking": is_speaking,
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to send speaking state to widget",
+                extra={
+                    "room": room_name,
+                    "error": str(e),
+                },
+            )
+
+    # Track speaking state for agent messages
+    agent_is_speaking = False
+
+    @session.on("conversation_item_added")
+    def on_conversation_item_added_for_widget(event: ConversationItemAddedEvent) -> None:
+        """
+        Send agent messages to widget for chat display.
+
+        Requirement 3.3: Display agent's text as agent message bubble
+        """
+        nonlocal agent_is_speaking
+
+        item = event.item
+        text_content = item.text_content
+
+        if not text_content:
+            return
+
+        if item.role == "assistant":
+            # Send agent message to widget for display in chat panel
+            # Mark as speaking since TTS will follow
+            agent_is_speaking = True
+            asyncio.create_task(_send_agent_message_async(text_content, is_speaking=True))
+            asyncio.create_task(_send_speaking_state_async(True))
+
+    # API conversation logging (if enabled)
     if session_context.api_conversation_id and session_context.widget_token:
-        import asyncio
-        
+
         async def _log_turn_async(user_query: str, agent_response: str) -> None:
             """Async helper to log turn to API."""
             try:
@@ -559,7 +716,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     user_query=user_query,
                     agent_response=agent_response,
                 )
-                
+
                 session_manager = SessionManager(db_pool=None)
                 await session_manager.log_turn_to_api(
                     conversation_id=session_context.api_conversation_id,
@@ -567,7 +724,7 @@ async def entrypoint(ctx: JobContext) -> None:
                     widget_token=session_context.widget_token,
                     api_url=api_server_url,
                 )
-                
+
                 logger.debug(
                     "Turn logged to API",
                     extra={
@@ -584,22 +741,22 @@ async def entrypoint(ctx: JobContext) -> None:
                         "error": str(e),
                     },
                 )
-        
+
         @session.on("conversation_item_added")
-        def on_conversation_item_added(event: ConversationItemAddedEvent) -> None:
+        def on_conversation_item_added_for_logging(event: ConversationItemAddedEvent) -> None:
             """
             Log conversation turns to API server.
-            
+
             Captures user queries and agent responses, pairing them into turns.
             """
             nonlocal pending_user_query
-            
+
             item = event.item
             text_content = item.text_content
-            
+
             if not text_content:
                 return
-            
+
             if item.role == "user":
                 # Store user query to pair with next agent response
                 pending_user_query = text_content
@@ -612,25 +769,66 @@ async def entrypoint(ctx: JobContext) -> None:
                 )
             elif item.role == "assistant" and pending_user_query:
                 # We have a complete turn - log it async
-                asyncio.create_task(
-                    _log_turn_async(pending_user_query, text_content)
-                )
+                asyncio.create_task(_log_turn_async(pending_user_query, text_content))
                 pending_user_query = None
-    
+
     try:
         # Start the session - framework handles everything from here!
         # Note: AgentSession.start() only takes room and agent parameters
         # The framework automatically handles participant connections
         await session.start(room=ctx.room, agent=agent)
-        
+
         logger.info(
             "AgentSession started",
             extra={
                 "room": room_name,
                 "project_id": project_id,
                 "api_logging_enabled": session_context.api_conversation_id is not None,
+                "has_active_form": active_form is not None,
             },
         )
+
+        # Handle conversation initiation based on mode (Requirements 1.2, 1.3)
+        # Use session.generate_reply() to make the agent speak first
+        initiation_mode = agent_config.initiation_mode if agent_config else "agent_first"
+        
+        if initiation_mode == "agent_first":
+            # Requirement 1.2: Agent greets user automatically within 2 seconds
+            logger.info(
+                "Agent-first mode: generating greeting",
+                extra={"room": room_name, "project_id": project_id},
+            )
+            await session.generate_reply(
+                instructions="Greet the user warmly and offer your assistance. Keep it brief and friendly."
+            )
+        else:
+            # Requirement 1.3: Agent waits for user to speak first
+            logger.info(
+                "User-first mode: waiting for user to speak",
+                extra={"room": room_name, "project_id": project_id},
+            )
+
+        # NOTE: Do NOT send form_activate here automatically!
+        # Requirements 1.1, 1.3, 2.1 specify that:
+        # - The agent SHALL greet the user first
+        # - The agent SHALL wait for user response to understand intent
+        # - The agent SHALL explain the form's purpose before activating
+        #
+        # Form activation should happen via the FormCapabilityV2 when:
+        # 1. User expresses intent matching a form's trigger phrases
+        # 2. Agent determines a form is appropriate for the conversation
+        #
+        # The active_form is stored in session_context and available to
+        # the agent's instructions for context-aware responses.
+        if active_form:
+            logger.info(
+                "Active form available for agent (not auto-activated)",
+                extra={
+                    "room": room_name,
+                    "form_id": active_form.get("id"),
+                    "form_name": active_form.get("name"),
+                },
+            )
     except Exception as e:
         logger.error(
             "Failed to start agent session",
@@ -648,6 +846,7 @@ async def entrypoint(ctx: JobContext) -> None:
 @dataclass
 class ProjectMetadataResult:
     """Result of extracting project metadata from room."""
+
     project_id: Optional[str] = None
     widget_token: Optional[str] = None
     agent_config: Optional[AgentConfig] = None
@@ -656,34 +855,34 @@ class ProjectMetadataResult:
 async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
     """
     Extract and validate project_id, widget_token, and agent config from metadata.
-    
+
     The metadata is set on the participant token by the API server when generating
     LiveKit credentials. We can access it via ctx.job.metadata or from the participant.
-    
+
     Args:
         ctx: JobContext with room and job information
-        
+
     Returns:
         ProjectMetadataResult with extracted values (None if invalid/missing)
     """
     import json
-    
+
     result = ProjectMetadataResult()
-    
+
     try:
         # First try job metadata (set via room creation)
         metadata = None
-        
+
         # Try to get metadata from the job (if available)
-        if hasattr(ctx, 'job') and ctx.job and hasattr(ctx.job, 'metadata') and ctx.job.metadata:
+        if hasattr(ctx, "job") and ctx.job and hasattr(ctx.job, "metadata") and ctx.job.metadata:
             metadata = ctx.job.metadata
             logger.debug("Got metadata from job", extra={"room": ctx.room.name})
-        
+
         # Fall back to room metadata
         if not metadata and ctx.room.metadata:
             metadata = ctx.room.metadata
             logger.debug("Got metadata from room", extra={"room": ctx.room.name})
-        
+
         # Try to get from first remote participant's metadata
         if not metadata:
             for participant in ctx.room.remote_participants.values():
@@ -691,14 +890,16 @@ async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
                     metadata = participant.metadata
                     logger.debug(
                         "Got metadata from participant",
-                        extra={"room": ctx.room.name, "participant": participant.identity}
+                        extra={"room": ctx.room.name, "participant": participant.identity},
                     )
                     break
-        
+
         if not metadata:
-            logger.warning("No metadata found in job, room, or participants", extra={"room": ctx.room.name})
+            logger.warning(
+                "No metadata found in job, room, or participants", extra={"room": ctx.room.name}
+            )
             return result
-        
+
         # Parse metadata if it's a string
         if isinstance(metadata, str):
             try:
@@ -706,43 +907,68 @@ async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
             except json.JSONDecodeError:
                 logger.error("Failed to parse metadata JSON", extra={"room": ctx.room.name})
                 return result
-        
+
         # Extract project_id and widget_token
         project_id = metadata.get("project_id")
         widget_token = metadata.get("widget_token")
-        
+
         if not project_id:
             logger.warning("No project_id in metadata", extra={"room": ctx.room.name})
             return result
-        
+
         # Validate project_id format (CUID - starts with 'c' and is alphanumeric)
         if not isinstance(project_id, str) or len(project_id) < 20:
-            logger.error("Invalid project_id format", extra={"room": ctx.room.name, "project_id": project_id})
+            logger.error(
+                "Invalid project_id format", extra={"room": ctx.room.name, "project_id": project_id}
+            )
             return result
-        
+
         result.project_id = project_id
         result.widget_token = widget_token
-        
+
         # Extract agent config (optional)
         system_prompt = metadata.get("system_prompt")
         agent_name = metadata.get("agent_name")
         
-        if system_prompt or agent_name:
-            result.agent_config = AgentConfig(
-                system_prompt=system_prompt,
-                agent_name=agent_name,
+        # Extract session control settings (Requirements 1.4, 1.5)
+        # Default to "agent_first" if not specified
+        initiation_mode = metadata.get("initiation_mode", "agent_first")
+        if initiation_mode not in ("agent_first", "user_first"):
+            logger.warning(
+                "Invalid initiation_mode, defaulting to agent_first",
+                extra={"room": ctx.room.name, "received": initiation_mode},
             )
-            logger.info(
-                "Agent config loaded",
-                extra={
-                    "room": ctx.room.name,
-                    "has_system_prompt": system_prompt is not None,
-                    "agent_name": agent_name,
-                },
-            )
+            initiation_mode = "agent_first"
         
+        # Default to True if not specified
+        auto_terminate = metadata.get("auto_terminate", True)
+        if not isinstance(auto_terminate, bool):
+            logger.warning(
+                "Invalid auto_terminate type, defaulting to True",
+                extra={"room": ctx.room.name, "received": auto_terminate},
+            )
+            auto_terminate = True
+
+        # Always create AgentConfig to ensure session control settings are available
+        result.agent_config = AgentConfig(
+            system_prompt=system_prompt,
+            agent_name=agent_name,
+            initiation_mode=initiation_mode,
+            auto_terminate=auto_terminate,
+        )
+        logger.info(
+            "Agent config loaded",
+            extra={
+                "room": ctx.room.name,
+                "has_system_prompt": system_prompt is not None,
+                "agent_name": agent_name,
+                "initiation_mode": initiation_mode,
+                "auto_terminate": auto_terminate,
+            },
+        )
+
         return result
-        
+
     except Exception as e:
         logger.error(
             "Failed to extract project metadata",
@@ -755,149 +981,17 @@ async def _extract_project_metadata(ctx: JobContext) -> ProjectMetadataResult:
 async def _extract_project_id(ctx: JobContext) -> Optional[str]:
     """
     Extract and validate project_id from room metadata.
-    
+
     Legacy function - use _extract_project_metadata for full metadata extraction.
     """
     result = await _extract_project_metadata(ctx)
     return result.project_id
 
 
-def _build_agent_instructions(
-    page_url: Optional[str] = None,
-    agent_config: Optional[AgentConfig] = None,
-    active_form: Optional[dict] = None,
-) -> str:
-    """
-    Build agent instructions with optional page context and custom configuration.
-    
-    Args:
-        page_url: Current page URL the user is viewing (optional)
-        agent_config: Custom agent configuration from project settings (optional)
-        active_form: Active form schema for form-filling mode (optional)
-        
-    Returns:
-        Agent instructions string
-    """
-    # If there's an active form, use form-filling mode
-    if active_form:
-        form_name = active_form.get("name", "Contact Form")
-        fields = active_form.get("fields", [])
-        
-        # Build field descriptions
-        field_descriptions = []
-        for i, field in enumerate(fields, 1):
-            field_type = field.get("type", "string")
-            label = field.get("label", field.get("name", f"Field {i}"))
-            required = field.get("required", True)
-            options = field.get("options", [])
-            
-            desc = f"{i}. {label} ({field_type})"
-            if not required:
-                desc += " - optional"
-            if options:
-                desc += f" - options: {', '.join(options)}"
-            field_descriptions.append(desc)
-        
-        fields_list = "\n".join(field_descriptions)
-        
-        agent_name = "a helpful assistant"
-        if agent_config and agent_config.agent_name:
-            agent_name = agent_config.agent_name
-        
-        base_instructions = f"""You are {agent_name} helping collect information through a conversational form called "{form_name}".
 
-YOUR PRIMARY TASK: Guide the user through filling out this form by asking questions one at a time.
 
-FORM FIELDS TO COLLECT:
-{fields_list}
 
-HOW TO CONDUCT THE FORM:
-1. Start by greeting the user and explaining you'll help them fill out the {form_name}
-2. Ask for each field ONE AT A TIME in order
-3. After each answer, confirm what you heard and move to the next question
-4. For optional fields, let the user know they can skip
-5. When all fields are collected, summarize the information and confirm
 
-EXTRACTING ANSWERS:
-- For email: Listen for email addresses (e.g., "john at gmail dot com" = john@gmail.com)
-- For phone: Listen for phone numbers in any format
-- For enum/select fields: Match the user's answer to the closest option
-- If you can't understand an answer, politely ask them to repeat
 
-IMPORTANT RULES:
-- Be conversational and friendly, not robotic
-- Keep questions short and clear
-- Confirm each answer before moving on
-- If the user asks unrelated questions, briefly answer using search_knowledge, then guide back to the form
-- Never skip required fields without an answer
 
-EXAMPLE FLOW:
-"Hi! I'll help you fill out our {form_name}. Let's start - what's your name?"
-[User: "I'm John"]
-"Great, John! And what's your email address?"
-[User: "john at example dot com"]
-"Got it - john@example.com. And your phone number?"
-..."""
 
-        if page_url:
-            base_instructions += f"""
-
-Current context: The user is viewing: {page_url}"""
-        
-        return base_instructions
-    
-    # Use custom system prompt if provided, otherwise use default
-    if agent_config and agent_config.system_prompt:
-        # Custom prompt - wrap with essential capabilities
-        agent_name = agent_config.agent_name or "a helpful voice assistant"
-        base_instructions = f"""You are {agent_name}.
-
-{agent_config.system_prompt}
-
-IMPORTANT CAPABILITIES (always available):
-- Use the search_knowledge tool to find information from uploaded documents when answering questions
-- Use the get_page_context tool when users ask what page they're viewing
-
-Communication style:
-- Be conversational and concise
-- Speak naturally as if having a real conversation
-- Keep responses brief unless more detail is needed"""
-    else:
-        # Default FAQ-optimized instructions
-        base_instructions = """You are a helpful voice assistant for website visitors.
-
-Your primary role is to answer questions using the knowledge base.
-
-ANSWERING QUESTIONS:
-1. Use the search_knowledge tool to find relevant information
-2. Synthesize the search results into a clear, direct answer
-3. If results mention "not entirely sure" or have low relevance scores, acknowledge uncertainty
-4. If no relevant information is found, say "I don't have information about that" - don't make things up
-
-RESPONSE STYLE FOR FAQ:
-- Give direct answers first, then brief explanation if needed
-- Keep responses to 1-3 sentences for simple questions
-- For complex topics, break into digestible points
-- Use natural, conversational language - avoid robotic phrasing
-- Never say "according to the documents" or "based on my search" - just answer naturally
-
-HANDLING UNCERTAINTY:
-- If search results have low confidence, say "I'm not entirely sure, but..."
-- If you can't find relevant info, offer to help with something else
-- Never fabricate information - honesty builds trust
-
-PAGE CONTEXT:
-- Use get_page_context when users ask about their current page
-- Context updates as users navigate
-
-TONE:
-- Friendly and helpful, like a knowledgeable colleague
-- Concise but not curt
-- Confident when you have good information, humble when uncertain"""
-
-    if page_url:
-        base_instructions += f"""
-
-Current context: The user is viewing: {page_url}"""
-
-    return base_instructions

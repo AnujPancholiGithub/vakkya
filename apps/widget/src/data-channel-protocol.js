@@ -7,12 +7,12 @@
 
 /**
  * Message types from Widget to Agent
- * @typedef {'keyboard_input'|'field_confirmed'|'field_rejected'|'form_abandoned'|'submission_approved'|'edit_requested'|'page_context'|'user_transcription'} WidgetToAgentType
+ * @typedef {'keyboard_input'|'field_completed'|'field_confirmed'|'field_rejected'|'form_abandoned'|'submission_approved'|'edit_requested'|'page_context'|'user_transcription'|'mute_status_changed'|'user_ended_session'} WidgetToAgentType
  */
 
 /**
  * Message types from Agent to Widget
- * @typedef {'form_activate'|'field_focus'|'value_extracted'|'value_confirmed'|'show_summary'|'submission_success'|'submission_failed'|'form_deactivated'|'agent_message'|'agent_speaking_start'|'agent_speaking_end'} AgentToWidgetType
+ * @typedef {'form_activate'|'field_focus'|'value_extracted'|'value_confirmed'|'show_summary'|'submission_success'|'submission_failed'|'form_deactivated'|'agent_message'|'agent_speaking_start'|'agent_speaking_end'|'session_end'} AgentToWidgetType
  */
 
 /**
@@ -20,6 +20,16 @@
  * @property {'keyboard_input'} type
  * @property {string} fieldName
  * @property {unknown} value
+ */
+
+/**
+ * Widget → Agent: Field completed with value (keyboard submit)
+ * Requirements 1.1, 4.2: Immediate notification when user submits a field via keyboard
+ * @typedef {Object} WidgetFieldCompletedMessage
+ * @property {'field_completed'} type
+ * @property {string} fieldName
+ * @property {unknown} value
+ * @property {'keyboard'|'voice'} source
  */
 
 /**
@@ -65,7 +75,22 @@
  */
 
 /**
- * @typedef {KeyboardInputMessage|FieldConfirmedMessage|FieldRejectedMessage|FormAbandonedMessage|SubmissionApprovedMessage|EditRequestedMessage|PageContextMessage|UserTranscriptionMessage} WidgetToAgentMessage
+ * Widget → Agent: Mute status changed
+ * Requirements 3.5: Notify agent when microphone state changes
+ * @typedef {Object} MuteStatusChangedMessage
+ * @property {'mute_status_changed'} type
+ * @property {boolean} muted - True if microphone is muted, false if unmuted
+ */
+
+/**
+ * Widget → Agent: User ended session
+ * Requirements 4.3: Notify agent before disconnecting when user ends session
+ * @typedef {Object} UserEndedSessionMessage
+ * @property {'user_ended_session'} type
+ */
+
+/**
+ * @typedef {KeyboardInputMessage|WidgetFieldCompletedMessage|FieldConfirmedMessage|FieldRejectedMessage|FormAbandonedMessage|SubmissionApprovedMessage|EditRequestedMessage|PageContextMessage|UserTranscriptionMessage|MuteStatusChangedMessage|UserEndedSessionMessage} WidgetToAgentMessage
  */
 
 /**
@@ -78,6 +103,7 @@
  * @typedef {Object} FieldFocusMessage
  * @property {'field_focus'} type
  * @property {string} fieldName
+ * @property {number} fieldIndex - Index of the field in the form schema (Requirement 4.3)
  */
 
 /**
@@ -93,6 +119,13 @@
  * @property {'value_confirmed'} type
  * @property {string} fieldName
  * @property {unknown} value
+ */
+
+/**
+ * @typedef {Object} FieldCompletedMessage
+ * @property {'field_completed'} type
+ * @property {string} fieldName
+ * @property {unknown} value - The confirmed value for the field
  */
 
 /**
@@ -137,12 +170,34 @@
  */
 
 /**
- * @typedef {FormActivateMessage|FieldFocusMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage|AgentMessageMessage|AgentSpeakingStartMessage|AgentSpeakingEndMessage} AgentToWidgetMessage
+ * @typedef {Object} ValidationErrorMessage
+ * @property {'validation_error'} type
+ * @property {string} fieldName
+ * @property {string} error - Error message to display
+ */
+
+/**
+ * Valid termination reasons for session_end message
+ * @typedef {'conversation_complete'|'user_inactive'|'form_submitted'|'user_requested'|'error'} SessionEndReason
+ */
+
+/**
+ * Agent → Widget: Session end notification
+ * Requirements 2.3, 2.4: Agent terminates session with reason and optional closing message
+ * @typedef {Object} SessionEndMessage
+ * @property {'session_end'} type
+ * @property {SessionEndReason} reason - Termination reason
+ * @property {string} [message] - Optional closing message to display
+ */
+
+/**
+ * @typedef {FormActivateMessage|FieldFocusMessage|FieldCompletedMessage|ValueExtractedMessage|ValueConfirmedMessage|ShowSummaryMessage|SubmissionSuccessMessage|SubmissionFailedMessage|FormDeactivatedMessage|AgentMessageMessage|AgentSpeakingStartMessage|AgentSpeakingEndMessage|ValidationErrorMessage|SessionEndMessage} AgentToWidgetMessage
  */
 
 // Valid message types for validation
 const WIDGET_TO_AGENT_TYPES = [
   'keyboard_input',
+  'field_completed',
   'field_confirmed',
   'field_rejected',
   'form_abandoned',
@@ -150,11 +205,14 @@ const WIDGET_TO_AGENT_TYPES = [
   'edit_requested',
   'page_context',
   'user_transcription',
+  'mute_status_changed',
+  'user_ended_session',
 ];
 
 const AGENT_TO_WIDGET_TYPES = [
   'form_activate',
   'field_focus',
+  'field_completed',
   'value_extracted',
   'value_confirmed',
   'show_summary',
@@ -164,6 +222,17 @@ const AGENT_TO_WIDGET_TYPES = [
   'agent_message',
   'agent_speaking_start',
   'agent_speaking_end',
+  'validation_error',
+  'session_end',
+];
+
+// Valid session end reasons for validation
+const VALID_SESSION_END_REASONS = [
+  'conversation_complete',
+  'user_inactive',
+  'form_submitted',
+  'user_requested',
+  'error',
 ];
 
 /**
@@ -236,6 +305,18 @@ export function createKeyboardInputMessage(fieldName, value) {
 }
 
 /**
+ * Create a field completed message (Widget → Agent)
+ * Requirements 1.1, 4.2: Notify agent immediately when user submits a field
+ * @param {string} fieldName
+ * @param {unknown} value
+ * @param {'keyboard'|'voice'} source
+ * @returns {WidgetFieldCompletedMessage}
+ */
+export function createFieldCompletedMessage(fieldName, value, source = 'keyboard') {
+  return { type: 'field_completed', fieldName, value, source };
+}
+
+/**
  * Create a field confirmed message
  * @param {string} fieldName
  * @returns {FieldConfirmedMessage}
@@ -298,5 +379,33 @@ export function createUserTranscriptionMessage(content, isFinal) {
   return { type: 'user_transcription', content, isFinal };
 }
 
+/**
+ * Create a mute status changed message
+ * Requirements 3.5: Notify agent when microphone state changes
+ * @param {boolean} muted - True if microphone is muted, false if unmuted
+ * @returns {MuteStatusChangedMessage}
+ */
+export function createMuteStatusMessage(muted) {
+  return { type: 'mute_status_changed', muted };
+}
+
+/**
+ * Create a user ended session message
+ * Requirements 4.3: Notify agent before disconnecting when user ends session
+ * @returns {UserEndedSessionMessage}
+ */
+export function createUserEndedSessionMessage() {
+  return { type: 'user_ended_session' };
+}
+
+/**
+ * Check if a session end reason is valid
+ * @param {string} reason
+ * @returns {boolean}
+ */
+export function isValidSessionEndReason(reason) {
+  return VALID_SESSION_END_REASONS.includes(reason);
+}
+
 // Export constants for testing
-export { WIDGET_TO_AGENT_TYPES, AGENT_TO_WIDGET_TYPES };
+export { WIDGET_TO_AGENT_TYPES, AGENT_TO_WIDGET_TYPES, VALID_SESSION_END_REASONS };

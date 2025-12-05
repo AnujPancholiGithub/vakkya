@@ -10,6 +10,7 @@ import {
   serializeMessage,
   deserializeMessage,
   createKeyboardInputMessage,
+  createFieldCompletedMessage,
   createFieldConfirmedMessage,
   createFieldRejectedMessage,
   createFormAbandonedMessage,
@@ -17,6 +18,8 @@ import {
   createEditRequestedMessage,
   createPageContextMessage,
   createUserTranscriptionMessage,
+  createMuteStatusMessage,
+  createUserEndedSessionMessage,
 } from './data-channel-protocol.js';
 
 /** @type {typeof import('livekit-client')|null} */
@@ -265,6 +268,9 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   
   /** @type {boolean} */
   let formsLoaded = false;
+  
+  /** @type {boolean} */
+  let isMuted = false;
 
   /**
    * Update connection state
@@ -421,25 +427,35 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   /**
    * Handle transcription event from LiveKit
    * Requirements 3.2: Display user speech as message bubbles
+   * Requirements 3.3: Display agent speech as message bubbles
    * @param {Object} transcription - LiveKit transcription object
    * @param {Object} participant - Participant who spoke
    */
   function handleTranscription(transcription, participant) {
-    // Only handle user transcriptions (local participant)
-    if (!participant || !participant.isLocal) return;
+    if (!participant) return;
 
     const content = transcription.text || '';
     const isFinal = transcription.final || false;
 
-    // Notify widget via callback
-    if (onTranscriptionCallback) {
-      onTranscriptionCallback(content, isFinal);
-    }
+    if (participant.isLocal) {
+      // User transcription (Requirements 3.2)
+      if (onTranscriptionCallback) {
+        onTranscriptionCallback(content, isFinal);
+      }
 
-    // Send transcription to agent via data channel
-    if (isFinal && content.trim()) {
-      const message = createUserTranscriptionMessage(content, isFinal);
-      publishMessage(message);
+      // Send transcription to agent via data channel
+      if (isFinal && content.trim()) {
+        const message = createUserTranscriptionMessage(content, isFinal);
+        publishMessage(message);
+      }
+    } else {
+      // Agent transcription (Requirements 3.3)
+      // NOTE: Agent messages are sent via data channel from voice agent
+      // Do NOT duplicate here - the data channel message is authoritative
+      // This transcription is just for logging/debugging
+      if (isFinal && content.trim()) {
+        console.log('[Vakkya] Agent transcription (via LiveKit):', content.substring(0, 50) + '...');
+      }
     }
   }
 
@@ -518,6 +534,18 @@ export function createLiveKitManager(widgetToken, apiUrl) {
   }
 
   /**
+   * Send field completed message to agent
+   * Requirements 1.1, 4.2: Notify agent immediately when user submits a field via keyboard
+   * @param {string} fieldName
+   * @param {unknown} value
+   * @param {'keyboard'|'voice'} source
+   * @returns {boolean}
+   */
+  function sendFieldCompleted(fieldName, value, source = 'keyboard') {
+    return publishMessage(createFieldCompletedMessage(fieldName, value, source));
+  }
+
+  /**
    * Send field confirmation to agent
    * @param {string} fieldName
    * @returns {boolean}
@@ -558,6 +586,67 @@ export function createLiveKitManager(widgetToken, apiUrl) {
    */
   function sendEditRequested(fieldName) {
     return publishMessage(createEditRequestedMessage(fieldName));
+  }
+
+  /**
+   * Get current mute state
+   * Requirements 3.2, 3.3: Track microphone mute state
+   * @returns {boolean}
+   */
+  function getMuted() {
+    return isMuted;
+  }
+
+  /**
+   * Set microphone mute state
+   * Requirements 3.2, 3.3, 3.5: Mute/unmute local audio track and notify agent
+   * @param {boolean} muted - True to mute, false to unmute
+   * @returns {boolean} True if state was changed successfully
+   */
+  function setMuted(muted) {
+    // Validate input
+    if (typeof muted !== 'boolean') {
+      console.warn('[Vakkya] setMuted requires a boolean value');
+      return false;
+    }
+
+    // No change needed if already in desired state
+    if (isMuted === muted) {
+      return true;
+    }
+
+    // Update local audio track if available
+    if (localAudioTrack) {
+      try {
+        if (muted) {
+          localAudioTrack.mute();
+        } else {
+          localAudioTrack.unmute();
+        }
+      } catch (err) {
+        console.warn('[Vakkya] Failed to change mute state:', err);
+        return false;
+      }
+    }
+
+    // Update internal state
+    isMuted = muted;
+
+    // Notify agent via data channel (Requirements 3.5)
+    const message = createMuteStatusMessage(muted);
+    publishMessage(message);
+
+    return true;
+  }
+
+  /**
+   * Send user ended session notification to agent
+   * Requirements 4.3: Notify agent before disconnecting when user ends session
+   * @returns {boolean} True if message was sent successfully
+   */
+  function sendUserEndedSession() {
+    const message = createUserEndedSessionMessage();
+    return publishMessage(message);
   }
 
   /**
@@ -776,11 +865,17 @@ export function createLiveKitManager(widgetToken, apiUrl) {
     // Data channel methods
     publishMessage,
     sendKeyboardInput,
+    sendFieldCompleted,
     sendFieldConfirmed,
     sendFieldRejected,
     sendFormAbandoned,
     sendSubmissionApproved,
     sendEditRequested,
+    // Mute control methods (Requirements 3.2, 3.3, 3.5)
+    getMuted,
+    setMuted,
+    // Session control methods (Requirements 4.3)
+    sendUserEndedSession,
   };
 }
 

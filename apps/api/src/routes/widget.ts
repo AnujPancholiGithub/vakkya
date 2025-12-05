@@ -61,6 +61,8 @@ export async function widgetRoutes(app: FastifyInstance, env: Env) {
         widget_token: body.widgetToken,
         system_prompt: projectConfig.systemPrompt,
         agent_name: projectConfig.agentName,
+        initiation_mode: projectConfig.initiationMode,
+        auto_terminate: projectConfig.autoTerminate,
       });
       
       // Create room with metadata (so voice agent can read it)
@@ -109,13 +111,17 @@ export async function widgetRoutes(app: FastifyInstance, env: Env) {
 
       const livekitToken = await at.toJwt();
 
-      // Return LiveKit credentials
+      // Return LiveKit credentials with session configuration
       reply.send({
         projectId: projectConfig.projectId,
         projectName: projectConfig.name,
         livekitUrl: env.LIVEKIT_URL,
         livekitToken,
         roomName,
+        sessionConfig: {
+          initiationMode: projectConfig.initiationMode,
+          autoTerminate: projectConfig.autoTerminate,
+        },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

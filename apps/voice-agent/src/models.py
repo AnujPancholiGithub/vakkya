@@ -2,10 +2,13 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
+
+if TYPE_CHECKING:
+    from .form_state import FormCollectionState
 
 
 # ============================================================================
@@ -26,6 +29,9 @@ class AgentConfig:
 
     system_prompt: Optional[str] = None
     agent_name: Optional[str] = None
+    # Session control settings (Requirements 1.2, 1.3, 1.4, 1.5)
+    initiation_mode: str = "agent_first"  # "agent_first" | "user_first"
+    auto_terminate: bool = True
 
 
 @dataclass
@@ -44,6 +50,17 @@ class SessionContext:
     widget_token: Optional[str] = None
     # Custom agent configuration
     agent_config: Optional[AgentConfig] = None
+    # Form support - active form schema and room reference for widget messaging
+    active_form: Optional[dict] = None
+    room: Optional[object] = None  # rtc.Room reference
+    # Capability registry for dynamic tool and instruction management
+    capability_registry: Optional[object] = None  # CapabilityRegistry reference
+    # Form collection state - centralized tracking of confirmed fields (Requirement 7.3)
+    form_collection_state: Optional["FormCollectionState"] = None
+    # Pending keyboard inputs for injection into chat context via on_user_turn_completed hook
+    pending_keyboard_inputs: list[dict[str, Any]] = field(default_factory=list)
+    # User mute state - tracks if user has muted their microphone (Requirements 3.5, 3.7)
+    is_user_muted: bool = False
 
 
 @dataclass

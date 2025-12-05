@@ -166,13 +166,14 @@ export class WebhookService {
       throw new Error('Form not found');
     }
 
-    // Create submission
+    // Create submission with status 'completed' (Requirement 6.3)
     const submission = await prisma.formSubmission.create({
       data: {
         formSchemaId: formId,
         sessionId,
         data: data as object,
         webhookSent: false,
+        status: 'completed',
       },
     });
 

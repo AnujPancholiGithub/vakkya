@@ -334,4 +334,188 @@ describe('Form Routes V2', () => {
       expect(response.statusCode).toBe(200);
     });
   });
+
+  /**
+   * POST /internal/forms/:formId/submit - Internal form submission
+   * Validates: Requirements 6.1, 6.2, 6.3, 6.4
+   */
+  describe('POST /internal/forms/:formId/submit - Form Submission Persistence', () => {
+    let testFormId: string;
+
+    beforeEach(async () => {
+      // Create a test form for submission tests
+      const form = await prisma.formSchema.create({
+        data: {
+          projectId: testProjectId,
+          name: 'Submission Test Form',
+          fields: [
+            { name: 'email', type: 'email', label: 'Email', required: true },
+            { name: 'name', type: 'string', label: 'Name', required: true },
+          ],
+          isActive: true,
+        },
+      });
+      testFormId = form.id;
+    });
+
+    it('should create FormSubmission record with status completed (Requirement 6.3)', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        payload: {
+          sessionId: 'test-session-123',
+          data: {
+            email: 'test@example.com',
+            name: 'John Doe',
+          },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.submission.id).toBeDefined();
+
+      // Verify the submission was created with correct status
+      const submission = await prisma.formSubmission.findUnique({
+        where: { id: body.submission.id },
+      });
+      expect(submission).not.toBeNull();
+      expect(submission?.status).toBe('completed');
+      expect(submission?.formSchemaId).toBe(testFormId);
+      expect(submission?.sessionId).toBe('test-session-123');
+    });
+
+    it('should store all field values in submission (Requirement 6.2)', async () => {
+      const submissionData = {
+        email: 'user@example.com',
+        name: 'Jane Smith',
+        phone: '+1234567890',
+        notes: 'Additional notes here',
+      };
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        payload: {
+          sessionId: 'test-session-456',
+          data: submissionData,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+
+      // Verify all field values are stored
+      const submission = await prisma.formSubmission.findUnique({
+        where: { id: body.submission.id },
+      });
+      expect(submission?.data).toEqual(submissionData);
+    });
+
+    it('should return 400 for empty submission data', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        payload: {
+          sessionId: 'test-session-789',
+          data: {},
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should return 400 for missing sessionId', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        payload: {
+          data: { email: 'test@example.com' },
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should return 404 for non-existent form', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/clxxxxxxxxxxxxxxxxxxxxxxxxx/submit`,
+        payload: {
+          sessionId: 'test-session',
+          data: { email: 'test@example.com' },
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.error.code).toBe('NOT_FOUND');
+    });
+
+    it('should not require authentication (internal endpoint)', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        // No Authorization header
+        payload: {
+          sessionId: 'no-auth-session',
+          data: { email: 'noauth@example.com', name: 'No Auth' },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+    });
+
+    it('should return webhook delivery status when webhook is configured (Requirement 6.4)', async () => {
+      // Create a form with webhook URL
+      const formWithWebhook = await prisma.formSchema.create({
+        data: {
+          projectId: testProjectId,
+          name: 'Webhook Form',
+          fields: [{ name: 'email', type: 'email', label: 'Email', required: true }],
+          webhookUrl: 'https://example.com/webhook',
+          isActive: true,
+        },
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${formWithWebhook.id}/submit`,
+        payload: {
+          sessionId: 'webhook-test-session',
+          data: { email: 'webhook@example.com' },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      
+      // Response should include webhook delivery info
+      expect(body.submission.id).toBeDefined();
+      // webhookDelivered will be null/false since the webhook URL doesn't exist
+      // but the field should be present in the response
+      expect('webhookDelivered' in body.submission).toBe(true);
+      expect('webhookAttempts' in body.submission).toBe(true);
+    });
+
+    it('should not attempt webhook when not configured', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/internal/forms/${testFormId}/submit`,
+        payload: {
+          sessionId: 'no-webhook-session',
+          data: { email: 'nowebhook@example.com', name: 'No Webhook' },
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      
+      // webhookDelivered should be null when no webhook is configured
+      expect(body.submission.webhookDelivered).toBeNull();
+      expect(body.submission.webhookAttempts).toBeNull();
+    });
+  });
 });
