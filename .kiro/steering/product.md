@@ -131,15 +131,15 @@ Transform any website into an interactive, voice-first experience with a single 
 ## User Journeys
 
 ### Journey A: Voice FAQ
-1. Developer signs up on dashboard.vakkya.ai
+1. Developer signs up on www.vakkya.com
 2. Creates project, uploads 3 PDFs (product docs)
-3. Copies embed code: `<script src="cdn.vakkya.ai/widget.js" data-token="xxx"></script>`
+3. Copies embed code: `<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="xxx"></script>`
 4. Pastes into website `<body>` tag
 5. Visitor clicks widget, asks "How do I reset password?"
 6. Agent responds in voice with answer from uploaded docs
 
 ### Journey B: Conversational Forms
-1. Business owner signs up on dashboard.vakkya.ai
+1. Business owner signs up on www.vakkya.com
 2. Creates project, creates form schema (name, email, budget, timeline)
 3. Configures webhook URL (Zapier, HubSpot, etc.)
 4. Copies embed code, pastes into website

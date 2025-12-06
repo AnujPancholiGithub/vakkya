@@ -7,7 +7,7 @@ Embeddable voice assistant widget for any website.
 Add this single line to your website:
 
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" data-token="your-project-token"></script>
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" data-token="your-project-token"></script>
 ```
 
 The widget will appear as a floating button in the bottom-right corner.
@@ -40,7 +40,7 @@ pnpm build
 
 | Attribute | Default | Options | Description |
 |-----------|---------|---------|-------------|
-| `data-api-url` | `https://api.vakkya.ai` | Any URL | Custom API URL (useful for development) |
+| `data-api-url` | `https://api.vakkya.com` | Any URL | Custom API URL (useful for development) |
 | `data-accent-color` | `#3B82F6` | Any valid CSS color | Primary accent color for the widget |
 | `data-theme` | `light` | `light`, `dark` | Widget theme mode |
 | `data-position` | `bottom-right` | `bottom-right`, `bottom-left` | Widget button position |
@@ -51,28 +51,28 @@ The `data-accent-color` attribute accepts any valid CSS color format:
 
 **Hex Colors:**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token" 
   data-accent-color="#8B5CF6"></script>
 ```
 
 **RGB/RGBA:**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token" 
   data-accent-color="rgba(59, 130, 246, 0.9)"></script>
 ```
 
 **HSL/HSLA:**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token" 
   data-accent-color="hsl(217, 91%, 60%)"></script>
 ```
 
 **Named Colors:**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token" 
   data-accent-color="purple"></script>
 ```
@@ -81,7 +81,7 @@ The `data-accent-color` attribute accepts any valid CSS color format:
 
 **Purple Dark Theme:**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token"
   data-accent-color="#8B5CF6"
   data-theme="dark"
@@ -90,7 +90,7 @@ The `data-accent-color` attribute accepts any valid CSS color format:
 
 **Green Light Theme (Left Position):**
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-token"
   data-accent-color="#10B981"
   data-theme="light"

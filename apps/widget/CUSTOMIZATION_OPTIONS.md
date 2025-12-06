@@ -17,7 +17,7 @@ The Vakkya widget provides **5 customization options** via HTML data attributes.
 ### 2. **data-api-url** (Optional)
 - **Description**: Custom API server URL (useful for development/testing)
 - **Type**: URL String
-- **Default**: `https://api.vakkya.ai`
+- **Default**: `https://api.vakkya.com`
 - **Example**: `data-api-url="http://localhost:3001"`
 
 ### 3. **data-accent-color** (Optional)
@@ -189,7 +189,7 @@ I've created **5 demo files** for you to test all the customization options:
 Simply add the data attributes to your script tag:
 
 ```html
-<script src="https://cdn.vakkya.ai/widget.js" 
+<script src="https://pub-a237803d9a4049e08f39776dcf74b747.r2.dev/widget.js" 
   data-token="your-project-token"
   data-accent-color="#8B5CF6"
   data-theme="dark"

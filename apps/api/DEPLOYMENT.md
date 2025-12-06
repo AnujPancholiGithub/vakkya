@@ -34,7 +34,7 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}  # Auto-linked from Railway
 JWT_SECRET=<generate-secure-random-string-min-32-chars>
 JWT_EXPIRES_IN=7d
 OPENAI_API_KEY=<your-openai-api-key>
-ALLOWED_ORIGINS=https://dashboard.vakkya.ai,https://widget.vakkya.ai
+ALLOWED_ORIGINS=https://www.vakkya.com
 ```
 
 ### Step 4: Configure Build Settings
@@ -100,7 +100,7 @@ docker run -p 3000:3000 \
   -e DATABASE_URL="postgresql://..." \
   -e JWT_SECRET="your-secret" \
   -e OPENAI_API_KEY="sk-..." \
-  -e ALLOWED_ORIGINS="https://dashboard.vakkya.ai" \
+  -e ALLOWED_ORIGINS="https://www.vakkya.com" \
   vakkya-api
 ```
 

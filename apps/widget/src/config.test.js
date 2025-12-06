@@ -22,7 +22,7 @@ describe('parseConfig', () => {
     
     const config = parseConfig(script);
     
-    expect(config.apiUrl).toBe('https://api.vakkya.ai');
+    expect(config.apiUrl).toBe('https://api.vakkya.com');
   });
 
   it('should allow custom API URL override', () => {
